@@ -11,7 +11,7 @@ You are provided with a set of project manuals, architectural drawings, and exis
 
 - Define Scope of Work (SOW): Identify the specific tasks, materials, and requirements for the project.
 
-- Assign Trades: Categorize the identified scope into relevant construction trades (e.g., Electrical, Plumbing, HVAC, Drywall).
+- Assign Trades (Trade_List): Categorize the identified scope into relevant construction trades (e.g., Electrical, Plumbing, HVAC, Drywall).
 
 ### Phase 2: Bid Analysis & Line-Item Verification
 - Scope Checks: For each trade identified in Phase 1, analyze the associated Bid documents to ensure they align with the project requirements.
@@ -52,7 +52,7 @@ You are provided with a set of project manuals, architectural drawings, and exis
 - UI: Implement with Fast API to setup the backend python application with client side rendering (React or Nextjs).
 
 ##  Deadline
-All submissions must be completed by May 7, 2026, at 11:00 EST AM.
+All submissions must be completed by May 7, 2026, at 06:00 EST PM.
 
 Note: Late submissions will not be considered. We recommend performing a test push early to ensure your environment is set up correctly.
 
