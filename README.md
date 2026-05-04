@@ -21,6 +21,8 @@ You are provided with a set of project manuals, architectural drawings, and exis
 - Inclusions & Exclusions: Identify and list what is specifically included or excluded in the bid based on your generated scope checks.
 
 ## Repository Structure
+- /trade_list: All the trade list based on CSI Master Format.[OneDrive Documents](https://eatonconstructionserv-my.sharepoint.com/:f:/g/personal/shubham_eatonprojects_com/IgCaJ5_vydZJSZylb_J5pSj4AXnXy7CZvzwDzDicbox3n24?e=hByBfD)
+
 - /manuals: Project specifications and guidelines.[OneDrive Documents](https://eatonconstructionserv-my.sharepoint.com/:f:/g/personal/shubham_eatonprojects_com/IgCaJ5_vydZJSZylb_J5pSj4AXnXy7CZvzwDzDicbox3n24?e=hByBfD)
 
 - /drawings: Architectural and structural blueprints.[OneDrive Documents](https://eatonconstructionserv-my.sharepoint.com/:f:/g/personal/shubham_eatonprojects_com/IgCaJ5_vydZJSZylb_J5pSj4AXnXy7CZvzwDzDicbox3n24?e=hByBfD)
