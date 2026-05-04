@@ -52,7 +52,7 @@ You are provided with a set of project manuals, architectural drawings, and exis
 - UI: Implement with Fast API to setup the backend python application with client side rendering (React or Nextjs).
 
 ##  Deadline
-All submissions must be completed by May 6, 2026, at 11:00 EST PM.
+All submissions must be completed by May 7, 2026, at 11:00 EST AM.
 
 Note: Late submissions will not be considered. We recommend performing a test push early to ensure your environment is set up correctly.
 
