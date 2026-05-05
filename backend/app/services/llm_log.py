@@ -38,6 +38,12 @@ PRICING_USD_PER_MTOK: dict[str, dict[str, float]] = {
         "cache_write": 18.75,
         "cache_read": 1.50,
     },
+    # OpenAI embeddings — input only, no output cost
+    "openai:text-embedding-3-large": {"input": 0.13, "output": 0.0},
+    "openai:text-embedding-3-small": {"input": 0.02, "output": 0.0},
+    # Cohere — embed v4 (input) + rerank v3 (per search, ~$0.001)
+    "cohere:embed-v4.0": {"input": 0.12, "output": 0.0},
+    "cohere:rerank-v3.5": {"input": 0.0, "output": 0.0},  # billed per-search
 }
 
 

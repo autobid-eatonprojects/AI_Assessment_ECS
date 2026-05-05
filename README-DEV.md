@@ -161,6 +161,31 @@ Cost expectation: ~$5–7 per 54-page drawing set on Sonnet 4.6.
 
 > **First-time setup for Phase 2:** the same `ANTHROPIC_API_KEY` from Phase 1 is reused. Vision concurrency is configurable via `VISION_CONCURRENCY=5` in `backend/.env`.
 
+## Phase 3 test scenario — search across the project
+
+**Pre-requisite:** add a Cohere key to `backend/.env`:
+```
+COHERE_API_KEY=...
+```
+(Cohere covers both Embed v4 and Rerank 3.) If you don't set it, indexing won't run; reranking falls back to Claude Haiku.
+
+After Phase 2 finishes, the pipeline now also runs Phase 3 indexing automatically. You'll see the document status flow through `extracting → indexing → ready`. The cost is logged in the `llm_calls` table and surfaced in the UI.
+
+1. Open a project page → there's a search box at the top, or press **⌘K**.
+2. Try queries like:
+   - "footing reinforcement" → top hit should be S1.1 Footing Schedule
+   - "TYCO TY3121" → FP0.1 sprinkler legend
+   - "Wilsonart" → F1.1 finishes
+   - "kitchen" → A1.1 / F1.1 room labels
+   - "NFPA 13" → FP0.1
+3. Each hit shows: chunk type, sheet number, snippet, relevance score.
+4. Click a hit → opens that page's detail view with the Phase-2 extraction (and hover-to-highlight bbox).
+5. The reranker label at the top of the results pane shows `cohere` (or `claude` if Cohere is unavailable).
+
+**Quality gate:** ≥ 8/10 manually-defined queries return the correct top result. We're at **10/10** on the Elks data.
+
+Cost expectation: ~$0.03 to index a 54-page drawing set (~3,500 chunks). Each search costs ~$0.001 (Cohere rerank).
+
 ## What's NOT in Phase 0 (intentionally)
 
 These are added in later phases when needed:

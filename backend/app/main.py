@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import auth, documents, extraction, projects
+from .api import auth, documents, extraction, projects, search
 from .config import settings
 from .database import init_db
 
@@ -52,3 +52,4 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(projects.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(extraction.router, prefix="/api")
+app.include_router(search.router, prefix="/api")

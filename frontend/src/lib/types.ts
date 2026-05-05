@@ -147,6 +147,32 @@ export interface DocumentExtractionOverview {
   pages: PageExtractionSummary[];
 }
 
+export interface SearchHit {
+  chunk_id: string;
+  document_id: string;
+  document_filename: string;
+  page_id: string | null;
+  page_number: number | null;
+  chunk_type: string;
+  text: string;
+  snippet: string | null;
+  bbox: BoundingBox | null;
+  sheet_number: string | null;
+  sheet_title: string | null;
+  discipline: string | null;
+  dense_score: number;
+  sparse_score: number;
+  rrf_score: number;
+  rerank_score: number | null;
+}
+
+export interface SearchResponse {
+  query: string;
+  hits: SearchHit[];
+  candidates_considered: number;
+  rerank_used: "cohere" | "claude" | "none";
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;

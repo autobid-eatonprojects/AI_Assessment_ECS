@@ -10,6 +10,7 @@ import { AppHeader } from "@/components/app-header";
 import { AuthGuard } from "@/components/auth-guard";
 import { DocumentList } from "@/components/document-list";
 import { DocumentUpload } from "@/components/document-upload";
+import { SearchBar } from "@/components/search-bar";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
@@ -78,6 +79,10 @@ function ProjectDetail({ projectId }: { projectId: string }) {
           </Button>
         </div>
       </div>
+
+      <section className="mb-6">
+        <SearchBar projectId={projectId} />
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">

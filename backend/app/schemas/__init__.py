@@ -12,6 +12,7 @@ from .extraction import (
     ScheduleOut,
 )
 from .project import ProjectCreate, ProjectOut, ProjectUpdate
+from .search import SearchHit, SearchRequest, SearchResponse
 
 __all__ = [
     "BoundingBox",
@@ -29,6 +30,9 @@ __all__ = [
     "ProjectOut",
     "ProjectUpdate",
     "ScheduleOut",
+    "SearchHit",
+    "SearchRequest",
+    "SearchResponse",
     "TokenResponse",
     "UserOut",
 ]

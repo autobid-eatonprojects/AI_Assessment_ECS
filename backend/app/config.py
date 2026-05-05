@@ -36,6 +36,17 @@ class Settings(BaseSettings):
     vision_concurrency: int = 5  # parallel Claude vision calls
     vision_max_retries: int = 2
 
+    # Phase 3 — Indexing + Retrieval (Cohere Embed v4 + Cohere Rerank 3)
+    openai_api_key: str | None = None  # reserved for future / fallback
+    embedding_model: str = "embed-v4.0"
+    embedding_dim: int = 1536
+
+    cohere_api_key: str | None = None
+    rerank_model: str = "rerank-v3.5"
+
+    contextualizer_model: str = "claude-haiku-4-5"
+    index_concurrency: int = 10
+
     # PDF rendering
     page_dpi: int = 150  # full-page render DPI
     thumbnail_max_dim: int = 320  # px

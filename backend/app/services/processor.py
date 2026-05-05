@@ -422,6 +422,7 @@ async def process_document(document_id: str) -> None:
         doc = result.scalar_one_or_none()
         doc_type = doc.doc_type if doc else None
 
+    extraction_error: str | None = None
     if doc_type == "drawing-set" and pages:
         await _seed_page_extractions(document_id)
         await _set_status(document_id, "extracting")
@@ -434,15 +435,31 @@ async def process_document(document_id: str) -> None:
             failed,
         )
         if failed > 0:
-            await _set_status(
-                document_id,
-                "ready",
-                error=f"{failed} of {ready + failed} pages failed extraction; re-extract from UI",
+            extraction_error = (
+                f"{failed} of {ready + failed} pages failed extraction; re-extract from UI"
             )
-        else:
-            await _set_status(document_id, "ready")
-    else:
-        await _set_status(document_id, "ready")
+
+    # 4. Phase 3 — index for search.
+    await _set_status(document_id, "indexing")
+    try:
+        from . import indexer
+
+        result = await indexer.index_document(document_id)
+        log.info(
+            "processor: indexed %s — %d chunks, $%.4f",
+            filename,
+            result.get("chunks", 0),
+            result.get("cost_usd", 0.0),
+        )
+    except Exception as e:  # noqa: BLE001
+        log.exception("processor: indexing failed for %s", filename)
+        # Indexing failure shouldn't fail the whole doc — extraction is the
+        # primary deliverable. We surface the error but mark the doc ready.
+        extraction_error = (
+            f"{extraction_error}; indexing: {e}" if extraction_error else f"indexing: {e}"
+        )
+
+    await _set_status(document_id, "ready", error=extraction_error)
 
 
 async def reextract_page(page_extraction_id: str) -> None:
@@ -478,7 +495,7 @@ async def resume_pending() -> None:
         result = await db.execute(
             select(Document).where(
                 Document.processing_status.in_(
-                    ("pending", "classifying", "rendering", "extracting")
+                    ("pending", "classifying", "rendering", "extracting", "indexing")
                 )
             )
         )

@@ -1,3 +1,4 @@
+from .chunk import Chunk
 from .document import Document
 from .document_page import DocumentPage
 from .extraction import (
@@ -11,6 +12,7 @@ from .extraction import (
 from .project import Project
 
 __all__ = [
+    "Chunk",
     "Document",
     "DocumentPage",
     "ExtractedCrossReference",

@@ -5,6 +5,7 @@ import type {
   DocumentPage,
   PageExtraction,
   Project,
+  SearchResponse,
   TokenResponse,
   User,
 } from "./types";
@@ -129,6 +130,13 @@ export const api = {
       `/api/projects/${projectId}/documents/${documentId}/pages/${pageNumber}/reextract`,
       { method: "POST" },
     ),
+
+  // Phase 3: Search
+  search: (projectId: string, query: string, top_k = 10) =>
+    request<SearchResponse>(`/api/projects/${projectId}/search`, {
+      method: "POST",
+      body: JSON.stringify({ query, top_k }),
+    }),
 };
 
 export { ApiError };
