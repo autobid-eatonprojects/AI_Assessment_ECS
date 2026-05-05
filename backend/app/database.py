@@ -32,6 +32,9 @@ _NEW_COLUMNS_BY_TABLE: dict[str, dict[str, str]] = {
         # Two-stage workflow (project setup vs bid submissions)
         "source": "VARCHAR(32) NOT NULL DEFAULT 'project_document'",
         "vendor_name": "VARCHAR(255)",
+        # Phase 11: vendor canonicalization
+        "canonical_vendor": "VARCHAR(255)",
+        "vendor_provenance": "JSON",
     },
     "projects": {
         "lifecycle_state": "VARCHAR(32) NOT NULL DEFAULT 'setup'",

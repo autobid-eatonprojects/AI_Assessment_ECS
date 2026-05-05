@@ -84,6 +84,19 @@ async def _persist_classification(document_id: str, c: classifier.Classification
         doc.doc_type = c.doc_type
         doc.classification_confidence = c.confidence
         doc.classification_reasoning = c.reasoning
+
+        # Vendor extraction (Phase 11). Operator-typed vendor_name is the
+        # initial value; the classifier reads the actual letterhead and may
+        # supply a more accurate / canonical form. Prefer the classifier
+        # result when present; record both in vendor_provenance for audit.
+        operator_typed = doc.vendor_name
+        if c.vendor_name:
+            doc.vendor_name = c.vendor_name
+        provenance = doc.vendor_provenance or {}
+        provenance["operator_typed"] = operator_typed
+        provenance["classifier_detected"] = c.vendor_name
+        doc.vendor_provenance = provenance
+
         await db.commit()
 
 
@@ -464,6 +477,24 @@ async def process_document(document_id: str) -> None:
             c.doc_type,
             c.confidence,
         )
+        # Phase 11: re-canonicalize vendor names on the project after every
+        # bid classification. Idempotent + cheap (~$0.001 embed call).
+        if upload_source == "bid_submission":
+            try:
+                from .vendor_canonicalizer import canonicalize_vendors
+
+                async with SessionLocal() as db:
+                    doc_row = (
+                        await db.execute(
+                            select(Document.project_id).where(
+                                Document.id == document_id
+                            )
+                        )
+                    ).scalar_one_or_none()
+                if doc_row:
+                    await canonicalize_vendors(doc_row)
+            except Exception as e:  # noqa: BLE001
+                log.warning("processor: canonicalize_vendors failed: %s", e)
     except classifier.ClassifierUnavailable:
         log.warning("processor: no API key — skipping classification for %s", filename)
         needs_api_key = True

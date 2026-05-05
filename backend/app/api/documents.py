@@ -96,11 +96,9 @@ async def upload_documents(
                     "can only be uploaded once scope is locked (open-for-bids)"
                 ),
             )
-        if not (vendor_name and vendor_name.strip()):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="vendor_name is required when uploading a bid submission",
-            )
+        # Phase 11: vendor_name is now optional. Each document's vendor is
+        # auto-extracted from the letterhead by the classifier and grouped
+        # via canonicalization. Operator-typed value still wins if provided.
     elif vendor_name:
         # vendor_name on a project_document is meaningless — drop it
         vendor_name = None

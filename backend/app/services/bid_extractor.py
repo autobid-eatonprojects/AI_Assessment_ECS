@@ -281,11 +281,36 @@ async def extract_one_bid(
         log.warning("bid_extractor: no tool_use for bid %s", document.id)
         return None
 
+    # Defensively coerce numeric fields. Sonnet sometimes returns the JSON
+    # string "null" or "N/A" for nullable numbers; storing those into Float
+    # columns 500s the run.
+    def _coerce_float(v):
+        if v is None:
+            return None
+        if isinstance(v, (int, float)):
+            return float(v)
+        if isinstance(v, str):
+            cleaned = v.strip().replace(",", "").replace("$", "")
+            if cleaned.lower() in {"", "null", "none", "n/a", "na", "tbd", "varies"}:
+                return None
+            try:
+                return float(cleaned)
+            except ValueError:
+                return None
+        return None
+
+    def _normalize_line(item: dict) -> dict:
+        return {
+            **item,
+            "unit_price_usd": _coerce_float(item.get("unit_price_usd")),
+            "total_price_usd": _coerce_float(item.get("total_price_usd")),
+        }
+
     return BidExtraction(
         vendor_name=payload.get("vendor_name"),
-        bid_total_usd=payload.get("bid_total_usd"),
+        bid_total_usd=_coerce_float(payload.get("bid_total_usd")),
         primary_csi_divisions=list(payload.get("primary_csi_divisions") or []),
-        line_items=list(payload.get("line_items") or []),
+        line_items=[_normalize_line(it) for it in (payload.get("line_items") or [])],
         inclusions=list(payload.get("explicit_inclusions") or []),
         exclusions=list(payload.get("explicit_exclusions") or []),
         usage=usage_from_anthropic(msg),

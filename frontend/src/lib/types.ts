@@ -314,6 +314,100 @@ export interface ProjectProfile {
   updated_at: string;
 }
 
+// Phase 11 — vendor profile + bid leveling
+export interface VendorQualifications {
+  has_license_or_insurance: boolean;
+  has_safety_manual: boolean;
+  has_contractor_info: boolean;
+  is_complete: boolean;
+  license_or_insurance_count: number;
+  safety_manual_count: number;
+  contractor_info_count: number;
+}
+
+export interface VendorCoverageStats {
+  covered: number;
+  partial: number;
+  excluded: number;
+  not_covered: number;
+}
+
+export interface VendorSummary {
+  canonical_vendor: string;
+  primary_csi_divisions: string[];
+  bid_total_usd: number | null;
+  line_item_count: number;
+  inclusion_count: number;
+  exclusion_count: number;
+  document_count: number;
+  has_priced_bid: boolean;
+  qualifications: VendorQualifications;
+  coverage: VendorCoverageStats | null;
+  aliases: string[];
+}
+
+export interface VendorDocSummary {
+  id: string;
+  filename: string;
+  doc_type: string | null;
+  classification_confidence: number | null;
+  processing_status: string;
+  page_count: number | null;
+}
+
+export interface VendorProfile {
+  canonical_vendor: string;
+  primary_csi_divisions: string[];
+  bid_total_usd: number | null;
+  line_item_count: number;
+  inclusion_count: number;
+  exclusion_count: number;
+  qualifications: VendorQualifications;
+  coverage: VendorCoverageStats | null;
+  aliases: string[];
+  documents: VendorDocSummary[];
+  line_items: Array<{
+    id: string;
+    description: string;
+    quantity: string | null;
+    unit: string | null;
+    unit_price_usd: number | null;
+    total_price_usd: number | null;
+    csi_section_guess: string | null;
+    page_number: number | null;
+  }>;
+  inclusions: Array<{ id: string; text: string; page_number: number | null }>;
+  exclusions: Array<{ id: string; text: string; page_number: number | null }>;
+  covered_scope_item_ids: string[];
+  partial_scope_item_ids: string[];
+  excluded_scope_item_ids: string[];
+  not_covered_scope_item_ids: string[];
+}
+
+export interface BidLevelingCell {
+  vendor: string;
+  status: BidCoverageStatus;
+  matched_line_description: string | null;
+  matched_line_total_usd: number | null;
+  confidence: number;
+  reasoning: string | null;
+}
+
+export interface BidLevelingRow {
+  scope_item_id: string;
+  csi_code: string;
+  description: string;
+  quantity: string | null;
+  unit: string | null;
+  cells: BidLevelingCell[];
+}
+
+export interface BidLevelingResponse {
+  csi_division: string | null;
+  vendors: string[];
+  rows: BidLevelingRow[];
+}
+
 // Phase 8 — bid analysis
 export interface BidLineItem {
   id: string;

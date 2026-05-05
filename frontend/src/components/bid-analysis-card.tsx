@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Loader2, Play, Receipt, RefreshCw } from "lucide-react";
+import { ArrowRight, Loader2, Play, Receipt, RefreshCw, Users } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,14 @@ export function BidAnalysisCard({ projectId }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href={`/projects/${projectId}/vendors`}
+            className="inline-flex h-8 items-center gap-1 rounded-md border bg-background px-3 text-sm hover:bg-muted"
+          >
+            <Users className="size-3.5" />
+            Vendors
+            <ArrowRight className="size-3.5" />
+          </Link>
           {data && data.bid_summaries.length > 0 && (
             <Link
               href={`/projects/${projectId}/bids`}

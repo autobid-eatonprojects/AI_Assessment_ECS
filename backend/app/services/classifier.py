@@ -47,7 +47,43 @@ BID_DOC_TYPES = [
 DOC_TYPES = sorted(set(PROJECT_DOC_TYPES) | set(BID_DOC_TYPES))
 
 
-def _classify_tool(allowed_types: list[str], side_hint: str) -> dict:
+def _classify_tool(allowed_types: list[str], side_hint: str, *, extract_vendor: bool) -> dict:
+    """Build the classify tool. When `extract_vendor=True` (bid side), also
+    pull the vendor's company name from the letterhead — that lets the
+    vendor-profile aggregation auto-group docs by bidder without the
+    operator typing a name per upload."""
+    properties: dict = {
+        "doc_type": {
+            "type": "string",
+            "enum": allowed_types,
+            "description": "The single best matching type.",
+        },
+        "confidence": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+        },
+        "reasoning": {
+            "type": "string",
+            "description": "One short sentence explaining the choice.",
+        },
+    }
+    required = ["doc_type", "confidence", "reasoning"]
+
+    if extract_vendor:
+        properties["vendor_name"] = {
+            "type": "string",
+            "description": (
+                "The vendor / subcontractor / company name on the document "
+                "letterhead, OR null if no clear vendor identification is "
+                "visible. Use the legal entity form when shown (e.g. "
+                "'Smyrna Ready Mix, LLC' rather than 'SRM Concrete'). "
+                "Capitalize as printed. Don't invent a name — only return "
+                "what the letterhead, header, or signature block actually "
+                "shows."
+            ),
+        }
+
     return {
         "name": "classify_document",
         "description": (
@@ -61,23 +97,8 @@ def _classify_tool(allowed_types: list[str], side_hint: str) -> dict:
         ),
         "input_schema": {
             "type": "object",
-            "properties": {
-                "doc_type": {
-                    "type": "string",
-                    "enum": allowed_types,
-                    "description": "The single best matching type.",
-                },
-                "confidence": {
-                    "type": "number",
-                    "minimum": 0.0,
-                    "maximum": 1.0,
-                },
-                "reasoning": {
-                    "type": "string",
-                    "description": "One short sentence explaining the choice.",
-                },
-            },
-            "required": ["doc_type", "confidence", "reasoning"],
+            "properties": properties,
+            "required": required,
         },
     }
 
@@ -88,6 +109,7 @@ _PROJECT_DOC_TOOL = _classify_tool(
         "This document was uploaded as a PROJECT DOCUMENT during project setup, "
         "so it should be one of: 'drawing-set', 'written-spec', 'trade-list', or 'other'."
     ),
+    extract_vendor=False,  # project docs come from the GC, not a vendor
 )
 _BID_DOC_TOOL = _classify_tool(
     BID_DOC_TYPES,
@@ -96,6 +118,7 @@ _BID_DOC_TOOL = _classify_tool(
         "so it should be one of: 'bid-quote', 'scope-letter', 'license-insurance', "
         "'safety-manual', 'contractor-info', or 'other'."
     ),
+    extract_vendor=True,
 )
 
 
@@ -110,6 +133,7 @@ class Classification:
     doc_type: str
     confidence: float
     reasoning: str
+    vendor_name: str | None = None  # extracted from letterhead on bid-side docs
 
 
 class ClassifierUnavailable(Exception):
@@ -495,10 +519,22 @@ async def classify(
     for block in response.content:
         if getattr(block, "type", None) == "tool_use" and block.name == "classify_document":
             data = block.input
+            vendor = data.get("vendor_name")
+            # Normalize: empty / whitespace / literal "null" / "n/a" → None.
+            # Sonnet/Haiku occasionally return the JSON-string "null" instead
+            # of the actual JSON null, especially when a field is marked
+            # nullable but typed as string in the schema.
+            if isinstance(vendor, str):
+                cleaned = vendor.strip()
+                if cleaned.lower() in {"", "null", "none", "n/a", "na", "unknown", "(unknown)"}:
+                    vendor = None
+                else:
+                    vendor = cleaned
             return Classification(
                 doc_type=data["doc_type"],
                 confidence=float(data["confidence"]),
                 reasoning=data["reasoning"],
+                vendor_name=vendor,
             )
 
     raise RuntimeError("classifier returned no tool_use block")

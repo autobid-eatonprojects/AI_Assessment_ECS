@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, BigInteger, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
@@ -37,8 +37,19 @@ class Document(Base):
     source: Mapped[str] = mapped_column(
         String(32), nullable=False, default="project_document", index=True
     )
-    # Free-text vendor identifier on bid submissions only. Null on project docs.
+    # Free-text vendor identifier on bid submissions only. Initially typed
+    # by the operator at upload; overwritten by the classifier when it can
+    # read a clearer name from the document letterhead. Null on project docs.
     vendor_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+
+    # Phase 11: post-canonicalization vendor key — variants like 'TLC',
+    # 'Tennessee Lawn Care', and 'The Cleaning Leaders LLC' all collapse to
+    # the same canonical_vendor so the vendor profile page groups cleanly.
+    canonical_vendor: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+
+    # Phase 11: audit trail for the vendor name — what the operator typed,
+    # what the classifier detected, and the canonical form chosen.
+    vendor_provenance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Classification (Phase 1)
     doc_type: Mapped[str | None] = mapped_column(String(64), nullable=True)

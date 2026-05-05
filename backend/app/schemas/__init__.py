@@ -30,6 +30,16 @@ from .profile import (
 from .project import LifecycleTransition, ProjectCreate, ProjectOut, ProjectUpdate
 from .scope import ScopeCitationOut, ScopeItemOut, ScopeOverview, ScopeRunOut
 from .search import SearchHit, SearchRequest, SearchResponse
+from .vendor import (
+    BidLevelingCell,
+    BidLevelingResponse,
+    BidLevelingRow,
+    VendorCoverageStats,
+    VendorDocSummary,
+    VendorProfileResponse,
+    VendorQualifications,
+    VendorSummary,
+)
 
 __all__ = [
     "BidAnalysisOverview",
@@ -70,4 +80,12 @@ __all__ = [
     "TradeRelevanceMatrix",
     "TradeRelevanceOverrideIn",
     "UserOut",
+    "BidLevelingCell",
+    "BidLevelingResponse",
+    "BidLevelingRow",
+    "VendorCoverageStats",
+    "VendorDocSummary",
+    "VendorProfileResponse",
+    "VendorQualifications",
+    "VendorSummary",
 ]

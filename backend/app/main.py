@@ -14,6 +14,7 @@ from .api import (
     scope,
     search,
     trade_relevance,
+    vendors,
 )
 from .config import settings
 from .database import init_db
@@ -67,3 +68,5 @@ app.include_router(profile.router, prefix="/api")
 app.include_router(trade_relevance.router, prefix="/api")
 app.include_router(scope.router, prefix="/api")
 app.include_router(bids.router, prefix="/api")
+app.include_router(vendors.router, prefix="/api")
+app.include_router(vendors.bidleveling_router, prefix="/api")

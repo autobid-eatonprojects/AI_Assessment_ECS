@@ -43,8 +43,10 @@ export function DocumentUpload({
     },
   });
 
-  const isLocked =
-    disabled || (source === "bid_submission" && !vendorName?.trim());
+  // Phase 11: vendor_name is no longer required for bid submissions —
+  // the classifier auto-extracts vendor from each document's letterhead.
+  // Operator-typed vendor still works as an override.
+  const isLocked = disabled;
 
   const onDrop = useCallback(
     (accepted: File[]) => {

@@ -3,8 +3,11 @@ import type {
   BidAnalysisOverview,
   BidCoverage,
   BidDetail,
+  BidLevelingResponse,
   BidRun,
   Document,
+  VendorProfile,
+  VendorSummary,
   DocumentExtractionOverview,
   DocumentPage,
   DocumentPageText,
@@ -228,6 +231,22 @@ export const api = {
     request<BidDetail>(
       `/api/projects/${projectId}/bid-analysis/bids/${bidDocumentId}`,
     ),
+
+  // Phase 11: vendor profile + bid leveling
+  listVendors: (projectId: string) =>
+    request<VendorSummary[]>(`/api/projects/${projectId}/vendors`),
+  getVendorProfile: (projectId: string, vendorName: string) =>
+    request<VendorProfile>(
+      `/api/projects/${projectId}/vendors/${encodeURIComponent(vendorName)}`,
+    ),
+  getBidLeveling: (projectId: string, csi_division?: string) => {
+    const qs = csi_division
+      ? `?csi_division=${encodeURIComponent(csi_division)}`
+      : "";
+    return request<BidLevelingResponse>(
+      `/api/projects/${projectId}/bid-leveling${qs}`,
+    );
+  },
 };
 
 export { ApiError };
