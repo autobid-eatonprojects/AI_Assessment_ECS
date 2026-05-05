@@ -2,7 +2,10 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FileText, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
+import { ClassificationBadge } from "@/components/classification-badge";
+import { ProcessingStatusIndicator } from "@/components/processing-status";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth";
@@ -19,6 +22,18 @@ export function DocumentList({ projectId }: Props) {
   const { data, isLoading } = useQuery({
     queryKey: ["documents", projectId],
     queryFn: () => api.listDocuments(projectId),
+    // Poll while anything is processing
+    refetchInterval: (query) => {
+      const docs = query.state.data;
+      if (!docs) return false;
+      const processing = docs.some(
+        (d) =>
+          d.processing_status === "pending" ||
+          d.processing_status === "classifying" ||
+          d.processing_status === "rendering",
+      );
+      return processing ? 2_000 : false;
+    },
   });
 
   const del = useMutation({
@@ -72,13 +87,35 @@ export function DocumentList({ projectId }: Props) {
         >
           <FileText className="size-5 shrink-0 text-muted-foreground" />
           <div className="min-w-0 flex-1">
-            <p className="truncate font-medium" title={d.filename}>
-              {d.filename}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {formatBytes(d.size_bytes)} · {formatRelativeTime(d.created_at)}
-              {d.doc_type && ` · ${d.doc_type}`}
-            </p>
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/projects/${projectId}/documents/${d.id}`}
+                className="truncate font-medium hover:underline"
+                title={d.filename}
+              >
+                {d.filename}
+              </Link>
+              <ClassificationBadge
+                docType={d.doc_type}
+                confidence={d.classification_confidence}
+              />
+            </div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span>{formatBytes(d.size_bytes)}</span>
+              <span>·</span>
+              <span>{formatRelativeTime(d.created_at)}</span>
+              {d.page_count != null && (
+                <>
+                  <span>·</span>
+                  <span>{d.page_count} {d.page_count === 1 ? "page" : "pages"}</span>
+                </>
+              )}
+              <span>·</span>
+              <ProcessingStatusIndicator
+                status={d.processing_status}
+                error={d.processing_error}
+              />
+            </div>
           </div>
           <Button
             variant="ghost"

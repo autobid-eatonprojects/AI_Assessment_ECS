@@ -12,5 +12,25 @@ class DocumentOut(BaseModel):
     content_type: str
     size_bytes: int
     sha256: str
+
     doc_type: str | None
+    classification_confidence: float | None
+    classification_reasoning: str | None
+
+    page_count: int | None
+    processing_status: str
+    processing_error: str | None
+    processed_at: datetime | None
+
+    created_at: datetime
+
+
+class DocumentPageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    document_id: str
+    page_number: int
+    width: int
+    height: int
     created_at: datetime

@@ -1,5 +1,11 @@
 import { useAuthStore } from "./auth";
-import type { Document, Project, TokenResponse, User } from "./types";
+import type {
+  Document,
+  DocumentPage,
+  Project,
+  TokenResponse,
+  User,
+} from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -77,9 +83,34 @@ export const api = {
     request<void>(`/api/projects/${projectId}/documents/${documentId}`, {
       method: "DELETE",
     }),
-  documentDownloadUrl: (projectId: string, documentId: string) => {
+  getDocument: (projectId: string, documentId: string) =>
+    request<Document>(
+      `/api/projects/${projectId}/documents/${documentId}`,
+    ),
+  reclassifyDocument: (projectId: string, documentId: string) =>
+    request<Document>(
+      `/api/projects/${projectId}/documents/${documentId}/reclassify`,
+      { method: "POST" },
+    ),
+  listPages: (projectId: string, documentId: string) =>
+    request<DocumentPage[]>(
+      `/api/projects/${projectId}/documents/${documentId}/pages`,
+    ),
+
+  // Authenticated image fetch — caller turns the blob into an object URL
+  async fetchPageImage(
+    projectId: string,
+    documentId: string,
+    pageNumber: number,
+    variant: "image" | "thumbnail",
+  ): Promise<Blob> {
     const token = useAuthStore.getState().token;
-    return `${API_URL}/api/projects/${projectId}/documents/${documentId}/download?token=${token}`;
+    const res = await fetch(
+      `${API_URL}/api/projects/${projectId}/documents/${documentId}/pages/${pageNumber}/${variant}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!res.ok) throw new ApiError(`failed to fetch ${variant}`, res.status);
+    return res.blob();
   },
 };
 

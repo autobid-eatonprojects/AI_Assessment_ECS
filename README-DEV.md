@@ -95,6 +95,33 @@ After both servers are up:
 
 If all 9 steps pass, Phase 0 is good.
 
+## Phase 1 test scenario — classification + page rendering
+
+**Pre-requisite:** put your Anthropic API key in `backend/.env`:
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+Without it, files still upload and pages still render, but they land in the
+`needs-api-key` status (no classification).
+
+Restart the backend after editing `.env`.
+
+1. Sign in, create a fresh project ("Elks Phase 1")
+2. Drag-drop a mix of files:
+   - the 54-page drawings PDF
+   - a clear bid (e.g. `ELKS COMMUNITY ENRICHMENT CENTER-EATON-SRM CONCRETE...pdf`)
+   - an insurance certificate (e.g. `ACORD_25_Parkmium_LLC.pdf`)
+   - a safety manual (e.g. `TLC 12 25 HEALTH SAFETY...pdf`)
+   - the business license JPG
+3. Each row should immediately show **status = Queued / Classifying** then transition through Rendering → Ready over a few seconds
+4. Each row gets a coloured **classification badge** with confidence % (e.g. "Drawings · 98%", "Bid · 99%", "License / Insurance · 95%")
+5. Click the drawings doc → opens detail page with a **grid of 54 thumbnails**
+6. Click any thumbnail → fullscreen viewer; **arrow keys** navigate, **ESC** closes
+7. The detail page shows the classifier's reasoning sentence
+8. Click **Re-process** on any doc → status loops back through and lands on Ready again
+
+**Quality gate:** Classifier ≥ 95% accuracy on the supplied `bids/` folder. We're at 100% (8/8) on a representative sample.
+
 ## What's NOT in Phase 0 (intentionally)
 
 These are added in later phases when needed:

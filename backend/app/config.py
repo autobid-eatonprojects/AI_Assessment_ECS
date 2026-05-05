@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,6 +8,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        env_ignore_empty=True,  # Empty shell env vars must not override .env values
     )
 
     app_env: str = "development"
@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
 
     max_upload_mb: int = 200
+
+    # AI providers
+    anthropic_api_key: str | None = None
+    classifier_model: str = "claude-haiku-4-5"
+
+    # PDF rendering
+    page_dpi: int = 150  # full-page render DPI
+    thumbnail_max_dim: int = 320  # px
 
     @property
     def cors_origin_list(self) -> list[str]:

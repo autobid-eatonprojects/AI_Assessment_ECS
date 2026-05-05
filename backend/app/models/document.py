@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String
+from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
@@ -29,9 +29,25 @@ class Document(Base):
     storage_path: Mapped[str] = mapped_column(String(1024), nullable=False)
     sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
 
-    # Phase-1 will populate this; nullable for Phase 0
+    # Classification (Phase 1)
     doc_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    classification_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    classification_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Page rendering (Phase 1)
+    page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Background processing status:
+    # pending | classifying | rendering | ready | failed | needs-api-key
+    processing_status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False)
+    processing_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     project: Mapped["Project"] = relationship(back_populates="documents")  # noqa: F821
+    pages: Mapped[list["DocumentPage"]] = relationship(  # noqa: F821
+        back_populates="document",
+        cascade="all, delete-orphan",
+        order_by="DocumentPage.page_number",
+    )
