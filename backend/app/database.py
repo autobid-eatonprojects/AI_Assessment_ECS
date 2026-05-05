@@ -41,6 +41,11 @@ _NEW_COLUMNS_BY_TABLE: dict[str, dict[str, str]] = {
         "text_content": "TEXT",
         "text_source": "VARCHAR(16)",
     },
+    "scope_items": {
+        # Phase 6 quantity resolver
+        "qty_confidence": "VARCHAR(16)",
+        "qty_provenance": "JSON",
+    },
 }
 
 

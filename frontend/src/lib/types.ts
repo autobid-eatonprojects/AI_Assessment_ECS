@@ -228,6 +228,8 @@ export interface ScopeCitation {
   excerpt: string | null;
 }
 
+export type QtyConfidence = "high" | "medium" | "conflicting" | "unverified";
+
 export interface ScopeItem {
   id: string;
   project_id: string;
@@ -243,6 +245,8 @@ export interface ScopeItem {
   location: string | null;
   confidence: number;
   extraction_method: string | null;
+  qty_confidence: QtyConfidence | null;
+  qty_provenance: Record<string, unknown> | null;
   citations: ScopeCitation[];
   created_at: string;
   updated_at: string;

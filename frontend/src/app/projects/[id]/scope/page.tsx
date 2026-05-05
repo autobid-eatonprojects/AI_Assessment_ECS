@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { AppHeader } from "@/components/app-header";
 import { AuthGuard } from "@/components/auth-guard";
 import { CitationViewerModal } from "@/components/citation-viewer-modal";
+import { QuantityBadge } from "@/components/quantity-badge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
@@ -61,16 +62,19 @@ function ScopeItemDetail({
             <dd className="mt-0.5">{item.specification}</dd>
           </div>
         )}
-        {item.quantity && (
-          <div>
-            <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-              Quantity
-            </dt>
-            <dd className="mt-0.5 font-mono">
-              {item.quantity} {item.unit}
-            </dd>
-          </div>
-        )}
+        <div>
+          <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+            Quantity
+          </dt>
+          <dd className="mt-1">
+            <QuantityBadge
+              quantity={item.quantity}
+              unit={item.unit}
+              confidence={item.qty_confidence}
+              provenance={item.qty_provenance}
+            />
+          </dd>
+        </div>
         {item.location && (
           <div>
             <dt className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -158,6 +162,7 @@ function exportToCSV(items: ScopeItem[]): string {
     "Specification",
     "Quantity",
     "Unit",
+    "Qty Confidence",
     "Location",
     "Confidence",
     "Method",
@@ -176,6 +181,7 @@ function exportToCSV(items: ScopeItem[]): string {
       i.specification,
       i.quantity,
       i.unit,
+      i.qty_confidence,
       i.location,
       i.confidence.toFixed(2),
       i.extraction_method,
@@ -385,11 +391,15 @@ function ScopeView({ projectId }: { projectId: string }) {
                       {item.csi_code}
                     </span>
                     <ConfidenceBadge value={item.confidence} />
-                    {item.quantity && (
-                      <span className="ml-auto font-mono text-xs text-muted-foreground">
-                        {item.quantity} {item.unit}
-                      </span>
-                    )}
+                    <span className="ml-auto">
+                      <QuantityBadge
+                        compact
+                        quantity={item.quantity}
+                        unit={item.unit}
+                        confidence={item.qty_confidence}
+                        provenance={item.qty_provenance}
+                      />
+                    </span>
                   </div>
                   <p className="line-clamp-2 text-sm">{item.description}</p>
                 </button>

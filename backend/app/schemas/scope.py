@@ -40,6 +40,9 @@ class ScopeItemOut(BaseModel):
     confidence: float
     extraction_method: str | None
 
+    qty_confidence: str | None = None
+    qty_provenance: dict | None = None
+
     citations: list[ScopeCitationOut]
 
     created_at: datetime

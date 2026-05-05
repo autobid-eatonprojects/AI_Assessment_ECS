@@ -41,6 +41,7 @@ from ..models import (
 )
 from .csi_grounder import ground_code
 from .project_profiler import get_or_create_profile
+from .quantity_resolver import resolve_quantities
 from .schedule_miner import mine_schedules
 from .scope_deduper import dedupe
 from .scope_extractor import (
@@ -392,6 +393,13 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
     candidates, validated, deduped = await _persist_results(
         run_id, project_id, division_results, taxonomy
     )
+
+    # Stage E — Quantity Resolver. Deterministic post-pass: aggregate every
+    # quantity signal (Sonnet-stated, schedule-miner cluster sizes, regex-
+    # sniffed numerics from excerpts) and resolve a final qty + confidence
+    # band per ScopeItem. No LLM calls.
+    qty_updated = await resolve_quantities(run_id)
+    log.info("scope_runner: quantity resolver updated %d items", qty_updated)
 
     # Compute final cost from llm_calls for this run window
     total_cost = sum(d.cost_usd for d in division_results) + schedule_cost

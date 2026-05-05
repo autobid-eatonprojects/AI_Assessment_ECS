@@ -86,8 +86,16 @@ class ScopeItem(Base):
 
     # Quality signals
     confidence: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)  # 0..1
-    # schedule | note | spec_section | plan_callout | inferred
+    # schedule | note | spec_section | plan_callout | inferred | schedule_miner
     extraction_method: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    # Quantity confidence (Phase 6 quantity resolver):
+    #   high          — schedule-derived count or explicit unambiguous source
+    #   medium        — single source, plausible but not corroborated
+    #   conflicting   — multiple sources disagree numerically; record both in provenance
+    #   unverified    — no quantity signal in any citation
+    qty_confidence: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    qty_provenance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Audit
     raw_extractions: Mapped[list | None] = mapped_column(JSON, nullable=True)
