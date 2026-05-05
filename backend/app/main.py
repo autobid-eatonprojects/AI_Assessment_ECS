@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .api import (
     auth,
+    bids,
     documents,
     extraction,
     profile,
@@ -65,3 +66,4 @@ app.include_router(search.router, prefix="/api")
 app.include_router(profile.router, prefix="/api")
 app.include_router(trade_relevance.router, prefix="/api")
 app.include_router(scope.router, prefix="/api")
+app.include_router(bids.router, prefix="/api")

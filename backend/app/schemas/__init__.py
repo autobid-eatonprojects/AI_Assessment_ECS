@@ -1,4 +1,14 @@
 from .auth import LoginRequest, TokenResponse, UserOut
+from .bid import (
+    BidAnalysisOverview,
+    BidCoverageOut,
+    BidDetailOut,
+    BidExclusionOut,
+    BidInclusionOut,
+    BidLineItemOut,
+    BidRunOut,
+    BidSummaryOut,
+)
 from .document import DocumentOut, DocumentPageOut, DocumentPageTextOut
 from .extraction import (
     BoundingBox,
@@ -22,6 +32,14 @@ from .scope import ScopeCitationOut, ScopeItemOut, ScopeOverview, ScopeRunOut
 from .search import SearchHit, SearchRequest, SearchResponse
 
 __all__ = [
+    "BidAnalysisOverview",
+    "BidCoverageOut",
+    "BidDetailOut",
+    "BidExclusionOut",
+    "BidInclusionOut",
+    "BidLineItemOut",
+    "BidRunOut",
+    "BidSummaryOut",
     "BoundingBox",
     "CrossReferenceOut",
     "DocumentExtractionOverview",

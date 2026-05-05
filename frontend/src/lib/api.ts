@@ -1,5 +1,9 @@
 import { useAuthStore } from "./auth";
 import type {
+  BidAnalysisOverview,
+  BidCoverage,
+  BidDetail,
+  BidRun,
   Document,
   DocumentExtractionOverview,
   DocumentPage,
@@ -206,6 +210,24 @@ export const api = {
   },
   getScopeItem: (projectId: string, itemId: string) =>
     request<ScopeItem>(`/api/projects/${projectId}/scope/items/${itemId}`),
+
+  // Phase 8: bid analysis
+  getBidAnalysisOverview: (projectId: string) =>
+    request<BidAnalysisOverview>(`/api/projects/${projectId}/bid-analysis`),
+  startBidAnalysisRun: (projectId: string) =>
+    request<BidRun>(`/api/projects/${projectId}/bid-analysis/runs`, {
+      method: "POST",
+    }),
+  getBidAnalysisRun: (projectId: string, runId: string) =>
+    request<BidRun>(`/api/projects/${projectId}/bid-analysis/runs/${runId}`),
+  listBidCoverage: (projectId: string) =>
+    request<BidCoverage[]>(`/api/projects/${projectId}/bid-analysis/coverage`),
+  listBidGaps: (projectId: string) =>
+    request<ScopeItem[]>(`/api/projects/${projectId}/bid-analysis/gaps`),
+  getBidDetail: (projectId: string, bidDocumentId: string) =>
+    request<BidDetail>(
+      `/api/projects/${projectId}/bid-analysis/bids/${bidDocumentId}`,
+    ),
 };
 
 export { ApiError };

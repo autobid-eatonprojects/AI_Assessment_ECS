@@ -293,6 +293,102 @@ export interface ProjectProfile {
   updated_at: string;
 }
 
+// Phase 8 — bid analysis
+export interface BidLineItem {
+  id: string;
+  bid_document_id: string;
+  description: string;
+  quantity: string | null;
+  unit: string | null;
+  unit_price_usd: number | null;
+  total_price_usd: number | null;
+  csi_section_guess: string | null;
+  page_number: number | null;
+}
+
+export interface BidExclusion {
+  id: string;
+  bid_document_id: string;
+  text: string;
+  page_number: number | null;
+}
+
+export interface BidInclusion {
+  id: string;
+  bid_document_id: string;
+  text: string;
+  page_number: number | null;
+}
+
+export interface BidSummary {
+  id: string;
+  project_id: string;
+  run_id: string;
+  bid_document_id: string;
+  vendor_name: string | null;
+  bid_total_usd: number | null;
+  primary_csi_divisions: string[] | null;
+  line_item_count: number;
+  inclusion_count: number;
+  exclusion_count: number;
+  extraction_cost_usd: number | null;
+  extraction_latency_ms: number | null;
+}
+
+export type BidCoverageStatus =
+  | "covered"
+  | "partial"
+  | "excluded"
+  | "not_covered"
+  | "not_applicable";
+
+export interface BidCoverage {
+  id: string;
+  scope_item_id: string;
+  bid_document_id: string;
+  status: BidCoverageStatus;
+  confidence: number;
+  reasoning: string | null;
+  matched_line_item_id: string | null;
+  judge_model: string | null;
+}
+
+export interface BidRun {
+  id: string;
+  project_id: string;
+  scope_run_id: string | null;
+  status: "running" | "complete" | "failed";
+  started_at: string;
+  completed_at: string | null;
+  error: string | null;
+  bids_total: number;
+  bids_extracted: number;
+  coverage_pairs_total: number;
+  coverage_pairs_completed: number;
+  total_cost_usd: number;
+  total_latency_ms: number;
+  config: Record<string, unknown> | null;
+}
+
+export interface BidAnalysisOverview {
+  project_id: string;
+  latest_run: BidRun | null;
+  bid_summaries: BidSummary[];
+  coverage_counts: {
+    covered: number;
+    partial: number;
+    excluded: number;
+    not_covered: number;
+  };
+}
+
+export interface BidDetail {
+  summary: BidSummary;
+  line_items: BidLineItem[];
+  inclusions: BidInclusion[];
+  exclusions: BidExclusion[];
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;

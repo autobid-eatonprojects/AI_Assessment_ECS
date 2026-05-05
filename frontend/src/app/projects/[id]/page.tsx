@@ -8,6 +8,7 @@ import { use } from "react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/app-header";
 import { AuthGuard } from "@/components/auth-guard";
+import { BidAnalysisCard } from "@/components/bid-analysis-card";
 import { BidUpload } from "@/components/bid-upload";
 import { DocumentList } from "@/components/document-list";
 import { DocumentUpload } from "@/components/document-upload";
@@ -113,6 +114,12 @@ function ProjectDetail({ projectId }: { projectId: string }) {
       <div className="mb-6">
         <ScopeOfWorkCard projectId={projectId} />
       </div>
+
+      {(inBids || lifecycle === "complete") && (
+        <div className="mb-6">
+          <BidAnalysisCard projectId={projectId} />
+        </div>
+      )}
 
       <div className="mb-6">
         <SearchBar projectId={projectId} />
