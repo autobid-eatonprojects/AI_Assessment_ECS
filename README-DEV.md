@@ -29,12 +29,16 @@ In two terminals:
 ```bash
 # Terminal 1 — backend (http://localhost:8000)
 cd backend
-uv run uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --port 8000
 
 # Terminal 2 — frontend (http://localhost:3000)
 cd frontend
 npm run dev
 ```
+
+> **Note:** don't use `--reload` on the backend. Uvicorn's filesystem
+> watcher can interfere with the long-running classification + rendering
+> tasks and cause them to stall. Restart manually after backend code edits.
 
 Open http://localhost:3000 and sign in with the dev credentials shown on the login page (`admin@ecs.local` / `admin`).
 

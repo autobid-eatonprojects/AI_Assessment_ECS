@@ -115,6 +115,16 @@ def render_sync(source: Path, document_id: str) -> list[RenderedPage]:
     return []  # unsupported types yield no pages
 
 
+# Rendering is CPU-bound and PyMuPDF doesn't reliably release the GIL, so two
+# concurrent `asyncio.to_thread` calls can stall the event loop and starve
+# other tasks (e.g. an in-flight Anthropic classification). A global semaphore
+# of 1 turns the renderer into a queue: predictable throughput without GIL
+# contention. Phase 2 will swap this for a process pool when we add the heavy
+# vision pre-pass.
+_render_semaphore = asyncio.Semaphore(1)
+
+
 async def render(source: Path, document_id: str) -> list[RenderedPage]:
-    log.info("rendering pages for %s (%s)", document_id, source.name)
-    return await asyncio.to_thread(render_sync, source, document_id)
+    async with _render_semaphore:
+        log.info("rendering pages for %s (%s)", document_id, source.name)
+        return await asyncio.to_thread(render_sync, source, document_id)

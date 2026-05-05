@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -6,6 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api import auth, documents, projects
 from .config import settings
 from .database import init_db
+
+# App-level loggers (processor, classifier, renderer) need INFO level to be
+# visible alongside uvicorn access logs.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 
 @asynccontextmanager

@@ -49,5 +49,11 @@ async def init_db() -> None:
     from . import models  # noqa: F401  ensure models are registered
 
     async with engine.begin() as conn:
+        # WAL mode lets multiple concurrent transactions read while one writes.
+        # Critical for our background processor (multiple docs in flight at once).
+        if settings.database_url.startswith("sqlite"):
+            await conn.execute(text("PRAGMA journal_mode=WAL"))
+            await conn.execute(text("PRAGMA busy_timeout=10000"))
+            await conn.execute(text("PRAGMA synchronous=NORMAL"))
         await conn.run_sync(Base.metadata.create_all)
         await _migrate(conn)
