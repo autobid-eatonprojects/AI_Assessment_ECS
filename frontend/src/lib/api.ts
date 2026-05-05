@@ -7,6 +7,9 @@ import type {
   PageExtraction,
   Project,
   ProjectProfile,
+  ScopeItem,
+  ScopeOverview,
+  ScopeRun,
   SearchResponse,
   TokenResponse,
   TradeRelevanceMatrix,
@@ -187,6 +190,22 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ csi_division, is_relevant }),
     }),
+
+  // Phase 4.3 / 4.4: scope of work
+  getScopeOverview: (projectId: string) =>
+    request<ScopeOverview>(`/api/projects/${projectId}/scope`),
+  startScopeRun: (projectId: string) =>
+    request<ScopeRun>(`/api/projects/${projectId}/scope/runs`, {
+      method: "POST",
+    }),
+  getScopeRun: (projectId: string, runId: string) =>
+    request<ScopeRun>(`/api/projects/${projectId}/scope/runs/${runId}`),
+  listScopeItems: (projectId: string, csi_division?: string) => {
+    const qs = csi_division ? `?csi_division=${csi_division}` : "";
+    return request<ScopeItem[]>(`/api/projects/${projectId}/scope/items${qs}`);
+  },
+  getScopeItem: (projectId: string, itemId: string) =>
+    request<ScopeItem>(`/api/projects/${projectId}/scope/items/${itemId}`),
 };
 
 export { ApiError };

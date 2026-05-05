@@ -13,6 +13,7 @@ import { DocumentList } from "@/components/document-list";
 import { DocumentUpload } from "@/components/document-upload";
 import { LifecycleBanner } from "@/components/lifecycle-banner";
 import { ProjectProfileCard } from "@/components/project-profile-card";
+import { ScopeOfWorkCard } from "@/components/scope-of-work-card";
 import { SearchBar } from "@/components/search-bar";
 import { TradeRelevanceCard } from "@/components/trade-relevance-card";
 import { Button } from "@/components/ui/button";
@@ -107,6 +108,10 @@ function ProjectDetail({ projectId }: { projectId: string }) {
 
       <div className="mb-6">
         <TradeRelevanceCard projectId={projectId} />
+      </div>
+
+      <div className="mb-6">
+        <ScopeOfWorkCard projectId={projectId} />
       </div>
 
       <div className="mb-6">

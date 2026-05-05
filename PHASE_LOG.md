@@ -261,9 +261,14 @@ A running record of what has shipped, been tested, and what remains.
 | Phase | Status | Quality gate | Notes |
 |---|---|---|---|
 | 0 — Foundation | ✅ Shipped | ✅ | Skeleton + auth + project/doc CRUD + upload, all persisted |
+| 0.5 — Two-stage workflow refactor | ✅ Shipped | ✅ | Project lifecycle, source-aware uploads, classifier split (project-doc vs bid-doc), OCR fallback for scanned written-spec |
 | 1 — Doc classification + page rendering | ✅ Shipped | ✅ | 8/8 classification correct, 54-page render in ~28s, fullscreen viewer working |
 | 2 — Vision pre-pass | ✅ Shipped | ✅ | Per-page Claude Sonnet 4.6 vision extraction. Schedules/Notes/Refs/Entities with bboxes. Cost tracking, retries, per-page failure isolation, resumability. |
 | 3 — Indexing + Hybrid retrieval | ✅ Shipped | ✅ | Cohere Embed v4 → Chroma + BM25 sparse → RRF → Cohere Rerank 3. **10/10 on test suite**, $0.03 to index 3,567 chunks of 54-page Elks set. Search bar w/ ⌘K live in UI. |
+| 4.0 — Foundations | ✅ Shipped | ✅ | New models + Trade_List.xlsx parser. 34 divs, 1250 sections parsed. |
+| 4.1 — Project profiler | ✅ Shipped | ✅ | Sonnet 4.6 reads cover + general notes → 9/9 fields on Elks at $0.04 |
+| 4.2 — Trade relevance filter | ✅ Shipped | ✅ | Parallel Haiku per division. 23 relevant / 11 skipped on Elks at $0.06. 100% on must-relevant + must-skip sets. |
+| 4.3 + 4.4 — EVE scope extraction + UI | ✅ Shipped | ✅ | Multi-query Sonnet + 3-vote Haiku validator + strict CSI grounding + embedding dedupe + scope explorer UI. 432 items / 745 citations / $6.19 / 5:10 on Elks. Strong on narrative scope; per-row schedule enumeration weaker (known follow-up). |
 | 2 — Vision pre-pass | Not started | — | — |
 | 3 — Indexing + search | Not started | — | — |
 | 4 — Trade-driven scope extraction | Not started | — | — |

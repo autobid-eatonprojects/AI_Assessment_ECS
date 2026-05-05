@@ -10,6 +10,7 @@ from .api import (
     extraction,
     profile,
     projects,
+    scope,
     search,
     trade_relevance,
 )
@@ -63,3 +64,4 @@ app.include_router(extraction.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
 app.include_router(profile.router, prefix="/api")
 app.include_router(trade_relevance.router, prefix="/api")
+app.include_router(scope.router, prefix="/api")

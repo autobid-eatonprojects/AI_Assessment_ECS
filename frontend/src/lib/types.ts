@@ -216,6 +216,63 @@ export interface TradeRelevanceMatrix {
   divisions: TradeDivisionRelevance[];
 }
 
+export interface ScopeCitation {
+  id: string;
+  chunk_id: string;
+  document_id: string | null;
+  page_number: number | null;
+  sheet_number: string | null;
+  bbox: BoundingBox | null;
+  rerank_score: number | null;
+  extraction_query: string | null;
+  excerpt: string | null;
+}
+
+export interface ScopeItem {
+  id: string;
+  project_id: string;
+  run_id: string;
+  csi_code: string;
+  csi_division: string;
+  division_label: string;
+  section_title: string | null;
+  description: string;
+  specification: string | null;
+  quantity: string | null;
+  unit: string | null;
+  location: string | null;
+  confidence: number;
+  extraction_method: string | null;
+  citations: ScopeCitation[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScopeRun {
+  id: string;
+  project_id: string;
+  status: "running" | "complete" | "failed" | "cancelled";
+  started_at: string;
+  completed_at: string | null;
+  error: string | null;
+  sections_total: number;
+  sections_completed: number;
+  sections_failed: number;
+  candidates_generated: number;
+  items_validated: number;
+  items_after_dedupe: number;
+  total_cost_usd: number;
+  total_latency_ms: number;
+  config: Record<string, unknown> | null;
+}
+
+export interface ScopeOverview {
+  project_id: string;
+  latest_run: ScopeRun | null;
+  total_items: number;
+  by_division: { csi_division: string; division_label: string; count: number }[];
+}
+
 export interface ProjectProfile {
   id: string;
   project_id: string;

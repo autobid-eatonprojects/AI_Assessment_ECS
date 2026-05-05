@@ -18,6 +18,7 @@ from .profile import (
     TradeRelevanceOverrideIn,
 )
 from .project import LifecycleTransition, ProjectCreate, ProjectOut, ProjectUpdate
+from .scope import ScopeCitationOut, ScopeItemOut, ScopeOverview, ScopeRunOut
 from .search import SearchHit, SearchRequest, SearchResponse
 
 __all__ = [
@@ -39,6 +40,10 @@ __all__ = [
     "ProjectProfileOut",
     "ProjectUpdate",
     "ScheduleOut",
+    "ScopeCitationOut",
+    "ScopeItemOut",
+    "ScopeOverview",
+    "ScopeRunOut",
     "SearchHit",
     "SearchRequest",
     "SearchResponse",
