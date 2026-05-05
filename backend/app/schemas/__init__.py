@@ -11,7 +11,7 @@ from .extraction import (
     PageExtractionSummary,
     ScheduleOut,
 )
-from .project import ProjectCreate, ProjectOut, ProjectUpdate
+from .project import LifecycleTransition, ProjectCreate, ProjectOut, ProjectUpdate
 from .search import SearchHit, SearchRequest, SearchResponse
 
 __all__ = [
@@ -21,6 +21,7 @@ __all__ = [
     "DocumentOut",
     "DocumentPageOut",
     "EntityOut",
+    "LifecycleTransition",
     "LoginRequest",
     "NoteOut",
     "PageExtractionIn",

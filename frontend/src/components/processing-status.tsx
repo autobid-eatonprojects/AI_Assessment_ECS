@@ -9,6 +9,8 @@ const STATUS: Record<
   classifying: { label: "Classifying", icon: Loader2, className: "text-blue-600" },
   rendering: { label: "Rendering pages", icon: Loader2, className: "text-blue-600" },
   extracting: { label: "Vision pre-pass", icon: Loader2, className: "text-purple-600" },
+  ocr: { label: "OCR (Gemini Flash)", icon: Loader2, className: "text-cyan-600" },
+  indexing: { label: "Indexing", icon: Loader2, className: "text-blue-600" },
   ready: { label: "Ready", icon: CheckCircle2, className: "text-emerald-600" },
   failed: { label: "Failed", icon: AlertTriangle, className: "text-red-600" },
   "needs-api-key": {
@@ -27,7 +29,13 @@ export function ProcessingStatusIndicator({
 }) {
   const cfg = STATUS[status];
   const Icon = cfg.icon;
-  const spin = status === "pending" || status === "classifying" || status === "rendering";
+  const spin =
+    status === "pending" ||
+    status === "classifying" ||
+    status === "rendering" ||
+    status === "extracting" ||
+    status === "ocr" ||
+    status === "indexing";
   return (
     <span
       className={`inline-flex items-center gap-1 text-xs font-medium ${cfg.className}`}

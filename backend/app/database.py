@@ -21,13 +21,26 @@ async def get_db() -> AsyncIterator[AsyncSession]:
 
 # Lightweight idempotent migrations for SQLite dev environments.
 # Replace with Alembic when we move to Postgres.
-_DOCUMENT_NEW_COLUMNS = {
-    "classification_confidence": "FLOAT",
-    "classification_reasoning": "TEXT",
-    "page_count": "INTEGER",
-    "processing_status": "VARCHAR(32) NOT NULL DEFAULT 'pending'",
-    "processing_error": "TEXT",
-    "processed_at": "DATETIME",
+_NEW_COLUMNS_BY_TABLE: dict[str, dict[str, str]] = {
+    "documents": {
+        "classification_confidence": "FLOAT",
+        "classification_reasoning": "TEXT",
+        "page_count": "INTEGER",
+        "processing_status": "VARCHAR(32) NOT NULL DEFAULT 'pending'",
+        "processing_error": "TEXT",
+        "processed_at": "DATETIME",
+        # Two-stage workflow (project setup vs bid submissions)
+        "source": "VARCHAR(32) NOT NULL DEFAULT 'project_document'",
+        "vendor_name": "VARCHAR(255)",
+    },
+    "projects": {
+        "lifecycle_state": "VARCHAR(32) NOT NULL DEFAULT 'setup'",
+    },
+    "document_pages": {
+        # Per-page text content for the chunker — populated by PyMuPDF or OCR
+        "text_content": "TEXT",
+        "text_source": "VARCHAR(16)",
+    },
 }
 
 
@@ -39,10 +52,16 @@ def _existing_columns(sync_conn, table: str) -> set[str]:
 
 
 async def _migrate(conn) -> None:
-    existing = await conn.run_sync(_existing_columns, "documents")
-    for col, sql_type in _DOCUMENT_NEW_COLUMNS.items():
-        if col not in existing:
-            await conn.execute(text(f"ALTER TABLE documents ADD COLUMN {col} {sql_type}"))
+    for table, new_cols in _NEW_COLUMNS_BY_TABLE.items():
+        existing = await conn.run_sync(_existing_columns, table)
+        if not existing:
+            # Table doesn't exist yet — create_all will handle it.
+            continue
+        for col, sql_type in new_cols.items():
+            if col not in existing:
+                await conn.execute(
+                    text(f"ALTER TABLE {table} ADD COLUMN {col} {sql_type}")
+                )
 
 
 async def init_db() -> None:

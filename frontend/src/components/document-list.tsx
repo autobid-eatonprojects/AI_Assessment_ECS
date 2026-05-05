@@ -13,13 +13,15 @@ import { formatBytes, formatRelativeTime } from "@/lib/format";
 
 interface Props {
   projectId: string;
+  source?: "project_document" | "bid_submission";
+  emptyHint?: string;
 }
 
-export function DocumentList({ projectId }: Props) {
+export function DocumentList({ projectId, source, emptyHint }: Props) {
   const qc = useQueryClient();
   const token = useAuthStore((s) => s.token);
 
-  const { data, isLoading } = useQuery({
+  const { data: allDocs, isLoading } = useQuery({
     queryKey: ["documents", projectId],
     queryFn: () => api.listDocuments(projectId),
     // Poll while anything is processing
@@ -30,11 +32,15 @@ export function DocumentList({ projectId }: Props) {
         (d) =>
           d.processing_status === "pending" ||
           d.processing_status === "classifying" ||
-          d.processing_status === "rendering",
+          d.processing_status === "rendering" ||
+          d.processing_status === "ocr" ||
+          d.processing_status === "indexing",
       );
       return processing ? 2_000 : false;
     },
   });
+
+  const data = source ? allDocs?.filter((d) => d.source === source) : allDocs;
 
   const del = useMutation({
     mutationFn: (id: string) => api.deleteDocument(projectId, id),
@@ -73,7 +79,7 @@ export function DocumentList({ projectId }: Props) {
   if (!data || data.length === 0) {
     return (
       <p className="rounded-md border border-dashed py-8 text-center text-sm text-muted-foreground">
-        No documents yet. Upload some files to get started.
+        {emptyHint || "No documents yet. Upload some files to get started."}
       </p>
     );
   }
@@ -101,6 +107,14 @@ export function DocumentList({ projectId }: Props) {
               />
             </div>
             <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {d.vendor_name && (
+                <>
+                  <span className="font-medium text-foreground">
+                    {d.vendor_name}
+                  </span>
+                  <span>·</span>
+                </>
+              )}
               <span>{formatBytes(d.size_bytes)}</span>
               <span>·</span>
               <span>{formatRelativeTime(d.created_at)}</span>

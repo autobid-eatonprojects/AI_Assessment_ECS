@@ -6,8 +6,12 @@ const STYLES: Record<DocType | "unclassified", { label: string; className: strin
     className: "bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-200",
   },
   "written-spec": {
-    label: "Spec",
+    label: "Project manual",
     className: "bg-indigo-100 text-indigo-900 dark:bg-indigo-900/40 dark:text-indigo-200",
+  },
+  "trade-list": {
+    label: "Trade list",
+    className: "bg-violet-100 text-violet-900 dark:bg-violet-900/40 dark:text-violet-200",
   },
   "bid-quote": {
     label: "Bid",

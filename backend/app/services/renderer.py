@@ -28,6 +28,9 @@ class RenderedPage:
     height: int
     image_path: Path
     thumbnail_path: Path
+    # Native PyMuPDF text. Empty string for scanned PDFs / images;
+    # OCR fills it in later when needed.
+    native_text: str = ""
 
 
 def _pages_dir(document_id: str) -> Path:
@@ -61,6 +64,9 @@ def _render_pdf_sync(source: Path, document_id: str) -> list[RenderedPage]:
             thumb_path = out_dir / f"p{i:04d}_thumb.png"
             _make_thumbnail(png_bytes, thumb_path)
 
+            # Pull native text in the same pass — free where it exists.
+            native = page.get_text("text") or ""
+
             rendered.append(
                 RenderedPage(
                     page_number=i,
@@ -68,6 +74,7 @@ def _render_pdf_sync(source: Path, document_id: str) -> list[RenderedPage]:
                     height=pix.height,
                     image_path=image_path,
                     thumbnail_path=thumb_path,
+                    native_text=native,
                 )
             )
 

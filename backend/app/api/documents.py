@@ -1,6 +1,7 @@
 import mimetypes
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, UploadFile, status
+from fastapi import APIRouter, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 
@@ -47,11 +48,58 @@ async def list_documents(project_id: str, db: DB, _: CurrentUser) -> list[Docume
 
 @router.post("", response_model=list[DocumentOut], status_code=status.HTTP_201_CREATED)
 async def upload_documents(
-    project_id: str, db: DB, _: CurrentUser, files: list[UploadFile]
+    project_id: str,
+    db: DB,
+    _: CurrentUser,
+    files: list[UploadFile],
+    source: Annotated[str, Form()] = "project_document",
+    vendor_name: Annotated[str | None, Form()] = None,
 ) -> list[DocumentOut]:
-    await _ensure_project(db, project_id)
+    """Upload one or more documents.
+
+    `source` controls which side of the workflow the document belongs to:
+        - "project_document"  (default) — drawings, specs, trade list, etc.
+                              Allowed only while project is in 'setup'.
+        - "bid_submission"    — vendor bids and qualification attachments.
+                              Allowed only when project is 'open-for-bids';
+                              vendor_name required.
+    """
+    if source not in ("project_document", "bid_submission"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"invalid source '{source}'",
+        )
+
+    project = await _ensure_project(db, project_id)
     if not files:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="no files uploaded")
+
+    # Lifecycle gating: which uploads are allowed in which state.
+    if source == "project_document" and project.lifecycle_state not in ("setup",):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"project is in '{project.lifecycle_state}' — re-open scope "
+                "(transition to 'setup') to add more project documents"
+            ),
+        )
+    if source == "bid_submission":
+        if project.lifecycle_state != "open-for-bids":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"project is in '{project.lifecycle_state}' — bid submissions "
+                    "can only be uploaded once scope is locked (open-for-bids)"
+                ),
+            )
+        if not (vendor_name and vendor_name.strip()):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="vendor_name is required when uploading a bid submission",
+            )
+    elif vendor_name:
+        # vendor_name on a project_document is meaningless — drop it
+        vendor_name = None
 
     out: list[Document] = []
     for f in files:
@@ -80,6 +128,8 @@ async def upload_documents(
             storage_path="",
             sha256="",
             processing_status="pending",
+            source=source,
+            vendor_name=vendor_name.strip() if vendor_name else None,
         )
         db.add(doc)
         await db.flush()

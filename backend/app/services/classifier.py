@@ -23,51 +23,85 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-DOC_TYPES = [
+# Project-side document types (what the GC uploads in the 'setup' phase)
+PROJECT_DOC_TYPES = [
     "drawing-set",       # architectural / structural / MEP drawings
-    "written-spec",      # CSI written specifications
+    "written-spec",      # CSI Project Manual / written specifications
+    "trade-list",        # CSI MasterFormat trade list (Excel/CSV)
+    "other",
+]
+
+# Bid-side document types (what comes in once project is open-for-bids)
+BID_DOC_TYPES = [
     "bid-quote",         # vendor quote, bid, proposal with pricing
-    "scope-letter",      # scope summary letter (no pricing)
-    "license-insurance", # business license, insurance certificate, registration
-    "safety-manual",     # health / safety / environmental docs
+    "scope-letter",      # scope summary letter
+    "license-insurance", # business license, insurance certificate
+    "safety-manual",     # subcontractor HSE manual / training
     "contractor-info",   # contractor questionnaire / qualification application
     "other",
 ]
 
-_CLASSIFY_TOOL = {
-    "name": "classify_document",
-    "description": (
-        "Classify a construction project document into one of the canonical types. "
-        "Use the visual layout, headers, and any visible text to decide. "
-        "Be conservative: if it's a drawing sheet (large-format with line art / "
-        "schedules / dimension callouts), choose 'drawing-set'. If it has a price "
-        "table or 'Quote' / 'Proposal' header, choose 'bid-quote'."
-    ),
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "doc_type": {
-                "type": "string",
-                "enum": DOC_TYPES,
-                "description": "The single best matching type.",
+# Union for backwards compatibility — the broader taxonomy still surfaces
+# for any caller that wants the union (e.g. older indexed data).
+DOC_TYPES = sorted(set(PROJECT_DOC_TYPES) | set(BID_DOC_TYPES))
+
+
+def _classify_tool(allowed_types: list[str], side_hint: str) -> dict:
+    return {
+        "name": "classify_document",
+        "description": (
+            "Classify a construction project document into one of the allowed types. "
+            f"{side_hint} "
+            "Use file metadata (page count, dimensions), visual layout, and any "
+            "extracted text. A 200+ page letter-size PDF is almost always a "
+            "written-spec (CSI Project Manual), not a drawing-set. "
+            "Drawing sets use large-format sheets (24x36, 30x42) with line art, "
+            "schedules, and dimension callouts."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_type": {
+                    "type": "string",
+                    "enum": allowed_types,
+                    "description": "The single best matching type.",
+                },
+                "confidence": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                },
+                "reasoning": {
+                    "type": "string",
+                    "description": "One short sentence explaining the choice.",
+                },
             },
-            "confidence": {
-                "type": "number",
-                "minimum": 0.0,
-                "maximum": 1.0,
-                "description": (
-                    "Calibrated confidence in [0, 1]. "
-                    "1.0 means certain; 0.5 means roughly even between two types."
-                ),
-            },
-            "reasoning": {
-                "type": "string",
-                "description": "One short sentence explaining what features drove the choice.",
-            },
+            "required": ["doc_type", "confidence", "reasoning"],
         },
-        "required": ["doc_type", "confidence", "reasoning"],
-    },
-}
+    }
+
+
+_PROJECT_DOC_TOOL = _classify_tool(
+    PROJECT_DOC_TYPES,
+    side_hint=(
+        "This document was uploaded as a PROJECT DOCUMENT during project setup, "
+        "so it should be one of: 'drawing-set', 'written-spec', 'trade-list', or 'other'."
+    ),
+)
+_BID_DOC_TOOL = _classify_tool(
+    BID_DOC_TYPES,
+    side_hint=(
+        "This document was uploaded as a BID SUBMISSION from a subcontractor, "
+        "so it should be one of: 'bid-quote', 'scope-letter', 'license-insurance', "
+        "'safety-manual', 'contractor-info', or 'other'."
+    ),
+)
+
+
+def _tool_for_source(source: str) -> dict:
+    if source == "bid_submission":
+        return _BID_DOC_TOOL
+    return _PROJECT_DOC_TOOL
 
 
 @dataclass
@@ -117,8 +151,159 @@ def _image_media_type(path: Path) -> str:
     }.get(ext, "image/png")
 
 
+# Anthropic caps the total request body at 32 MB. Base64 inflates raw bytes
+# by ~33%, so we cap raw PDFs we send directly at 22 MB (→ ~29 MB base64,
+# leaving headroom for the prompt + tool definition).
+_PDF_DIRECT_SIZE_LIMIT = 22 * 1024 * 1024
+
+
+def _extract_pdf_text_sample(path: Path, max_chars: int = 12_000) -> str:
+    """Extract the first N chars of text from a PDF using PyMuPDF.
+
+    For large project manuals (CSI specs), the cover sheet + TOC + first few
+    spec sections are plenty to classify accurately.
+    """
+    try:
+        import fitz  # PyMuPDF
+
+        text_parts: list[str] = []
+        running = 0
+        with fitz.open(path) as pdf:
+            for page in pdf:
+                t = page.get_text("text") or ""
+                text_parts.append(t)
+                running += len(t)
+                if running >= max_chars:
+                    break
+        return "".join(text_parts)[:max_chars]
+    except Exception as e:  # noqa: BLE001
+        log.warning("classifier: text extraction failed for %s: %s", path.name, e)
+        return ""
+
+
+def _render_pdf_sample_pages(path: Path, page_indices: list[int]) -> list[bytes]:
+    """Render selected pages as small JPEGs for the classifier.
+
+    Used when the PDF is too large to send whole AND/OR has no extractable
+    text (scanned). Each rendered page is ~150 KB JPEG, plenty of detail
+    for Haiku to recognize a CSI section header or a drawing title block.
+    """
+    import io
+
+    import fitz  # PyMuPDF
+    from PIL import Image
+
+    out: list[bytes] = []
+    try:
+        with fitz.open(path) as pdf:
+            for i in page_indices:
+                if i < 0 or i >= len(pdf):
+                    continue
+                pix = pdf[i].get_pixmap(dpi=110, alpha=False)
+                png_bytes = pix.tobytes("png")
+                # Re-encode as JPEG quality 80 to keep payload small
+                img = Image.open(io.BytesIO(png_bytes))
+                if img.mode != "RGB":
+                    img = img.convert("RGB")
+                # Cap longest edge ~1200 px
+                if max(img.size) > 1200:
+                    img.thumbnail((1200, 1200), Image.LANCZOS)
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=80, optimize=True)
+                out.append(buf.getvalue())
+    except Exception as e:  # noqa: BLE001
+        log.warning("classifier: page render failed for %s: %s", path.name, e)
+    return out
+
+
+def _pdf_metadata(path: Path) -> tuple[int, tuple[int, int]]:
+    """Return (page_count, (page_w_pt, page_h_pt)) — for the metadata header."""
+    try:
+        import fitz
+
+        with fitz.open(path) as pdf:
+            n = len(pdf)
+            r = pdf[0].rect if n > 0 else None
+            if r is not None:
+                return n, (int(r.width), int(r.height))
+            return n, (0, 0)
+    except Exception:  # noqa: BLE001
+        return 0, (0, 0)
+
+
+def _build_content_for_large_pdf(path: Path) -> list[dict]:
+    """Fallback for PDFs over the API size limit OR with no native text.
+
+    Strategy:
+      1. Pull first ~12 KB of extractable text (helps if any digital text exists).
+      2. Render pages 1, ~middle, ~3/4 as small JPEGs — works for scanned docs.
+      3. Include page count + page dimensions so the model can use them as
+         a strong feature (200+ letter pages → spec, not drawings).
+    """
+    text_sample = _extract_pdf_text_sample(path).strip()
+    size_mb = path.stat().st_size / (1024 * 1024)
+    page_count, (w_pt, h_pt) = _pdf_metadata(path)
+    in_w, in_h = w_pt / 72.0, h_pt / 72.0
+
+    # Pick sample pages: first, ~middle, ~3/4 if available.
+    sample_idxs: list[int] = [0]
+    if page_count >= 4:
+        sample_idxs.append(page_count // 2)
+    if page_count >= 8:
+        sample_idxs.append(int(page_count * 0.75))
+    page_images = _render_pdf_sample_pages(path, sample_idxs)
+
+    parts: list[dict] = []
+    for idx, img_bytes in zip(sample_idxs, page_images, strict=False):
+        b64 = base64.standard_b64encode(img_bytes).decode("ascii")
+        parts.append(
+            {
+                "type": "image",
+                "source": {"type": "base64", "media_type": "image/jpeg", "data": b64},
+            }
+        )
+        parts.append(
+            {"type": "text", "text": f"(image above is page {idx + 1} of the PDF)"}
+        )
+
+    metadata_blurb = (
+        f"PDF metadata:\n"
+        f"  - file size: {size_mb:.1f} MB\n"
+        f"  - page count: {page_count}\n"
+        f"  - page size: {in_w:.1f} × {in_h:.1f} inches "
+        f"(letter ~ 8.5×11, drawing sheets typically 24×36 or 30×42)\n"
+        f"  - has extractable text: {bool(text_sample)}\n"
+    )
+
+    if text_sample:
+        text_blurb = (
+            "First ~12 KB of extracted text:\n---\n" + text_sample + "\n---\n"
+        )
+    else:
+        text_blurb = (
+            "No extractable text — this is a scanned/image-only PDF. "
+            "Use the rendered sample pages above to classify it.\n"
+        )
+
+    parts.append(
+        {
+            "type": "text",
+            "text": metadata_blurb + "\n" + text_blurb + "\nUse the classify_document tool.",
+        }
+    )
+    return parts
+
+
 def _build_content_for_pdf(path: Path) -> list[dict]:
-    """Send the PDF directly via Anthropic's native PDF support."""
+    """Send the PDF directly when small; fall back to text-only when too large."""
+    if path.stat().st_size > _PDF_DIRECT_SIZE_LIMIT:
+        log.info(
+            "classifier: %s exceeds %d MB; using text-extraction fallback",
+            path.name,
+            _PDF_DIRECT_SIZE_LIMIT // (1024 * 1024),
+        )
+        return _build_content_for_large_pdf(path)
+
     data = base64.standard_b64encode(path.read_bytes()).decode("ascii")
     return [
         {
@@ -178,8 +363,14 @@ def _build_content_for_text(path: Path, content_type: str) -> list[dict]:
     ]
 
 
-async def classify(path: Path, content_type: str) -> Classification:
-    """Classify a single document. Raises ClassifierUnavailable if no API key."""
+async def classify(
+    path: Path, content_type: str, *, source: str = "project_document"
+) -> Classification:
+    """Classify a single document. Raises ClassifierUnavailable if no API key.
+
+    `source` selects between the project-doc and bid-doc taxonomies — the
+    classifier only chooses among the doc_types valid for that side.
+    """
     client = _get_client()
 
     if _is_pdf(path):
@@ -189,12 +380,19 @@ async def classify(path: Path, content_type: str) -> Classification:
     else:
         content = _build_content_for_text(path, content_type)
 
-    log.info("classifying %s (%s) with %s", path.name, content_type, settings.classifier_model)
+    tool = _tool_for_source(source)
+    log.info(
+        "classifying %s (%s, source=%s) with %s",
+        path.name,
+        content_type,
+        source,
+        settings.classifier_model,
+    )
 
     response = await client.messages.create(
         model=settings.classifier_model,
         max_tokens=512,
-        tools=[_CLASSIFY_TOOL],
+        tools=[tool],
         tool_choice={"type": "tool", "name": "classify_document"},
         messages=[{"role": "user", "content": content}],
     )
@@ -211,11 +409,17 @@ async def classify(path: Path, content_type: str) -> Classification:
     raise RuntimeError("classifier returned no tool_use block")
 
 
-async def classify_with_retry(path: Path, content_type: str, retries: int = 2) -> Classification:
+async def classify_with_retry(
+    path: Path,
+    content_type: str,
+    *,
+    source: str = "project_document",
+    retries: int = 2,
+) -> Classification:
     last: Exception | None = None
     for attempt in range(retries + 1):
         try:
-            return await classify(path, content_type)
+            return await classify(path, content_type, source=source)
         except ClassifierUnavailable:
             raise
         except Exception as e:  # noqa: BLE001

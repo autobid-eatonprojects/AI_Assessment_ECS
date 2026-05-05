@@ -7,38 +7,63 @@ import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
+import type { DocumentSource } from "@/lib/types";
 
 interface Props {
   projectId: string;
+  source?: DocumentSource;
+  vendorName?: string;
+  disabled?: boolean;
+  hint?: string;
 }
 
-export function DocumentUpload({ projectId }: Props) {
+export function DocumentUpload({
+  projectId,
+  source = "project_document",
+  vendorName,
+  disabled = false,
+  hint,
+}: Props) {
   const qc = useQueryClient();
 
   const upload = useMutation({
-    mutationFn: (files: File[]) => api.uploadDocuments(projectId, files),
+    mutationFn: (files: File[]) =>
+      api.uploadDocuments(projectId, files, {
+        source,
+        vendor_name: vendorName,
+      }),
     onSuccess: (docs) => {
       toast.success(`Uploaded ${docs.length} file${docs.length === 1 ? "" : "s"}`);
       qc.invalidateQueries({ queryKey: ["documents", projectId] });
       qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: ["project", projectId] });
     },
     onError: (e: Error) => {
       toast.error(e.message || "Upload failed");
     },
   });
 
+  const isLocked =
+    disabled || (source === "bid_submission" && !vendorName?.trim());
+
   const onDrop = useCallback(
     (accepted: File[]) => {
+      if (isLocked) return;
       if (accepted.length > 0) upload.mutate(accepted);
     },
-    [upload],
+    [upload, isLocked],
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     multiple: true,
-    disabled: upload.isPending,
+    disabled: isLocked || upload.isPending,
   });
+
+  const defaultHint =
+    source === "bid_submission"
+      ? "Vendor's bid PDFs / scope letters / insurance / safety docs"
+      : "Drawings, project manual, trade list — up to 200 MB each";
 
   return (
     <div
@@ -47,7 +72,7 @@ export function DocumentUpload({ projectId }: Props) {
         isDragActive
           ? "border-primary bg-primary/5"
           : "border-muted-foreground/30 hover:bg-muted/50"
-      } ${upload.isPending ? "pointer-events-none opacity-60" : ""}`}
+      } ${isLocked ? "cursor-not-allowed opacity-50" : ""} ${upload.isPending ? "pointer-events-none opacity-60" : ""}`}
     >
       <input {...getInputProps()} />
       <UploadCloud className="mb-2 size-8 text-muted-foreground" />
@@ -55,13 +80,17 @@ export function DocumentUpload({ projectId }: Props) {
         <p className="text-sm text-muted-foreground">Uploading…</p>
       ) : isDragActive ? (
         <p className="text-sm">Drop files here</p>
+      ) : isLocked ? (
+        <p className="text-sm text-muted-foreground">
+          {hint || "Upload disabled"}
+        </p>
       ) : (
         <>
           <p className="text-sm font-medium">
             Drag &amp; drop files, or click to browse
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            PDFs, drawings, bids, trade lists — up to {formatBytes(200 * 1024 * 1024)} each
+            {hint || defaultHint} · max {formatBytes(200 * 1024 * 1024)} each
           </p>
         </>
       )}

@@ -2,6 +2,60 @@
 
 A running record of what has shipped, been tested, and what remains.
 
+## Phase 0.5 — Two-stage workflow refactor ✅ Shipped
+
+**Why:** the original Phases 0–3 used a single unified upload zone for every file. That works for a demo but not for an enterprise estimating workflow where the GC uploads project documents first, then subcontractors send bids in response. Discovered when a real-world scanned Project Manual (370 pages, image-only) was misclassified as `drawing-set` and started running Phase-2 vision pre-pass on the wrong job (~$0.65 burned before stop). Refactor restores the correct two-stage architecture before Phase 4 sits on top of it.
+
+**Backend changes:**
+- `Project.lifecycle_state` enum: `setup` → `open-for-bids` → `complete`
+- `Document.source` enum: `project_document` | `bid_submission`
+- `Document.vendor_name` (free-text on bid submissions)
+- `DocumentPage.text_content` + `text_source` for chunker input (PyMuPDF or OCR)
+- Idempotent ALTER TABLE migration adds the columns to existing SQLite
+- New endpoint `POST /api/projects/{id}/lifecycle` (state-machine transitions)
+- Upload endpoint takes `source` + `vendor_name`, gates by lifecycle:
+   - 409 if uploading project_document while not in `setup`
+   - 409 if uploading bid_submission while not in `open-for-bids`
+   - 400 if bid_submission missing vendor_name
+- Classifier split into two taxonomies:
+   - **Project-doc**: drawing-set | written-spec | trade-list | other
+   - **Bid-doc**: bid-quote | scope-letter | license-insurance | safety-manual | contractor-info | other
+- Classifier renders sample pages (1, mid, 3/4-mark) + sends page-count + page-size metadata for **scanned PDFs with no text layer** — fixes the 370-page Project Manual misclassification root cause
+- New `services/ocr.py` — Gemini 2.5 Flash OCR on rendered page images for scanned `written-spec` documents
+- Processor routes by `(source, doc_type)`:
+   - `project_document + drawing-set` → Phase 2 vision pre-pass
+   - `project_document + written-spec` → OCR if no native text → chunk
+   - `bid_submission + bid-quote/scope-letter` → OCR if scanned → chunk
+   - everything else just renders + indexes
+- Chunker now reads `DocumentPage.text_content` directly (PyMuPDF or OCR — same code path)
+
+**Frontend changes:**
+- Types extended (lifecycle_state, source, vendor_name, ocr/indexing statuses)
+- API client gains `transitionLifecycle` + upload accepts `{source, vendor_name}`
+- Project page refactored into **tabs**: Project documents | Bid submissions
+- New `LifecycleBanner` shows current state with the right action buttons (lock scope / re-open / mark complete)
+- New `BidUpload` component requires vendor name before allowing dropzone activation
+- Existing `DocumentUpload` accepts `source` + disabled hints
+- `DocumentList` filters by source + surfaces vendor name on bid rows
+- New `trade-list` classification badge
+- Existing data backfilled: existing project lands in `setup`, existing docs are `project_document`
+
+**Verified end-to-end (curl):**
+1. Bid upload to project in `setup` → **409 rejected**
+2. Transition `setup` → `open-for-bids` → **200 ok**
+3. Project doc upload to `open-for-bids` → **409 rejected**
+4. Bid upload without vendor_name → **400 rejected**
+5. Bid upload with vendor "SRM Concrete" → classified `bid-quote` 99% with vendor attached ✅
+
+**Effort:** ~5 hours (matching the original estimate). No reshape of the AI pipeline, vector store, or schemas — only the routing and upload surface.
+
+**What this unblocks:**
+- Phase 4 can now read only `source = project_document` documents (correct scope source).
+- Phase 8 (later) reads only `source = bid_submission` documents (correct bid source).
+- Scanned project manuals now route correctly through OCR → indexed text → searchable.
+
+---
+
 ## Phase 0 — Foundation ✅ Shipped
 
 **Goal:** Working skeleton with no AI. User can create a project, upload files, and see them persisted.

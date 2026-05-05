@@ -71,12 +71,29 @@ export const api = {
   getProject: (id: string) => request<Project>(`/api/projects/${id}`),
   deleteProject: (id: string) =>
     request<void>(`/api/projects/${id}`, { method: "DELETE" }),
+  transitionLifecycle: (
+    id: string,
+    new_state: "setup" | "open-for-bids" | "complete",
+  ) =>
+    request<Project>(`/api/projects/${id}/lifecycle`, {
+      method: "POST",
+      body: JSON.stringify({ new_state }),
+    }),
 
   listDocuments: (projectId: string) =>
     request<Document[]>(`/api/projects/${projectId}/documents`),
-  uploadDocuments: (projectId: string, files: File[]) => {
+  uploadDocuments: (
+    projectId: string,
+    files: File[],
+    options?: {
+      source?: "project_document" | "bid_submission";
+      vendor_name?: string;
+    },
+  ) => {
     const fd = new FormData();
     files.forEach((f) => fd.append("files", f));
+    if (options?.source) fd.append("source", options.source);
+    if (options?.vendor_name) fd.append("vendor_name", options.vendor_name);
     return request<Document[]>(`/api/projects/${projectId}/documents`, {
       method: "POST",
       body: fd,

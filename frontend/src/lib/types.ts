@@ -1,15 +1,22 @@
+export type LifecycleState = "setup" | "open-for-bids" | "complete";
+export type DocumentSource = "project_document" | "bid_submission";
+
 export interface Project {
   id: string;
   name: string;
   description: string | null;
+  lifecycle_state: LifecycleState;
   created_at: string;
   updated_at: string;
   document_count: number;
+  project_document_count: number;
+  bid_submission_count: number;
 }
 
 export type DocType =
   | "drawing-set"
   | "written-spec"
+  | "trade-list"
   | "bid-quote"
   | "scope-letter"
   | "license-insurance"
@@ -22,6 +29,8 @@ export type ProcessingStatus =
   | "classifying"
   | "rendering"
   | "extracting"
+  | "ocr"
+  | "indexing"
   | "ready"
   | "failed"
   | "needs-api-key";
@@ -33,6 +42,8 @@ export interface Document {
   content_type: string;
   size_bytes: number;
   sha256: string;
+  source: DocumentSource;
+  vendor_name: string | null;
   doc_type: DocType | null;
   classification_confidence: number | null;
   classification_reasoning: string | null;

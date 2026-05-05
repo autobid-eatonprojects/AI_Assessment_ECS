@@ -29,6 +29,17 @@ class Document(Base):
     storage_path: Mapped[str] = mapped_column(String(1024), nullable=False)
     sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
 
+    # Two-stage workflow:
+    #   project_document — uploaded by the GC during project setup (drawings,
+    #                       specs, trade list). Feeds Phase 4 scope extraction.
+    #   bid_submission   — uploaded after scope is locked, comes from a vendor.
+    #                       Feeds Phase 8 bid analysis.
+    source: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="project_document", index=True
+    )
+    # Free-text vendor identifier on bid submissions only. Null on project docs.
+    vendor_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+
     # Classification (Phase 1)
     doc_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     classification_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)

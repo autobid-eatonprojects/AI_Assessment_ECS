@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
@@ -32,6 +32,13 @@ class DocumentPage(Base):
 
     image_path: Mapped[str] = mapped_column(String(1024), nullable=False)
     thumbnail_path: Mapped[str] = mapped_column(String(1024), nullable=False)
+
+    # Per-page text content. Sourced from PyMuPDF for digital PDFs OR from
+    # OCR (Gemini vision) for scanned PDFs. The chunker reads from here, so
+    # downstream Phase 3 indexing doesn't care which path produced it.
+    text_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    text_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # text_source: "pymupdf" | "ocr-gemini" | "ocr-anthropic" | None
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 

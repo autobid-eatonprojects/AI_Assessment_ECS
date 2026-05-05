@@ -219,7 +219,13 @@ async def _chunks_from_drawing(db: AsyncSession, doc: Document) -> list[ChunkPay
 
 
 async def _chunks_from_other(db: AsyncSession, doc: Document) -> list[ChunkPayload]:
-    """Extract page text via PyMuPDF for non-drawing docs (bids, specs, etc.)."""
+    """Chunk non-drawing docs from `DocumentPage.text_content`.
+
+    `text_content` is populated upstream by either:
+      - the renderer (native PyMuPDF text for digital PDFs), or
+      - the OCR service (Gemini Flash for scanned PDFs).
+    Either way the chunker treats it the same.
+    """
     payloads: list[ChunkPayload] = []
     page_result = await db.execute(
         select(DocumentPage)
@@ -230,58 +236,37 @@ async def _chunks_from_other(db: AsyncSession, doc: Document) -> list[ChunkPaylo
     if not pages:
         return payloads
 
-    source_path = storage.absolute_path(doc.storage_path)
-    if source_path.suffix.lower() != ".pdf":
-        # Image-only docs: no text extraction in Phase 3. The classification
-        # and rendered image are still indexed at page-summary level below.
-        for p in pages:
+    for p in pages:
+        text = (p.text_content or "").strip()
+        if not text:
             payloads.append(
                 ChunkPayload(
                     chunk_type="page_summary",
-                    text=f"{doc.filename} — page {p.page_number}",
+                    text=f"{doc.filename} — page {p.page_number} (no extractable text)",
                     page_id=p.id,
                     page_number=p.page_number,
-                    extra={"doc_type": doc.doc_type},
+                    extra={"doc_type": doc.doc_type, "source": doc.source},
                 )
             )
-        return payloads
+            continue
 
-    try:
-        with fitz.open(source_path) as pdf:
-            for page in pdf:
-                page_number = page.number + 1  # fitz is 0-indexed
-                page_obj = next((p for p in pages if p.page_number == page_number), None)
-                if page_obj is None:
-                    continue
-                text = page.get_text("text")
-                pieces = _split_page_text(text)
-                if not pieces:
-                    payloads.append(
-                        ChunkPayload(
-                            chunk_type="page_summary",
-                            text=f"{doc.filename} — page {page_number} (no extractable text)",
-                            page_id=page_obj.id,
-                            page_number=page_number,
-                            extra={"doc_type": doc.doc_type},
-                        )
-                    )
-                    continue
-                for i, piece in enumerate(pieces):
-                    payloads.append(
-                        ChunkPayload(
-                            chunk_type="page_text",
-                            text=piece,
-                            page_id=page_obj.id,
-                            page_number=page_number,
-                            extra={
-                                "doc_type": doc.doc_type,
-                                "chunk_index": i,
-                                "total_chunks": len(pieces),
-                            },
-                        )
-                    )
-    except Exception as e:  # noqa: BLE001
-        log.exception("chunker: failed to extract text from %s: %s", doc.filename, e)
+        pieces = _split_page_text(text)
+        for i, piece in enumerate(pieces):
+            payloads.append(
+                ChunkPayload(
+                    chunk_type="page_text",
+                    text=piece,
+                    page_id=p.id,
+                    page_number=p.page_number,
+                    extra={
+                        "doc_type": doc.doc_type,
+                        "source": doc.source,
+                        "text_source": p.text_source,
+                        "chunk_index": i,
+                        "total_chunks": len(pieces),
+                    },
+                )
+            )
 
     return payloads
 

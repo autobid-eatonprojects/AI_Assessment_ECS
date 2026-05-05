@@ -98,6 +98,7 @@ async def _persist_pages(document_id: str, pages: list[renderer.RenderedPage]) -
         await db.flush()
 
         for p in pages:
+            native = (p.native_text or "").strip()
             db.add(
                 DocumentPage(
                     document_id=document_id,
@@ -106,6 +107,8 @@ async def _persist_pages(document_id: str, pages: list[renderer.RenderedPage]) -
                     height=p.height,
                     image_path=str(p.image_path.relative_to(storage.root)),
                     thumbnail_path=str(p.thumbnail_path.relative_to(storage.root)),
+                    text_content=native or None,
+                    text_source="pymupdf" if native else None,
                 )
             )
 
@@ -114,6 +117,64 @@ async def _persist_pages(document_id: str, pages: list[renderer.RenderedPage]) -
         if doc is not None:
             doc.page_count = len(pages)
         await db.commit()
+
+
+async def _ocr_pages_if_needed(document_id: str) -> int:
+    """Run Gemini Flash OCR on pages that have no native text. Returns count OCR'd."""
+    from sqlalchemy import update as sql_update
+
+    from .ocr import OCRUnavailable, ocr_image
+
+    async with SessionLocal() as db:
+        result = await db.execute(
+            select(DocumentPage)
+            .where(DocumentPage.document_id == document_id)
+            .where(DocumentPage.text_content.is_(None))
+            .order_by(DocumentPage.page_number)
+        )
+        pages = list(result.scalars().all())
+        if not pages:
+            return 0
+        page_records = [(p.id, p.page_number, p.image_path) for p in pages]
+        project_id = (await db.get(Document, document_id)).project_id  # type: ignore[union-attr]
+
+    log.info("ocr: %d pages need OCR for doc %s", len(page_records), document_id)
+
+    async def _one(page_id: str, page_number: int, image_rel: str):
+        image_path = storage.absolute_path(image_rel)
+        try:
+            r = await ocr_image(image_path)
+        except OCRUnavailable:
+            log.warning("ocr: GOOGLE_API_KEY not set — skipping page %d", page_number)
+            return None
+        except Exception as e:  # noqa: BLE001
+            log.warning("ocr: page %d failed: %s", page_number, e)
+            return None
+        async with SessionLocal() as db:
+            await db.execute(
+                sql_update(DocumentPage)
+                .where(DocumentPage.id == page_id)
+                .values(text_content=r.text, text_source="ocr-gemini")
+            )
+            await record_call(
+                db,
+                purpose="ocr",
+                model="gemini-2.5-flash",
+                usage=r.usage,
+                latency_ms=r.latency_ms,
+                project_id=project_id,
+                document_id=document_id,
+                provider="google",
+            )
+            await db.commit()
+        return r
+
+    results = await asyncio.gather(
+        *(_one(pid, pn, ip) for pid, pn, ip in page_records),
+        return_exceptions=True,
+    )
+    ok = sum(1 for r in results if r is not None and not isinstance(r, Exception))
+    return ok
 
 
 # -----------------------------------------------------------------------------
@@ -386,15 +447,22 @@ async def process_document(document_id: str) -> None:
         source_path = storage.absolute_path(doc.storage_path)
         content_type = doc.content_type
         filename = doc.filename
+        upload_source = doc.source  # 'project_document' | 'bid_submission'
 
-    # 1. Classify
+    # 1. Classify (taxonomy depends on which side uploaded it)
     needs_api_key = False
     await _set_status(document_id, "classifying")
     try:
-        c = await classifier.classify_with_retry(source_path, content_type)
+        c = await classifier.classify_with_retry(
+            source_path, content_type, source=upload_source
+        )
         await _persist_classification(document_id, c)
         log.info(
-            "processor: classified %s as %s (conf=%.2f)", filename, c.doc_type, c.confidence
+            "processor: classified %s (source=%s) as %s (conf=%.2f)",
+            filename,
+            upload_source,
+            c.doc_type,
+            c.confidence,
         )
     except classifier.ClassifierUnavailable:
         log.warning("processor: no API key — skipping classification for %s", filename)
@@ -424,14 +492,22 @@ async def process_document(document_id: str) -> None:
         )
         return
 
-    # 3. Vision pre-pass — only for drawing sets.
+    # 3. Branch by (source, doc_type)
+    #
+    #    project_document + drawing-set    → Phase 2 vision pre-pass per page
+    #    project_document + written-spec   → OCR pages without native text
+    #    project_document + trade-list     → no per-page processing
+    #    project_document + other          → no per-page processing
+    #    bid_submission   + any            → OCR if scanned, otherwise nothing
+    #                                        Phase 8 will read the text content
     async with SessionLocal() as db:
         result = await db.execute(select(Document).where(Document.id == document_id))
         doc = result.scalar_one_or_none()
         doc_type = doc.doc_type if doc else None
 
     extraction_error: str | None = None
-    if doc_type == "drawing-set" and pages:
+
+    if upload_source == "project_document" and doc_type == "drawing-set" and pages:
         await _seed_page_extractions(document_id)
         await _set_status(document_id, "extracting")
         log.info("processor: vision pre-pass starting for %s (%d pages)", filename, len(pages))
@@ -446,6 +522,16 @@ async def process_document(document_id: str) -> None:
             extraction_error = (
                 f"{failed} of {ready + failed} pages failed extraction; re-extract from UI"
             )
+    elif doc_type in ("written-spec", "bid-quote", "scope-letter") and pages:
+        # Text-bearing docs: OCR any page that lacks native text so the
+        # downstream chunker has content to index.
+        await _set_status(document_id, "ocr")
+        try:
+            n_ocr = await _ocr_pages_if_needed(document_id)
+            log.info("processor: OCR'd %d pages for %s", n_ocr, filename)
+        except Exception as e:  # noqa: BLE001
+            log.exception("processor: OCR failed for %s", filename)
+            extraction_error = f"ocr: {e}"
 
     # 4. Phase 3 — index for search.
     await _set_status(document_id, "indexing")

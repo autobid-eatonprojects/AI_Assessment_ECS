@@ -13,6 +13,10 @@ class DocumentOut(BaseModel):
     size_bytes: int
     sha256: str
 
+    # Two-stage workflow
+    source: str  # "project_document" | "bid_submission"
+    vendor_name: str | None
+
     doc_type: str | None
     classification_confidence: float | None
     classification_reasoning: str | None
