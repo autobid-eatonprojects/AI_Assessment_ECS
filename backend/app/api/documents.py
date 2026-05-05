@@ -1,3 +1,4 @@
+import logging
 import mimetypes
 from typing import Annotated
 
@@ -9,8 +10,11 @@ from ..config import settings
 from ..models import Document, DocumentPage, Project
 from ..schemas import DocumentOut, DocumentPageOut, DocumentPageTextOut
 from ..services import processor
+from ..services.image_mime import detect_image_mime
 from ..services.storage import storage
 from .deps import DB, CurrentUser
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects/{project_id}/documents", tags=["documents"])
 
@@ -119,6 +123,20 @@ async def upload_documents(
         content_type = (
             f.content_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
         )
+
+        # Trust the bytes, not the extension. If a JPEG was renamed `.png`
+        # the browser hands us `image/png` and downstream API calls 400 on
+        # the magic-number mismatch. Sniff the first 16 bytes once and
+        # override content_type when the truth disagrees.
+        sniffed = detect_image_mime(data[:16])
+        if sniffed and sniffed != content_type:
+            log.info(
+                "upload: %s declared %s, sniffed %s — using sniffed",
+                filename,
+                content_type,
+                sniffed,
+            )
+            content_type = sniffed
 
         doc = Document(
             project_id=project_id,

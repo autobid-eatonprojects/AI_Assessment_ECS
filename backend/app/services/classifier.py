@@ -142,6 +142,17 @@ def _is_image(content_type: str, path: Path) -> bool:
 
 
 def _image_media_type(path: Path) -> str:
+    """Sniff the real format from the file's first bytes. Some users upload
+    JPEGs renamed to `.png` (or vice versa); trusting the extension makes
+    Anthropic / Gemini reject the request with a magic-number mismatch."""
+    from .image_mime import detect_image_mime
+
+    with open(path, "rb") as f:
+        head = f.read(16)
+    sniffed = detect_image_mime(head)
+    if sniffed:
+        return sniffed
+    # Fall back to extension if magic bytes don't match a known format.
     ext = path.suffix.lower()
     return {
         ".png": "image/png",
