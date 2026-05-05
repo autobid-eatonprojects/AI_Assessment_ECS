@@ -10,13 +10,15 @@ import {
   FileWarning,
   Grid3x3,
   Loader2,
+  MapPin,
   Receipt,
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
-import { use, useMemo, useState } from "react";
+import { Fragment, use, useMemo, useState } from "react";
 import { AppHeader } from "@/components/app-header";
 import { AuthGuard } from "@/components/auth-guard";
+import { CitationViewerModal } from "@/components/citation-viewer-modal";
 import {
   Tabs,
   TabsContent,
@@ -135,8 +137,8 @@ function CoverageMatrix({
           </thead>
           <tbody>
             {Object.entries(byDivision).map(([division, items]) => (
-              <>
-                <tr key={`hdr-${division}`}>
+              <Fragment key={division}>
+                <tr>
                   <td
                     colSpan={bids.length + 1}
                     className="bg-muted/40 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
@@ -185,7 +187,7 @@ function CoverageMatrix({
                     })}
                   </tr>
                 ))}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -215,6 +217,12 @@ function CoverageDetail({
   bid: BidSummary;
   cov: BidCoverage | null;
 }) {
+  const [showCitation, setShowCitation] = useState(false);
+  // Prefer a citation that carries a bbox so the modal can highlight the source
+  // region; fall back to the first available citation otherwise.
+  const citation =
+    scopeItem.citations.find((c) => c.bbox) ?? scopeItem.citations[0] ?? null;
+
   return (
     <div className="space-y-3 text-sm">
       <div>
@@ -269,14 +277,33 @@ function CoverageDetail({
           </p>
         )}
       </div>
-      <div className="border-t pt-3">
+      <div className="flex flex-wrap items-center gap-3 border-t pt-3 text-xs">
+        {citation && (
+          <button
+            type="button"
+            onClick={() => setShowCitation(true)}
+            className="inline-flex items-center gap-1 rounded border bg-card px-2 py-1 font-medium hover:bg-muted"
+          >
+            <MapPin className="size-3 text-blue-600" />
+            View scope source
+          </button>
+        )}
         <Link
           href={`/projects/${projectId}/bids?bid=${bid.bid_document_id}`}
-          className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 hover:underline dark:text-violet-400"
+          className="inline-flex items-center gap-1 font-medium text-violet-700 hover:underline dark:text-violet-400"
         >
           Open bid in detail tab <ExternalLink className="size-3" />
         </Link>
       </div>
+      {citation && (
+        <CitationViewerModal
+          open={showCitation}
+          onOpenChange={setShowCitation}
+          projectId={projectId}
+          scopeItem={scopeItem}
+          citation={citation}
+        />
+      )}
     </div>
   );
 }

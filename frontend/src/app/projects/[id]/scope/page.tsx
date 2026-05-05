@@ -1,16 +1,17 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, Download, Loader2, Play, RefreshCw } from "lucide-react";
+import { ChevronLeft, Download, Loader2, MapPin, Play, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { use, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/app-header";
 import { AuthGuard } from "@/components/auth-guard";
+import { CitationViewerModal } from "@/components/citation-viewer-modal";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
-import type { ScopeItem } from "@/lib/types";
+import type { ScopeCitation, ScopeItem } from "@/lib/types";
 
 function ConfidenceBadge({ value }: { value: number }) {
   const pct = Math.round(value * 100);
@@ -27,7 +28,15 @@ function ConfidenceBadge({ value }: { value: number }) {
   );
 }
 
-function ScopeItemDetail({ projectId, item }: { projectId: string; item: ScopeItem }) {
+function ScopeItemDetail({
+  projectId,
+  item,
+  onCitationClick,
+}: {
+  projectId: string;
+  item: ScopeItem;
+  onCitationClick: (c: ScopeCitation) => void;
+}) {
   return (
     <div className="space-y-4">
       <div>
@@ -87,38 +96,53 @@ function ScopeItemDetail({ projectId, item }: { projectId: string; item: ScopeIt
           Citations ({item.citations.length})
         </h4>
         <ul className="space-y-2">
-          {item.citations.map((c) => (
-            <li key={c.id} className="rounded-md border bg-muted/30 p-2 text-xs">
-              <div className="mb-1 flex items-center gap-2">
-                {c.sheet_number && (
-                  <span className="rounded bg-blue-100 px-1.5 py-0.5 font-mono font-medium text-blue-900 dark:bg-blue-900/40 dark:text-blue-200">
-                    {c.sheet_number}
-                  </span>
+          {item.citations.map((c) => {
+            const hasBbox = !!c.bbox;
+            return (
+              <li key={c.id} className="rounded-md border bg-muted/30 p-2 text-xs">
+                <div className="mb-1 flex items-center gap-2">
+                  {c.sheet_number && (
+                    <span className="rounded bg-blue-100 px-1.5 py-0.5 font-mono font-medium text-blue-900 dark:bg-blue-900/40 dark:text-blue-200">
+                      {c.sheet_number}
+                    </span>
+                  )}
+                  {c.page_number != null && (
+                    <span className="text-muted-foreground">
+                      page {c.page_number}
+                    </span>
+                  )}
+                  {c.extraction_query && (
+                    <span className="text-muted-foreground">
+                      via {c.extraction_query}
+                    </span>
+                  )}
+                  {c.rerank_score != null && (
+                    <span className="ml-auto text-muted-foreground">
+                      rerank {c.rerank_score.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+                {c.excerpt && (
+                  <p className="line-clamp-3 text-muted-foreground">{c.excerpt}</p>
                 )}
-                {c.page_number != null && c.document_id && (
-                  <Link
-                    href={`/projects/${projectId}/documents/${c.document_id}/pages/${c.page_number}`}
-                    className="text-blue-600 hover:underline"
+                {c.document_id && c.page_number != null && (
+                  <button
+                    type="button"
+                    onClick={() => onCitationClick(c)}
+                    className="mt-2 inline-flex items-center gap-1 rounded border bg-card px-2 py-0.5 text-[11px] font-medium hover:bg-muted"
+                    title={
+                      hasBbox
+                        ? "Open the source page with this citation's bbox highlighted"
+                        : "Open the source page (no bbox available for this chunk type)"
+                    }
                   >
-                    page {c.page_number} →
-                  </Link>
+                    <MapPin className="size-3 text-blue-600" />
+                    {hasBbox ? "View on drawing" : "View page"}
+                  </button>
                 )}
-                {c.extraction_query && (
-                  <span className="text-muted-foreground">
-                    via {c.extraction_query}-query
-                  </span>
-                )}
-                {c.rerank_score != null && (
-                  <span className="ml-auto text-muted-foreground">
-                    rerank {c.rerank_score.toFixed(2)}
-                  </span>
-                )}
-              </div>
-              {c.excerpt && (
-                <p className="line-clamp-3 text-muted-foreground">{c.excerpt}</p>
-              )}
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </div>
     </div>
@@ -173,6 +197,10 @@ function ScopeView({ projectId }: { projectId: string }) {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<string | null>(null); // csi_division
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
+  const [openCitation, setOpenCitation] = useState<{
+    item: ScopeItem;
+    citation: ScopeCitation;
+  } | null>(null);
 
   const overviewQuery = useQuery({
     queryKey: ["scope-overview", projectId],
@@ -373,7 +401,13 @@ function ScopeView({ projectId }: { projectId: string }) {
           <aside className="col-span-4 space-y-2">
             <div className="sticky top-4 rounded-md border bg-card p-4">
               {itemDetail ? (
-                <ScopeItemDetail projectId={projectId} item={itemDetail} />
+                <ScopeItemDetail
+                  projectId={projectId}
+                  item={itemDetail}
+                  onCitationClick={(c) =>
+                    setOpenCitation({ item: itemDetail, citation: c })
+                  }
+                />
               ) : (
                 <p className="text-sm text-muted-foreground">
                   Select an item to see details and citations.
@@ -382,6 +416,16 @@ function ScopeView({ projectId }: { projectId: string }) {
             </div>
           </aside>
         </div>
+      )}
+
+      {openCitation && (
+        <CitationViewerModal
+          open={!!openCitation}
+          onOpenChange={(o) => !o && setOpenCitation(null)}
+          projectId={projectId}
+          scopeItem={openCitation.item}
+          citation={openCitation.citation}
+        />
       )}
     </>
   );
