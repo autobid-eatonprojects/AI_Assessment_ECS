@@ -1,7 +1,19 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, Download, Loader2, MapPin, Play, RefreshCw } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronLeft,
+  Download,
+  Filter,
+  Loader2,
+  MapPin,
+  Play,
+  RefreshCw,
+  Sparkles,
+  XCircle,
+} from "lucide-react";
 import Link from "next/link";
 import { use, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -29,6 +41,115 @@ function ConfidenceBadge({ value }: { value: number }) {
   );
 }
 
+function VerifierBadge({ item }: { item: ScopeItem }) {
+  if (!item.verifier_status) return null;
+  const map = {
+    keep: {
+      Icon: CheckCircle2,
+      label: "Verified",
+      cls: "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200",
+    },
+    revised: {
+      Icon: Sparkles,
+      label: "Revised by Opus",
+      cls: "bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-200",
+    },
+    rejected: {
+      Icon: XCircle,
+      label: "Rejected",
+      cls: "bg-red-200 text-red-900 dark:bg-red-900/60 dark:text-red-100",
+    },
+  };
+  const s = map[item.verifier_status];
+  return (
+    <span
+      title={item.verifier_review?.reasoning ?? undefined}
+      className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium ${s.cls}`}
+    >
+      <s.Icon className="size-3" />
+      {s.label}
+    </span>
+  );
+}
+
+function FlagDrillDown({ item }: { item: ScopeItem }) {
+  // Only show if the item is flagged: red confidence, qty conflict, or
+  // anything Opus reviewed.
+  const isFlagged =
+    item.confidence < 0.6 ||
+    item.qty_confidence === "conflicting" ||
+    item.verifier_status != null;
+  if (!isFlagged) return null;
+
+  const review = item.verifier_review;
+
+  return (
+    <details className="rounded-md border border-amber-300 bg-amber-50/60 p-3 text-xs dark:border-amber-800 dark:bg-amber-950/30">
+      <summary className="cursor-pointer select-none font-medium text-amber-900 dark:text-amber-200">
+        <AlertCircle className="mr-1.5 inline size-3.5" />
+        Why is this flagged?
+      </summary>
+
+      <div className="mt-3 space-y-3">
+        <section>
+          <h5 className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Validator votes
+          </h5>
+          <p className="font-mono">
+            confidence {(item.confidence * 100).toFixed(0)}%
+            {item.confidence < 0.6 && " — below 60% threshold"}
+          </p>
+        </section>
+
+        {item.qty_confidence === "conflicting" && (
+          <section>
+            <h5 className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Quantity conflict
+            </h5>
+            <p>Multiple sources disagreed on the quantity for this item.</p>
+          </section>
+        )}
+
+        {review && (
+          <section className="border-t border-amber-300/50 pt-2 dark:border-amber-800/50">
+            <h5 className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Opus reflection ({review.model ?? "claude-opus-4-7"})
+            </h5>
+            <p className="mb-2 font-medium">
+              Verdict: <span className="capitalize">{review.verdict}</span>
+            </p>
+            {review.reasoning && (
+              <p className="mb-2 leading-relaxed">{review.reasoning}</p>
+            )}
+            {review.consistency_check && (
+              <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px]">
+                {review.consistency_check.schedule_says && (
+                  <>
+                    <dt className="text-muted-foreground">Schedule</dt>
+                    <dd>{review.consistency_check.schedule_says}</dd>
+                  </>
+                )}
+                {review.consistency_check.note_says && (
+                  <>
+                    <dt className="text-muted-foreground">Note</dt>
+                    <dd>{review.consistency_check.note_says}</dd>
+                  </>
+                )}
+                {review.consistency_check.spec_says && (
+                  <>
+                    <dt className="text-muted-foreground">Spec</dt>
+                    <dd>{review.consistency_check.spec_says}</dd>
+                  </>
+                )}
+              </dl>
+            )}
+          </section>
+        )}
+      </div>
+    </details>
+  );
+}
+
 function ScopeItemDetail({
   projectId,
   item,
@@ -49,9 +170,12 @@ function ScopeItemDetail({
             <span className="text-muted-foreground">{item.section_title}</span>
           )}
           <ConfidenceBadge value={item.confidence} />
+          <VerifierBadge item={item} />
         </div>
         <h3 className="text-base font-semibold">{item.description}</h3>
       </div>
+
+      <FlagDrillDown item={item} />
 
       <dl className="space-y-2 text-sm">
         {item.specification && (
@@ -203,6 +327,7 @@ function ScopeView({ projectId }: { projectId: string }) {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<string | null>(null); // csi_division
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
+  const [flaggedOnly, setFlaggedOnly] = useState(false);
   const [openCitation, setOpenCitation] = useState<{
     item: ScopeItem;
     citation: ScopeCitation;
@@ -236,7 +361,28 @@ function ScopeView({ projectId }: { projectId: string }) {
   const run = overview?.latest_run;
   const isRunning = run?.status === "running";
 
-  const items = itemsQuery.data ?? [];
+  const allItems = itemsQuery.data ?? [];
+  const items = useMemo(() => {
+    if (!flaggedOnly) return allItems;
+    return allItems.filter(
+      (i) =>
+        i.confidence < 0.6 ||
+        i.qty_confidence === "conflicting" ||
+        i.verifier_status === "rejected" ||
+        i.verifier_status === "revised",
+    );
+  }, [allItems, flaggedOnly]);
+  const flaggedCount = useMemo(
+    () =>
+      allItems.filter(
+        (i) =>
+          i.confidence < 0.6 ||
+          i.qty_confidence === "conflicting" ||
+          i.verifier_status === "rejected" ||
+          i.verifier_status === "revised",
+      ).length,
+    [allItems],
+  );
   const itemDetail = useMemo(
     () => items.find((i) => i.id === selectedItem),
     [items, selectedItem],
@@ -269,6 +415,19 @@ function ScopeView({ projectId }: { projectId: string }) {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {flaggedCount > 0 && (
+            <Button
+              variant={flaggedOnly ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFlaggedOnly(!flaggedOnly)}
+              title="Toggle to show only items flagged by the validator or revised/rejected by the Opus verifier"
+            >
+              <Filter className="size-4" />
+              <span className="ml-1.5">
+                {flaggedOnly ? "All items" : `Flagged (${flaggedCount})`}
+              </span>
+            </Button>
+          )}
           {items.length > 0 && (
             <Button
               variant="outline"
@@ -391,6 +550,7 @@ function ScopeView({ projectId }: { projectId: string }) {
                       {item.csi_code}
                     </span>
                     <ConfidenceBadge value={item.confidence} />
+                    <VerifierBadge item={item} />
                     <span className="ml-auto">
                       <QuantityBadge
                         compact
@@ -401,7 +561,13 @@ function ScopeView({ projectId }: { projectId: string }) {
                       />
                     </span>
                   </div>
-                  <p className="line-clamp-2 text-sm">{item.description}</p>
+                  <p
+                    className={`line-clamp-2 text-sm ${
+                      item.verifier_status === "rejected" ? "line-through opacity-60" : ""
+                    }`}
+                  >
+                    {item.description}
+                  </p>
                 </button>
               ))
             )}

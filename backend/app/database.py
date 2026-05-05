@@ -45,6 +45,9 @@ _NEW_COLUMNS_BY_TABLE: dict[str, dict[str, str]] = {
         # Phase 6 quantity resolver
         "qty_confidence": "VARCHAR(16)",
         "qty_provenance": "JSON",
+        # Phase 7 Opus reflection pass
+        "verifier_status": "VARCHAR(16)",
+        "verifier_review": "JSON",
     },
 }
 

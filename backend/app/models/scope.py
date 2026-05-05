@@ -97,6 +97,11 @@ class ScopeItem(Base):
     qty_confidence: Mapped[str | None] = mapped_column(String(16), nullable=True)
     qty_provenance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
+    # Phase 7 Opus reflection pass:
+    #   not_reviewed | keep | revised | rejected
+    verifier_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    verifier_review: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
     # Audit
     raw_extractions: Mapped[list | None] = mapped_column(JSON, nullable=True)
     validation_votes: Mapped[list | None] = mapped_column(JSON, nullable=True)

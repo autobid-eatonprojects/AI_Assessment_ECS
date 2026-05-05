@@ -44,6 +44,7 @@ from .project_profiler import get_or_create_profile
 from .quantity_resolver import resolve_quantities
 from .schedule_miner import mine_schedules
 from .scope_deduper import dedupe
+from .scope_verifier import verify_low_confidence
 from .scope_extractor import (
     CandidateItem,
     ScopeExtractorUnavailable,
@@ -401,8 +402,22 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
     qty_updated = await resolve_quantities(run_id)
     log.info("scope_runner: quantity resolver updated %d items", qty_updated)
 
+    # Stage F — Opus 4.7 reflection pass on flagged items only (red
+    # validator confidence + qty conflicts). Catches misses where the
+    # primary 3-vote validator wasn't decisive. ~$1-2 on a typical run.
+    kept, revised, rejected, verifier_cost = await verify_low_confidence(run_id)
+    log.info(
+        "scope_runner: verifier — %d kept, %d revised, %d rejected, $%.3f",
+        kept,
+        revised,
+        rejected,
+        verifier_cost,
+    )
+
     # Compute final cost from llm_calls for this run window
-    total_cost = sum(d.cost_usd for d in division_results) + schedule_cost
+    total_cost = (
+        sum(d.cost_usd for d in division_results) + schedule_cost + verifier_cost
+    )
 
     async with SessionLocal() as db:
         run = await db.get(ScopeExtractionRun, run_id)

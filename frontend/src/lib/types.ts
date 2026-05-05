@@ -229,6 +229,21 @@ export interface ScopeCitation {
 }
 
 export type QtyConfidence = "high" | "medium" | "conflicting" | "unverified";
+export type VerifierStatus = "keep" | "revised" | "rejected";
+
+export interface VerifierReview {
+  verdict: VerifierStatus;
+  reasoning: string | null;
+  consistency_check: {
+    schedule_says?: string | null;
+    note_says?: string | null;
+    spec_says?: string | null;
+    agree?: boolean | null;
+  } | null;
+  model: string | null;
+  latency_ms?: number | null;
+  cost_usd?: number | null;
+}
 
 export interface ScopeItem {
   id: string;
@@ -247,6 +262,8 @@ export interface ScopeItem {
   extraction_method: string | null;
   qty_confidence: QtyConfidence | null;
   qty_provenance: Record<string, unknown> | null;
+  verifier_status: VerifierStatus | null;
+  verifier_review: VerifierReview | null;
   citations: ScopeCitation[];
   created_at: string;
   updated_at: string;

@@ -43,6 +43,9 @@ class ScopeItemOut(BaseModel):
     qty_confidence: str | None = None
     qty_provenance: dict | None = None
 
+    verifier_status: str | None = None
+    verifier_review: dict | None = None
+
     citations: list[ScopeCitationOut]
 
     created_at: datetime
