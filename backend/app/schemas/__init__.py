@@ -11,6 +11,12 @@ from .extraction import (
     PageExtractionSummary,
     ScheduleOut,
 )
+from .profile import (
+    ProjectProfileOut,
+    TradeDivisionRelevanceOut,
+    TradeRelevanceMatrix,
+    TradeRelevanceOverrideIn,
+)
 from .project import LifecycleTransition, ProjectCreate, ProjectOut, ProjectUpdate
 from .search import SearchHit, SearchRequest, SearchResponse
 
@@ -30,11 +36,15 @@ __all__ = [
     "PageExtractionSummary",
     "ProjectCreate",
     "ProjectOut",
+    "ProjectProfileOut",
     "ProjectUpdate",
     "ScheduleOut",
     "SearchHit",
     "SearchRequest",
     "SearchResponse",
     "TokenResponse",
+    "TradeDivisionRelevanceOut",
+    "TradeRelevanceMatrix",
+    "TradeRelevanceOverrideIn",
     "UserOut",
 ]

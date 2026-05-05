@@ -12,6 +12,7 @@ import { BidUpload } from "@/components/bid-upload";
 import { DocumentList } from "@/components/document-list";
 import { DocumentUpload } from "@/components/document-upload";
 import { LifecycleBanner } from "@/components/lifecycle-banner";
+import { ProjectProfileCard } from "@/components/project-profile-card";
 import { SearchBar } from "@/components/search-bar";
 import { Button } from "@/components/ui/button";
 import {
@@ -97,6 +98,10 @@ function ProjectDetail({ projectId }: { projectId: string }) {
 
       <div className="mb-6">
         <LifecycleBanner project={data} />
+      </div>
+
+      <div className="mb-6">
+        <ProjectProfileCard projectId={projectId} />
       </div>
 
       <div className="mb-6">

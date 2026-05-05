@@ -193,6 +193,26 @@ export interface SearchResponse {
   rerank_used: "cohere" | "claude" | "none";
 }
 
+export interface ProjectProfile {
+  id: string;
+  project_id: string;
+  building_type: string | null;
+  size_sf: number | null;
+  occupancy: string | null;
+  construction_type: string | null;
+  sprinklered: boolean | null;
+  stories: number | null;
+  location: string | null;
+  project_number: string | null;
+  codes: string[] | null;
+  reasoning: string | null;
+  model: string | null;
+  cost_usd: number | null;
+  latency_ms: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;

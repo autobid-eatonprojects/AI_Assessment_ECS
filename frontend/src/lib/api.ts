@@ -6,6 +6,7 @@ import type {
   DocumentPageText,
   PageExtraction,
   Project,
+  ProjectProfile,
   SearchResponse,
   TokenResponse,
   User,
@@ -158,6 +159,14 @@ export const api = {
     request<SearchResponse>(`/api/projects/${projectId}/search`, {
       method: "POST",
       body: JSON.stringify({ query, top_k }),
+    }),
+
+  // Phase 4.1: Project profile
+  getProjectProfile: (projectId: string) =>
+    request<ProjectProfile | null>(`/api/projects/${projectId}/profile`),
+  runProjectProfiler: (projectId: string) =>
+    request<ProjectProfile>(`/api/projects/${projectId}/profile`, {
+      method: "POST",
     }),
 };
 
