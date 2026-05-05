@@ -9,6 +9,7 @@ import { AppHeader } from "@/components/app-header";
 import { AuthGuard } from "@/components/auth-guard";
 import { AuthImage } from "@/components/auth-image";
 import { ClassificationBadge } from "@/components/classification-badge";
+import { ExtractionOverview } from "@/components/extraction-overview";
 import { PageViewerModal } from "@/components/page-viewer-modal";
 import { ProcessingStatusIndicator } from "@/components/processing-status";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,12 @@ import { api } from "@/lib/api";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 
 function isProcessing(status: string): boolean {
-  return status === "pending" || status === "classifying" || status === "rendering";
+  return (
+    status === "pending" ||
+    status === "classifying" ||
+    status === "rendering" ||
+    status === "extracting"
+  );
 }
 
 function DocumentDetail({
@@ -131,6 +137,16 @@ function DocumentDetail({
         </Button>
       </div>
 
+      {doc.doc_type === "drawing-set" && (
+        <div className="mb-6">
+          <ExtractionOverview
+            projectId={projectId}
+            documentId={documentId}
+            documentStatus={doc.processing_status}
+          />
+        </div>
+      )}
+
       {pages.length === 0 ? (
         <div className="rounded-md border border-dashed py-12 text-center text-sm text-muted-foreground">
           {isProcessing(doc.processing_status)
@@ -142,24 +158,33 @@ function DocumentDetail({
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {pages.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setViewerPage(p.page_number)}
-              className="group relative overflow-hidden rounded-md border bg-muted text-left transition-shadow hover:shadow-md"
-              style={{ aspectRatio: `${p.width} / ${p.height}` }}
-            >
-              <AuthImage
-                projectId={projectId}
-                documentId={documentId}
-                pageNumber={p.page_number}
-                variant="thumbnail"
-                className="h-full w-full object-cover"
-                alt={`Page ${p.page_number}`}
-              />
-              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5 text-xs font-medium text-white">
-                <span>Page {p.page_number}</span>
-              </div>
-            </button>
+            <div key={p.id} className="space-y-1">
+              <button
+                onClick={() => setViewerPage(p.page_number)}
+                className="group relative block w-full overflow-hidden rounded-md border bg-muted text-left transition-shadow hover:shadow-md"
+                style={{ aspectRatio: `${p.width} / ${p.height}` }}
+              >
+                <AuthImage
+                  projectId={projectId}
+                  documentId={documentId}
+                  pageNumber={p.page_number}
+                  variant="thumbnail"
+                  className="h-full w-full object-cover"
+                  alt={`Page ${p.page_number}`}
+                />
+                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5 text-xs font-medium text-white">
+                  <span>Page {p.page_number}</span>
+                </div>
+              </button>
+              {doc.doc_type === "drawing-set" && (
+                <Link
+                  href={`/projects/${projectId}/documents/${documentId}/pages/${p.page_number}`}
+                  className="block truncate text-center text-xs text-muted-foreground hover:text-foreground hover:underline"
+                >
+                  Inspect extraction →
+                </Link>
+              )}
+            </div>
           ))}
         </div>
       )}

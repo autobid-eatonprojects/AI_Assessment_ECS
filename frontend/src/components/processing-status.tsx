@@ -8,6 +8,7 @@ const STATUS: Record<
   pending: { label: "Queued", icon: Loader2, className: "text-zinc-500" },
   classifying: { label: "Classifying", icon: Loader2, className: "text-blue-600" },
   rendering: { label: "Rendering pages", icon: Loader2, className: "text-blue-600" },
+  extracting: { label: "Vision pre-pass", icon: Loader2, className: "text-purple-600" },
   ready: { label: "Ready", icon: CheckCircle2, className: "text-emerald-600" },
   failed: { label: "Failed", icon: AlertTriangle, className: "text-red-600" },
   "needs-api-key": {

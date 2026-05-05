@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import auth, documents, projects
+from .api import auth, documents, extraction, projects
 from .config import settings
 from .database import init_db
 
@@ -20,6 +20,10 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    # Resume any work that was in flight when the previous process died.
+    from .services.processor import resume_pending
+
+    await resume_pending()
     yield
 
 
@@ -47,3 +51,4 @@ async def health() -> dict:
 app.include_router(auth.router, prefix="/api")
 app.include_router(projects.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
+app.include_router(extraction.router, prefix="/api")

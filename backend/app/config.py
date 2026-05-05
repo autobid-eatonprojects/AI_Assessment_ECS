@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     anthropic_api_key: str | None = None
     classifier_model: str = "claude-haiku-4-5"
 
+    # Vision pre-pass (Phase 2)
+    vision_model: str = "claude-sonnet-4-6"
+    vision_concurrency: int = 5  # parallel Claude vision calls
+    vision_max_retries: int = 2
+
     # PDF rendering
     page_dpi: int = 150  # full-page render DPI
     thumbnail_max_dim: int = 320  # px

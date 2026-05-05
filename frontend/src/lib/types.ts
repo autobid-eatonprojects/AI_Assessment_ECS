@@ -21,6 +21,7 @@ export type ProcessingStatus =
   | "pending"
   | "classifying"
   | "rendering"
+  | "extracting"
   | "ready"
   | "failed"
   | "needs-api-key";
@@ -49,6 +50,101 @@ export interface DocumentPage {
   width: number;
   height: number;
   created_at: string;
+}
+
+export interface BoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export type EntityType =
+  | "material"
+  | "manufacturer"
+  | "code"
+  | "dimension"
+  | "room"
+  | "equipment"
+  | "symbol"
+  | "other";
+
+export type ExtractionStatus = "pending" | "extracting" | "ready" | "failed";
+
+export interface ExtractedSchedule {
+  id: string;
+  name: string;
+  columns: string[];
+  rows: Record<string, unknown>[];
+  bbox: BoundingBox | null;
+}
+
+export interface ExtractedNote {
+  id: string;
+  text: string;
+  bbox: BoundingBox | null;
+}
+
+export interface ExtractedCrossReference {
+  id: string;
+  target_sheet: string;
+  detail_id: string | null;
+  context: string | null;
+  bbox: BoundingBox | null;
+}
+
+export interface ExtractedEntity {
+  id: string;
+  entity_type: EntityType;
+  value: string;
+  bbox: BoundingBox | null;
+  extra: Record<string, unknown> | null;
+}
+
+export interface PageExtraction {
+  id: string;
+  document_id: string;
+  page_id: string;
+  page_number: number;
+  sheet_number: string | null;
+  sheet_title: string | null;
+  discipline: string | null;
+  drawing_scale: string | null;
+  status: ExtractionStatus;
+  error: string | null;
+  model: string | null;
+  cost_usd: number | null;
+  latency_ms: number | null;
+  created_at: string;
+  extracted_at: string | null;
+  schedules: ExtractedSchedule[];
+  notes: ExtractedNote[];
+  cross_references: ExtractedCrossReference[];
+  entities: ExtractedEntity[];
+}
+
+export interface PageExtractionSummary {
+  page_number: number;
+  status: ExtractionStatus;
+  sheet_number: string | null;
+  sheet_title: string | null;
+  discipline: string | null;
+  schedule_count: number;
+  note_count: number;
+  cross_reference_count: number;
+  entity_count: number;
+  cost_usd: number | null;
+}
+
+export interface DocumentExtractionOverview {
+  document_id: string;
+  total_pages: number;
+  pages_ready: number;
+  pages_failed: number;
+  pages_pending: number;
+  pages_extracting: number;
+  total_cost_usd: number;
+  pages: PageExtractionSummary[];
 }
 
 export interface TokenResponse {

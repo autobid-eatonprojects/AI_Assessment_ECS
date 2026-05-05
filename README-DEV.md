@@ -126,6 +126,41 @@ Restart the backend after editing `.env`.
 
 **Quality gate:** Classifier ≥ 95% accuracy on the supplied `bids/` folder. We're at 100% (8/8) on a representative sample.
 
+## Phase 2 test scenario — vision pre-pass on drawings
+
+After Phase 1 is in place and a drawing-set PDF has been classified, Phase 2 kicks in automatically. For each page of every drawing-set document, the system runs a Claude Sonnet 4.6 vision pass to extract:
+
+- Sheet metadata (sheet number, title, discipline, scale)
+- Schedules (footing, door, finish, fixture, equipment, etc.) — full rows verbatim
+- General notes (paragraph text, code references)
+- Cross-references (e.g. "see S2.1", "detail 5/A5.2")
+- Entities (materials, manufacturers, codes, dimensions, room labels, equipment) — each with bbox
+
+Cost is logged per call in the `llm_calls` table.
+
+1. Sign in, create a fresh project ("Elks Phase 2")
+2. Upload one of the 54-page drawing PDFs
+3. Watch the document detail page — status flows: `Classifying → Rendering pages → Vision pre-pass → Ready`
+4. The "Vision pre-pass" panel appears with a per-page mini-grid (54 dots, each linking to that page's extraction view) and a running cost total
+5. Once a page lands in **Ready**, click "Inspect extraction →" beneath any thumbnail
+6. The page-detail view shows:
+   - Full-resolution drawing on the left
+   - Tabbed extraction panel on the right (Schedules / Notes / Refs / Entities / Raw)
+   - Hover any item → its bounding box highlights on the drawing
+7. **Schedules** render as proper HTML tables — footing schedule rows F3.0/F4.0/F6.0 should match the original drawing exactly
+8. Click the **Re-extract** button to re-run vision on a single page (failure isolation: one bad page never fails the whole doc)
+
+**Quality gate:** ≥ 90% schedule rows extracted correctly across 5 sample pages. Manually verify against:
+- **S1.1 Foundation Plan** — Footing Schedule
+- **S0.1 Structural Notes** — Design Loads / Lumber Species / Reinforcing schedules
+- **M0.1 HVAC** — Equipment schedules
+- **A2.1 Door Schedule**
+- **FP0.1 Sprinkler Schedule + Notes**
+
+Cost expectation: ~$5–7 per 54-page drawing set on Sonnet 4.6.
+
+> **First-time setup for Phase 2:** the same `ANTHROPIC_API_KEY` from Phase 1 is reused. Vision concurrency is configurable via `VISION_CONCURRENCY=5` in `backend/.env`.
+
 ## What's NOT in Phase 0 (intentionally)
 
 These are added in later phases when needed:

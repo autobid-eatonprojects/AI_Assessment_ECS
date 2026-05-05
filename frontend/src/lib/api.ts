@@ -1,7 +1,9 @@
 import { useAuthStore } from "./auth";
 import type {
   Document,
+  DocumentExtractionOverview,
   DocumentPage,
+  PageExtraction,
   Project,
   TokenResponse,
   User,
@@ -112,6 +114,21 @@ export const api = {
     if (!res.ok) throw new ApiError(`failed to fetch ${variant}`, res.status);
     return res.blob();
   },
+
+  // Extraction (Phase 2)
+  getExtractionOverview: (projectId: string, documentId: string) =>
+    request<DocumentExtractionOverview>(
+      `/api/projects/${projectId}/documents/${documentId}/extraction`,
+    ),
+  getPageExtraction: (projectId: string, documentId: string, pageNumber: number) =>
+    request<PageExtraction>(
+      `/api/projects/${projectId}/documents/${documentId}/pages/${pageNumber}/extraction`,
+    ),
+  reextractPage: (projectId: string, documentId: string, pageNumber: number) =>
+    request<PageExtraction>(
+      `/api/projects/${projectId}/documents/${documentId}/pages/${pageNumber}/reextract`,
+      { method: "POST" },
+    ),
 };
 
 export { ApiError };

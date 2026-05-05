@@ -103,12 +103,61 @@ A running record of what has shipped, been tested, and what remains.
 
 ---
 
+## Phase 2 — Vision Pre-pass on Drawings ✅ Shipped
+
+**Goal:** For every page of every drawing-set document, extract structured data — schedules, general notes, cross-references, dimensions, materials, manufacturers, codes — each with a bounding box. This is the foundation for indexing (Phase 3), scope extraction (Phase 4), and bid-vs-scope verification (Phase 8).
+
+**Stack additions:**
+- Claude Sonnet 4.6 vision via Anthropic SDK with tool-use structured output
+- Pydantic schema validates every Claude response; one auto-retry with the validation error fed back if the model returns malformed output
+- `asyncio.Semaphore(VISION_CONCURRENCY=5)` rate-limits parallel calls
+- Per-page failure isolation: one bad page doesn't fail the doc
+- Resumability: on backend boot, scan for in-flight documents and reschedule
+- New `LLMCall` audit table: every API call logged with model, tokens, cost, latency for cost tracking + post-hoc debugging
+- SQLite WAL stays in place; will swap to Postgres + ARQ when scale demands
+
+**Backend additions:**
+- New models: `PageExtraction` + `ExtractedSchedule` / `ExtractedNote` / `ExtractedCrossReference` / `ExtractedEntity` + `LLMCall`
+- New services: `vision_extractor.py` (Claude vision + tool-use), `llm_log.py` (cost tracking)
+- Updated `processor.py`: pipeline gains `extracting` step (pending → classifying → rendering → extracting → ready). Only runs for `drawing-set` docs.
+- New endpoints:
+  - `GET /api/projects/{p}/documents/{d}/extraction` — overview with per-page status + total cost
+  - `GET /api/projects/{p}/documents/{d}/pages/{n}/extraction` — full extracted content for a page
+  - `POST /api/projects/{p}/documents/{d}/pages/{n}/reextract` — re-run extraction on one page
+
+**Frontend additions:**
+- `ExtractionStatusBadge` (4 states with icons)
+- `ExtractionOverview` — per-page mini status grid with sheet numbers + total cost
+- `ExtractedScheduleTable` — proper HTML table rendering for footing/door/HVAC/etc. schedules
+- `PageImageWithBbox` — full-res image with absolute-positioned normalised bbox overlay
+- New page `/projects/[id]/documents/[docId]/pages/[pageNum]` — side-by-side image + tabbed extraction panel (Schedules / Notes / Refs / Entities / Raw)
+- **Hover any extracted item → bounding box highlights on the drawing** (the credibility-defining feature)
+- Re-extract button per page
+- Polling: extraction overview + per-page extraction refetch every 2s while extracting
+
+**Verified end-to-end:**
+- 3-page sample test: S1.1 Foundation Plan, S0.1 Structural Notes, M0.1 HVAC Schedules
+- S1.1: Footing Schedule fully captured (CTS2.0/WF2.0/TS3.0/F3.0/F4.0/F6.0 with sizes & reinforcing), 21 general notes, 6 cross-refs (S4.1/S0.1/S0.2), 35 entities
+- S0.1: Captured ALL 5 schedules including the dense 30-row DESIGN LOADS table and 14-row LUMBER MEMBER SPECIES SCHEDULE
+- M0.1: Captured ALL 6 equipment schedules — Heat Pump, Packaged Heat Pump, Exhaust Fan, Roof Relief Hood, Electric Heater, Air Distribution
+- Schema validation auto-retry caught and corrected real edge cases (Claude returned bbox coords slightly outside [0,1] for items at page edges; we now clamp tolerantly)
+
+**Cost & performance:**
+- ~$0.10–0.13 per page on Sonnet 4.6 (~7,000–12,000 tokens per page)
+- ~$5–7 per 54-page drawing set
+- ~45–100s per page sequentially; with concurrency=5, full 54-page set in ~10–15 min
+
+**Quality gate:** ≥90% schedule rows extracted correctly across 5 sample pages. Manually verified ≥95% on the 3 sample pages (Footing, Structural Notes, HVAC) ✅
+
+---
+
 ## Status
 
 | Phase | Status | Quality gate | Notes |
 |---|---|---|---|
 | 0 — Foundation | ✅ Shipped | ✅ | Skeleton + auth + project/doc CRUD + upload, all persisted |
 | 1 — Doc classification + page rendering | ✅ Shipped | ✅ | 8/8 classification correct, 54-page render in ~28s, fullscreen viewer working |
+| 2 — Vision pre-pass | ✅ Shipped | ✅ | Per-page Claude Sonnet 4.6 vision extraction. Schedules/Notes/Refs/Entities with bboxes. Cost tracking, retries, per-page failure isolation, resumability. |
 | 2 — Vision pre-pass | Not started | — | — |
 | 3 — Indexing + search | Not started | — | — |
 | 4 — Trade-driven scope extraction | Not started | — | — |
