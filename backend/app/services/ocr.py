@@ -83,15 +83,32 @@ class OCRResult:
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 _MAX_RETRIES = 5
 
+# Google overloads 403 PERMISSION_DENIED for two very different cases:
+#   (a) Truly permanent: invalid API key, billing disabled, API not enabled.
+#   (b) Transient: their automated abuse-detection briefly holds an API
+#       project after a burst of multimodal calls — the message is the
+#       distinctive "Your project has been denied access. Please contact
+#       support."
+# We retry only when the message smells like (b) so we don't loop forever
+# on real permission errors.
+_TRANSIENT_403_HINTS = (
+    "denied access",       # the abuse-detection wording
+    "consumer_suspended",  # short-term project suspension code
+    "abuse",
+    "temporarily",
+)
+
 
 def _is_retryable(exc: Exception) -> bool:
-    """Spot Gemini's transient errors (rate limit / overload / 5xx)."""
+    """Spot Gemini's transient errors (rate limit / overload / 5xx / abuse hold)."""
     msg = str(exc).lower()
     if "503" in msg or "unavailable" in msg or "high demand" in msg:
         return True
     if "429" in msg or "rate limit" in msg or "resource_exhausted" in msg:
         return True
     if "500" in msg or "502" in msg or "504" in msg:
+        return True
+    if "403" in msg and any(hint in msg for hint in _TRANSIENT_403_HINTS):
         return True
     code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
     if isinstance(code, int) and code in _RETRYABLE_STATUS:
