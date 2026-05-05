@@ -2,8 +2,8 @@
 
 Each uploaded file is classified into one of these types so the rest of the
 pipeline can route it to the correct extractor. The taxonomy is intentionally
-project-agnostic — it works for any construction project, not just the Elks
-sample.
+project-agnostic — it works for any construction project regardless of
+program, jurisdiction, or document conventions.
 """
 
 from __future__ import annotations

@@ -19,7 +19,7 @@ import json
 import logging
 import time
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
@@ -40,8 +40,8 @@ _RELEVANCE_TOOL = {
         "Decide if a CSI MasterFormat division applies to a given construction "
         "project. Be inclusive: when in doubt, mark relevant. Only mark "
         "not-relevant if the trade is clearly inapplicable (e.g. Division 35 "
-        "Marine on a small commercial building, Division 40 Process "
-        "Interconnections on a community center)."
+        "Marine on a warehouse, Division 41 Material Processing on a "
+        "small office tenant fit-out)."
     ),
     "input_schema": {
         "type": "object",
@@ -206,6 +206,17 @@ async def filter_trades(project_id: str, *, force: bool = False) -> list[TradeDi
 
     rows: list[TradeDivisionRelevance] = []
     async with SessionLocal() as db:
+        if force:
+            # Wipe existing rows so we can re-insert with the new verdicts.
+            # Operator overrides live on the same row, so a force re-run
+            # intentionally drops them — that matches the UI semantics
+            # ("Re-generate" = start fresh).
+            await db.execute(
+                delete(TradeDivisionRelevance).where(
+                    TradeDivisionRelevance.project_id == project_id
+                )
+            )
+            await db.flush()
         for r in results:
             if isinstance(r, Exception):
                 log.warning("trade_filter: division failed: %s", r)

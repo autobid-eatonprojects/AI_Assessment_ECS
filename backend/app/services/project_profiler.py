@@ -48,8 +48,9 @@ _PROFILE_TOOL = {
             "building_type": {
                 "type": ["string", "null"],
                 "description": (
-                    "Short noun phrase, e.g. 'community enrichment center', "
-                    "'school addition', 'tenant fit-out'. Lowercase."
+                    "Short noun phrase describing the program, e.g. "
+                    "'office building', 'school addition', 'warehouse', "
+                    "'tenant fit-out', 'medical clinic'. Lowercase."
                 ),
             },
             "size_sf": {
@@ -76,11 +77,11 @@ _PROFILE_TOOL = {
             },
             "location": {
                 "type": ["string", "null"],
-                "description": "City and state, e.g. 'Oak Ridge, TN'.",
+                "description": "City and state/region, e.g. 'Portland, OR'.",
             },
             "project_number": {
                 "type": ["string", "null"],
-                "description": "Architect/firm project number, e.g. '25026'.",
+                "description": "Architect/firm project number as printed on the cover sheet (any format).",
             },
             "codes": {
                 "type": "array",

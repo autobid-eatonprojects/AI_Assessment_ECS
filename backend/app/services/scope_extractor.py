@@ -117,8 +117,8 @@ _EXTRACT_TOOL = {
                         "location": {
                             "type": "string",
                             "description": (
-                                "Where in the building (e.g. 'kitchen 116', "
-                                "'building footprint'). Null if not stated."
+                                "Where in the building (e.g. 'level 2 corridor', "
+                                "'building footprint', 'mech room'). Null if not stated."
                             ),
                         },
                         "extraction_method": {

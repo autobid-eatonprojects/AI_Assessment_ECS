@@ -175,7 +175,7 @@ the context snippet from the drawing.
    - manufacturer: "TYCO TY3121", "VICTAULIC 717", "Wilsonart 1573SL"
    - code: "NFPA 13 2019", "ASTM E1264", "IBC 2024", "SMACNA"
    - dimension: explicit measurements ("8'-0\\"", "5,200 SF")
-   - room: visible room labels on plans ("KITCHEN 116", "LODGE 113")
+   - room: visible room labels on plans ("CONFERENCE 201", "STORAGE B-12")
    - equipment: equipment tags ("RTU-1", "AHU-2", "F6.0")
    - symbol: legend symbols with their meaning
    - other: anything else worth recording

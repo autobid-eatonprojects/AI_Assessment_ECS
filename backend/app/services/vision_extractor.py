@@ -13,7 +13,7 @@ Design notes
   error back to Claude with a corrective prompt. Empirically this fixes most
   small schema mistakes without burning the whole job.
 - The prompt is project-agnostic (pure CSI / industry standard) so the same
-  pipeline works for any construction drawing set, not just the Elks sample.
+  pipeline works for any construction drawing set.
 - Bounding boxes are NORMALISED [0, 1] so they're independent of render DPI
   and survive resizing in the frontend.
 """
@@ -214,7 +214,7 @@ the `context` snippet from the drawing.
    - manufacturer: "TYCO TY3121", "VICTAULIC 717", "Wilsonart 1573SL"
    - code: "NFPA 13 2019", "ASTM E1264", "IBC 2024", "SMACNA"
    - dimension: any explicit measurement worth tagging ("8'-0\\"", "5,200 SF")
-   - room: room/zone labels visible on plans ("KITCHEN 116", "LODGE 113")
+   - room: room/zone labels visible on plans ("CONFERENCE 201", "STORAGE B-12")
    - equipment: equipment tags ("RTU-1", "AHU-2", "F6.0")
    - symbol: legend symbols with their meaning
    - other: anything else worth recording
