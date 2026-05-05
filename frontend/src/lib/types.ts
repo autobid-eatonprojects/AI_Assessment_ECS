@@ -63,6 +63,15 @@ export interface DocumentPage {
   created_at: string;
 }
 
+export interface DocumentPageText {
+  page_number: number;
+  width: number;
+  height: number;
+  text: string | null;
+  text_source: "pymupdf" | "ocr-gemini" | "ocr-anthropic" | null;
+  char_count: number;
+}
+
 export interface BoundingBox {
   x: number;
   y: number;

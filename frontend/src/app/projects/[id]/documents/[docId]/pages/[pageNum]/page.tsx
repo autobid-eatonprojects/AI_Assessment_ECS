@@ -36,6 +36,71 @@ interface Highlight {
   label?: string;
 }
 
+
+function PageTextPanel({
+  text,
+  source,
+  isLoading,
+  docStatus,
+}: {
+  text: string | null;
+  source: string | null;
+  isLoading: boolean;
+  docStatus: string;
+}) {
+  if (isLoading) {
+    return <p className="text-sm text-muted-foreground">Loading page text…</p>;
+  }
+  if (!text) {
+    if (docStatus === "ocr") {
+      return (
+        <div className="space-y-2">
+          <p className="text-sm font-medium">OCR in progress…</p>
+          <p className="text-xs text-muted-foreground">
+            Gemini 2.5 Flash is transcribing this page. Text will appear here
+            within ~5 seconds of completion.
+          </p>
+        </div>
+      );
+    }
+    if (docStatus === "ready") {
+      return (
+        <p className="text-sm text-muted-foreground">
+          No text extracted from this page. Likely an empty / image-only page
+          that returned no readable content.
+        </p>
+      );
+    }
+    return (
+      <p className="text-sm text-muted-foreground">
+        Text not yet available — current status: {docStatus}
+      </p>
+    );
+  }
+
+  // Pretty preserve whitespace & line breaks; mono font for spec readability.
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>{text.length.toLocaleString()} characters</span>
+        <button
+          type="button"
+          onClick={() => {
+            navigator.clipboard.writeText(text);
+            toast.success("Copied to clipboard");
+          }}
+          className="rounded px-2 py-0.5 hover:bg-muted"
+        >
+          Copy
+        </button>
+      </div>
+      <pre className="whitespace-pre-wrap break-words font-mono text-[12px] leading-snug text-foreground">
+        {text}
+      </pre>
+    </div>
+  );
+}
+
 function PageView({
   projectId,
   documentId,
@@ -58,12 +123,35 @@ function PageView({
     queryFn: () => api.listPages(projectId, documentId),
   });
 
+  const isDrawingSet = docQuery.data?.doc_type === "drawing-set";
+
   const extractionQuery = useQuery({
     queryKey: ["extraction", projectId, documentId, pageNumber],
     queryFn: () => api.getPageExtraction(projectId, documentId, pageNumber),
+    enabled: isDrawingSet,
     refetchInterval: (q) => {
       const s = q.state.data?.status;
       return s === "extracting" || s === "pending" ? 2_000 : false;
+    },
+  });
+
+  // Per-page text (PyMuPDF or OCR). Used for non-drawing docs and as a
+  // supplementary tab even on drawings when native text exists.
+  const textQuery = useQuery({
+    queryKey: ["page-text", projectId, documentId, pageNumber],
+    queryFn: () => api.getPageText(projectId, documentId, pageNumber),
+    enabled: !!docQuery.data,
+    // While the doc is OCR'ing, the text appears progressively per-page.
+    // Poll until this page has content or we know the doc is fully done.
+    refetchInterval: (q) => {
+      const text = q.state.data?.text;
+      const docStatus = docQuery.data?.processing_status;
+      const stillProcessing =
+        docStatus === "ocr" ||
+        docStatus === "pending" ||
+        docStatus === "rendering" ||
+        docStatus === "indexing";
+      return !text && stillProcessing ? 3_000 : false;
     },
   });
 
@@ -137,6 +225,11 @@ function PageView({
         <h1 className="text-xl font-semibold">
           {ext?.sheet_number ?? `Page ${pageNumber}`}
           {ext?.sheet_title ? ` — ${ext.sheet_title}` : ""}
+          {!isDrawingSet && doc?.filename && (
+            <span className="ml-2 text-base font-normal text-muted-foreground">
+              · {doc.filename}
+            </span>
+          )}
         </h1>
         {ext?.discipline && (
           <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
@@ -154,22 +247,37 @@ function PageView({
             ${ext.cost_usd.toFixed(4)}
           </span>
         )}
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => reextract.mutate()}
-          disabled={
-            reextract.isPending ||
-            ext?.status === "extracting" ||
-            ext?.status === "pending"
-          }
-          className="ml-auto"
-        >
-          <RefreshCw
-            className={`size-4 ${reextract.isPending ? "animate-spin" : ""}`}
-          />
-          <span className="ml-1.5">Re-extract</span>
-        </Button>
+        {!isDrawingSet && textQuery.data?.text_source && (
+          <span
+            className="rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-900 dark:bg-cyan-900/40 dark:text-cyan-200"
+            title="How the text on this page was produced"
+          >
+            text:{" "}
+            {textQuery.data.text_source === "ocr-gemini"
+              ? "OCR (Gemini Flash)"
+              : textQuery.data.text_source === "ocr-anthropic"
+                ? "OCR (Claude)"
+                : "PyMuPDF (native)"}
+          </span>
+        )}
+        {isDrawingSet && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => reextract.mutate()}
+            disabled={
+              reextract.isPending ||
+              ext?.status === "extracting" ||
+              ext?.status === "pending"
+            }
+            className="ml-auto"
+          >
+            <RefreshCw
+              className={`size-4 ${reextract.isPending ? "animate-spin" : ""}`}
+            />
+            <span className="ml-1.5">Re-extract</span>
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[3fr_2fr]">
@@ -183,7 +291,15 @@ function PageView({
         </div>
 
         <div className="min-w-0 max-h-[80vh] overflow-y-auto rounded-md border bg-card p-4">
-          {!ext ? (
+          {!isDrawingSet ? (
+            // Non-drawing docs: show extracted text panel
+            <PageTextPanel
+              text={textQuery.data?.text ?? null}
+              source={textQuery.data?.text_source ?? null}
+              isLoading={textQuery.isLoading}
+              docStatus={doc.processing_status}
+            />
+          ) : !ext ? (
             <p className="text-sm text-muted-foreground">Loading extraction…</p>
           ) : ext.status === "pending" ? (
             <p className="text-sm text-muted-foreground">Queued for extraction…</p>

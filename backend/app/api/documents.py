@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from ..config import settings
 from ..models import Document, DocumentPage, Project
-from ..schemas import DocumentOut, DocumentPageOut
+from ..schemas import DocumentOut, DocumentPageOut, DocumentPageTextOut
 from ..services import processor
 from ..services.storage import storage
 from .deps import DB, CurrentUser
@@ -249,4 +249,27 @@ async def get_page_thumbnail(
         path=storage.absolute_path(page.thumbnail_path),
         media_type="image/png",
         headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@router.get(
+    "/{document_id}/pages/{page_number}/text", response_model=DocumentPageTextOut
+)
+async def get_page_text(
+    project_id: str, document_id: str, page_number: int, db: DB, _: CurrentUser
+) -> DocumentPageTextOut:
+    """Return per-page text content (PyMuPDF or Gemini OCR — same shape).
+
+    Used by the page detail view to QA OCR'd content for written-spec docs
+    and to show text alongside the image for any digital-text PDF.
+    """
+    page = await _get_page(db, project_id, document_id, page_number)
+    text = page.text_content or ""
+    return DocumentPageTextOut(
+        page_number=page.page_number,
+        width=page.width,
+        height=page.height,
+        text=text or None,
+        text_source=page.text_source,
+        char_count=len(text),
     )

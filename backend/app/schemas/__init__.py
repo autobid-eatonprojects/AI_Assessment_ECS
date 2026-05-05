@@ -1,5 +1,5 @@
 from .auth import LoginRequest, TokenResponse, UserOut
-from .document import DocumentOut, DocumentPageOut
+from .document import DocumentOut, DocumentPageOut, DocumentPageTextOut
 from .extraction import (
     BoundingBox,
     CrossReferenceOut,
@@ -20,6 +20,7 @@ __all__ = [
     "DocumentExtractionOverview",
     "DocumentOut",
     "DocumentPageOut",
+    "DocumentPageTextOut",
     "EntityOut",
     "LifecycleTransition",
     "LoginRequest",

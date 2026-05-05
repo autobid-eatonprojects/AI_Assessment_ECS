@@ -176,14 +176,14 @@ function DocumentDetail({
                   <span>Page {p.page_number}</span>
                 </div>
               </button>
-              {doc.doc_type === "drawing-set" && (
-                <Link
-                  href={`/projects/${projectId}/documents/${documentId}/pages/${p.page_number}`}
-                  className="block truncate text-center text-xs text-muted-foreground hover:text-foreground hover:underline"
-                >
-                  Inspect extraction →
-                </Link>
-              )}
+              <Link
+                href={`/projects/${projectId}/documents/${documentId}/pages/${p.page_number}`}
+                className="block truncate text-center text-xs text-muted-foreground hover:text-foreground hover:underline"
+              >
+                {doc.doc_type === "drawing-set"
+                  ? "Inspect extraction →"
+                  : "View page text →"}
+              </Link>
             </div>
           ))}
         </div>

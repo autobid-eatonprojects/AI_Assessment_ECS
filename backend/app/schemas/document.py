@@ -38,3 +38,16 @@ class DocumentPageOut(BaseModel):
     width: int
     height: int
     created_at: datetime
+
+
+class DocumentPageTextOut(BaseModel):
+    """Per-page text content (PyMuPDF or OCR — same shape)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    page_number: int
+    width: int
+    height: int
+    text: str | None
+    text_source: str | None  # "pymupdf" | "ocr-gemini" | None
+    char_count: int

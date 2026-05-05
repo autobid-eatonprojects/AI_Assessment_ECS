@@ -3,6 +3,7 @@ import type {
   Document,
   DocumentExtractionOverview,
   DocumentPage,
+  DocumentPageText,
   PageExtraction,
   Project,
   SearchResponse,
@@ -115,6 +116,10 @@ export const api = {
   listPages: (projectId: string, documentId: string) =>
     request<DocumentPage[]>(
       `/api/projects/${projectId}/documents/${documentId}/pages`,
+    ),
+  getPageText: (projectId: string, documentId: string, pageNumber: number) =>
+    request<DocumentPageText>(
+      `/api/projects/${projectId}/documents/${documentId}/pages/${pageNumber}/text`,
     ),
 
   // Authenticated image fetch — caller turns the blob into an object URL
