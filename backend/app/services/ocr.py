@@ -66,8 +66,10 @@ def _get_client():
 def _get_semaphore() -> asyncio.Semaphore:
     global _concurrency_sem
     if _concurrency_sem is None:
-        # OCR is light enough to run more in parallel than vision pre-pass.
-        _concurrency_sem = asyncio.Semaphore(max(8, settings.vision_concurrency))
+        # Gemini Flash starts returning 503s above ~5 concurrent requests for
+        # us. We pair this with retry-with-backoff so brief spikes recover
+        # instead of producing silent failures.
+        _concurrency_sem = asyncio.Semaphore(4)
     return _concurrency_sem
 
 
@@ -78,8 +80,27 @@ class OCRResult:
     latency_ms: int
 
 
+_RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+_MAX_RETRIES = 5
+
+
+def _is_retryable(exc: Exception) -> bool:
+    """Spot Gemini's transient errors (rate limit / overload / 5xx)."""
+    msg = str(exc).lower()
+    if "503" in msg or "unavailable" in msg or "high demand" in msg:
+        return True
+    if "429" in msg or "rate limit" in msg or "resource_exhausted" in msg:
+        return True
+    if "500" in msg or "502" in msg or "504" in msg:
+        return True
+    code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+    if isinstance(code, int) and code in _RETRYABLE_STATUS:
+        return True
+    return False
+
+
 async def ocr_image(image_path: Path) -> OCRResult:
-    """OCR a single rendered page image using Gemini Flash."""
+    """OCR a single rendered page image using Gemini Flash, with retry-on-overload."""
     client = _get_client()
     sem = _get_semaphore()
 
@@ -93,22 +114,44 @@ async def ocr_image(image_path: Path) -> OCRResult:
         gtypes.Part.from_text(text=_OCR_PROMPT),
     ]
 
-    async with sem:
-        t0 = time.perf_counter()
-        resp = await client.aio.models.generate_content(
-            model=_OCR_MODEL,
-            contents=content,
-            config=gtypes.GenerateContentConfig(
-                temperature=0.0,
-                max_output_tokens=8192,
-            ),
-        )
-        latency_ms = int((time.perf_counter() - t0) * 1000)
+    last: Exception | None = None
+    for attempt in range(_MAX_RETRIES + 1):
+        async with sem:
+            t0 = time.perf_counter()
+            try:
+                resp = await client.aio.models.generate_content(
+                    model=_OCR_MODEL,
+                    contents=content,
+                    config=gtypes.GenerateContentConfig(
+                        temperature=0.0,
+                        max_output_tokens=8192,
+                    ),
+                )
+            except Exception as e:  # noqa: BLE001
+                last = e
+                if not _is_retryable(e) or attempt == _MAX_RETRIES:
+                    raise
+                # Exponential backoff with jitter: 1s, 2s, 4s, 8s, 16s
+                import random
 
-    usage_meta = getattr(resp, "usage_metadata", None)
-    usage = Usage(
-        prompt_tokens=getattr(usage_meta, "prompt_token_count", 0) or 0,
-        completion_tokens=getattr(usage_meta, "candidates_token_count", 0) or 0,
-    )
-    text = (getattr(resp, "text", "") or "").strip()
-    return OCRResult(text=text, usage=usage, latency_ms=latency_ms)
+                delay = (2**attempt) + random.uniform(0, 0.5)
+                log.info(
+                    "ocr: retry %d after %.1fs (transient error: %s)",
+                    attempt + 1,
+                    delay,
+                    e,
+                )
+                await asyncio.sleep(delay)
+                continue
+            latency_ms = int((time.perf_counter() - t0) * 1000)
+
+        usage_meta = getattr(resp, "usage_metadata", None)
+        usage = Usage(
+            prompt_tokens=getattr(usage_meta, "prompt_token_count", 0) or 0,
+            completion_tokens=getattr(usage_meta, "candidates_token_count", 0) or 0,
+        )
+        text = (getattr(resp, "text", "") or "").strip()
+        return OCRResult(text=text, usage=usage, latency_ms=latency_ms)
+
+    assert last is not None
+    raise last
