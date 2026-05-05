@@ -9,7 +9,9 @@ from .extraction import (
     LLMCall,
     PageExtraction,
 )
+from .profile import ProjectProfile, TradeDivisionRelevance
 from .project import Project
+from .scope import ScopeCitation, ScopeExtractionRun, ScopeItem
 
 __all__ = [
     "Chunk",
@@ -22,4 +24,9 @@ __all__ = [
     "LLMCall",
     "PageExtraction",
     "Project",
+    "ProjectProfile",
+    "ScopeCitation",
+    "ScopeExtractionRun",
+    "ScopeItem",
+    "TradeDivisionRelevance",
 ]
