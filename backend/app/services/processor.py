@@ -26,10 +26,17 @@ from sqlalchemy.orm import selectinload
 from ..config import settings
 from ..database import SessionLocal
 from ..models import Document, DocumentPage, PageExtraction
-from ..services import classifier, renderer, vision_extractor
+from ..services import classifier, gemini_vision_extractor, renderer, vision_extractor
 from ..services.llm_log import record_call
 from ..services.storage import storage
 from ..services.vision_extractor import VisionResult, VisionUnavailable
+
+
+def _get_vision_extractor():
+    """Dispatch to the configured vision provider."""
+    if settings.vision_provider == "google":
+        return gemini_vision_extractor
+    return vision_extractor
 
 log = logging.getLogger(__name__)
 
@@ -272,10 +279,11 @@ async def _extract_one_page(
     the UI shows accurate counts of in-flight vs queued.
     """
     sem = _get_extract_semaphore()
+    extractor = _get_vision_extractor()
     async with sem:
         await _set_page_extraction_status(page_extraction_id, "extracting")
         try:
-            result = await vision_extractor.extract_page(
+            result = await extractor.extract_page(
                 image_path,
                 page_number=page_number,
                 document_filename=document_filename,

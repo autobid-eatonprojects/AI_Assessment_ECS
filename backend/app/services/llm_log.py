@@ -44,6 +44,9 @@ PRICING_USD_PER_MTOK: dict[str, dict[str, float]] = {
     # Cohere — embed v4 (input) + rerank v3 (per search, ~$0.001)
     "cohere:embed-v4.0": {"input": 0.12, "output": 0.0},
     "cohere:rerank-v3.5": {"input": 0.0, "output": 0.0},  # billed per-search
+    # Google Gemini 2.5 Pro
+    "gemini-2.5-pro": {"input": 1.25, "output": 10.00},
+    "gemini-2.5-flash": {"input": 0.30, "output": 2.50},
 }
 
 

@@ -31,10 +31,17 @@ class Settings(BaseSettings):
     anthropic_api_key: str | None = None
     classifier_model: str = "claude-haiku-4-5"
 
-    # Vision pre-pass (Phase 2)
+    # Vision pre-pass (Phase 2) — primary stays Anthropic; Google is a
+    # configurable alternative (benchmarks show Gemini 2.5 Pro stronger on
+    # engineering drawings). Set vision_provider="google" to switch.
+    vision_provider: str = "anthropic"  # anthropic | google
     vision_model: str = "claude-sonnet-4-6"
-    vision_concurrency: int = 5  # parallel Claude vision calls
+    vision_concurrency: int = 5  # parallel vision calls
     vision_max_retries: int = 2
+
+    # Google Gemini
+    google_api_key: str | None = None
+    gemini_vision_model: str = "gemini-2.5-pro"
 
     # Phase 3 — Indexing + Retrieval (Cohere Embed v4 + Cohere Rerank 3)
     openai_api_key: str | None = None  # reserved for future / fallback
