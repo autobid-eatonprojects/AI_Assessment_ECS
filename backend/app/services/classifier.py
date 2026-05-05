@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -363,6 +364,76 @@ def _build_content_for_text(path: Path, content_type: str) -> list[dict]:
     ]
 
 
+def _is_spreadsheet(path: Path) -> bool:
+    return path.suffix.lower() in {".xlsx", ".xlsm", ".xls", ".csv"}
+
+
+def _spreadsheet_csi_heuristic(path: Path) -> Classification | None:
+    """Quick rule-based check: an .xlsx that looks like a CSI MasterFormat
+    list is unambiguously `trade-list`. Saves an LLM call and is more
+    reliable than feeding garbled binary text to Claude."""
+    if path.suffix.lower() not in {".xlsx", ".xlsm"}:
+        return None
+    try:
+        import openpyxl
+
+        wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+        sheet = wb.active
+        # Sample first 30 rows looking for the CSI pattern: rows where col 0
+        # is a 6-digit-formatted code "NN NN NN".
+        section_re = re.compile(r"^\s*\d{2}\s+\d{2}\s+\d{2}\s*$")
+        section_hits = 0
+        sampled = 0
+        for row in sheet.iter_rows(max_row=50, values_only=True):
+            sampled += 1
+            if not row:
+                continue
+            cell = row[0] if row else None
+            if cell and section_re.match(str(cell)):
+                section_hits += 1
+        wb.close()
+        if section_hits >= 5:
+            return Classification(
+                doc_type="trade-list",
+                confidence=0.99,
+                reasoning=(
+                    f"Spreadsheet contains {section_hits}+ rows matching the "
+                    "CSI MasterFormat 'NN NN NN' section-code format."
+                ),
+            )
+    except Exception as e:  # noqa: BLE001
+        log.warning("classifier: xlsx heuristic failed for %s: %s", path.name, e)
+    return None
+
+
+def _build_content_for_spreadsheet(path: Path) -> list[dict]:
+    """Sample rows from an xlsx and send the text to Claude."""
+    try:
+        import openpyxl
+
+        wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+        sheet = wb.active
+        rows = []
+        for i, row in enumerate(sheet.iter_rows(max_row=20, values_only=True)):
+            row_str = " | ".join(str(c) if c is not None else "" for c in row[:8])
+            rows.append(f"row {i + 1}: {row_str}")
+        wb.close()
+        sample = "\n".join(rows)
+    except Exception as e:  # noqa: BLE001
+        sample = f"(could not read xlsx: {e})"
+    return [
+        {
+            "type": "text",
+            "text": (
+                f"This is an Excel spreadsheet (.xlsx). First 20 rows:\n"
+                f"---\n{sample}\n---\n"
+                "Use the classify_document tool. If it looks like a CSI "
+                "MasterFormat trade list, mark as 'trade-list'."
+            ),
+        }
+    ]
+
+
 async def classify(
     path: Path, content_type: str, *, source: str = "project_document"
 ) -> Classification:
@@ -371,12 +442,25 @@ async def classify(
     `source` selects between the project-doc and bid-doc taxonomies — the
     classifier only chooses among the doc_types valid for that side.
     """
+    # Fast path: spreadsheet with CSI structure → trade-list, no LLM needed.
+    if source == "project_document":
+        heuristic = _spreadsheet_csi_heuristic(path)
+        if heuristic is not None:
+            log.info(
+                "classifier: %s matched CSI heuristic → %s",
+                path.name,
+                heuristic.doc_type,
+            )
+            return heuristic
+
     client = _get_client()
 
     if _is_pdf(path):
         content = _build_content_for_pdf(path)
     elif _is_image(content_type, path):
         content = _build_content_for_image(path)
+    elif _is_spreadsheet(path):
+        content = _build_content_for_spreadsheet(path)
     else:
         content = _build_content_for_text(path, content_type)
 

@@ -14,6 +14,7 @@ import { DocumentUpload } from "@/components/document-upload";
 import { LifecycleBanner } from "@/components/lifecycle-banner";
 import { ProjectProfileCard } from "@/components/project-profile-card";
 import { SearchBar } from "@/components/search-bar";
+import { TradeRelevanceCard } from "@/components/trade-relevance-card";
 import { Button } from "@/components/ui/button";
 import {
   Tabs,
@@ -102,6 +103,10 @@ function ProjectDetail({ projectId }: { projectId: string }) {
 
       <div className="mb-6">
         <ProjectProfileCard projectId={projectId} />
+      </div>
+
+      <div className="mb-6">
+        <TradeRelevanceCard projectId={projectId} />
       </div>
 
       <div className="mb-6">

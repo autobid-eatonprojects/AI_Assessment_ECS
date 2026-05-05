@@ -193,6 +193,29 @@ export interface SearchResponse {
   rerank_used: "cohere" | "claude" | "none";
 }
 
+export interface TradeDivisionRelevance {
+  id: string;
+  project_id: string;
+  csi_division: string;
+  division_label: string;
+  is_relevant: boolean;
+  reasoning: string | null;
+  confidence: number | null;
+  operator_override: boolean;
+  override_value: boolean | null;
+  cost_usd: number | null;
+  latency_ms: number | null;
+  created_at: string;
+}
+
+export interface TradeRelevanceMatrix {
+  project_id: string;
+  relevant_count: number;
+  skipped_count: number;
+  total_cost_usd: number;
+  divisions: TradeDivisionRelevance[];
+}
+
 export interface ProjectProfile {
   id: string;
   project_id: string;

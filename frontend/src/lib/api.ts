@@ -9,6 +9,7 @@ import type {
   ProjectProfile,
   SearchResponse,
   TokenResponse,
+  TradeRelevanceMatrix,
   User,
 } from "./types";
 
@@ -167,6 +168,24 @@ export const api = {
   runProjectProfiler: (projectId: string) =>
     request<ProjectProfile>(`/api/projects/${projectId}/profile`, {
       method: "POST",
+    }),
+
+  // Phase 4.2: Trade relevance filter
+  getTradeRelevance: (projectId: string) =>
+    request<TradeRelevanceMatrix>(`/api/projects/${projectId}/trade-relevance`),
+  runTradeRelevance: (projectId: string, force = false) =>
+    request<TradeRelevanceMatrix>(
+      `/api/projects/${projectId}/trade-relevance${force ? "?force=true" : ""}`,
+      { method: "POST" },
+    ),
+  overrideTradeRelevance: (
+    projectId: string,
+    csi_division: string,
+    is_relevant: boolean,
+  ) =>
+    request<unknown>(`/api/projects/${projectId}/trade-relevance`, {
+      method: "PATCH",
+      body: JSON.stringify({ csi_division, is_relevant }),
     }),
 };
 
