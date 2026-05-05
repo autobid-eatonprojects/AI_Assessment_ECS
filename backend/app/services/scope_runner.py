@@ -41,13 +41,14 @@ from ..models import (
 )
 from .csi_grounder import ground_code
 from .project_profiler import get_or_create_profile
+from .schedule_miner import mine_schedules
 from .scope_deduper import dedupe
 from .scope_extractor import (
     CandidateItem,
     ScopeExtractorUnavailable,
     extract_division_candidates,
 )
-from .scope_validator import validate_candidate
+from .scope_validator import ValidationResult, validate_candidate
 from .trade_list_parser import (
     CSIDivision,
     CSITaxonomy,
@@ -70,7 +71,8 @@ class ScopeRunnerUnavailable(Exception):
 
 
 # Concurrency caps — tuned to keep within Anthropic's per-account limits
-# while still finishing the full Elks run in <15 minutes.
+# while still finishing a typical mid-size project (~20-30 relevant divisions)
+# in roughly 10-15 minutes.
 _DIVISION_CONCURRENCY = 4
 _VALIDATE_CONCURRENCY = 10
 
@@ -82,20 +84,36 @@ async def _process_division(
     taxonomy: CSITaxonomy,
     run_id: str,
     validator_sem: asyncio.Semaphore,
+    schedule_candidates: list[CandidateItem],
 ) -> _DivisionResult:
-    """Run Stages A–D for one division. Persists nothing; orchestrator does that."""
-    log.info("scope_runner: division %s starting", division.code)
-    candidates, _, extract_cost = await extract_division_candidates(
+    """Run Stages A–D for one division. Persists nothing; orchestrator does that.
+
+    `schedule_candidates` are the (already-deterministic) Stage 0 schedule-miner
+    items for this division. They bypass Stage B validation because they
+    enumerate Phase-2 structured rows rather than generating from prose.
+    """
+    log.info(
+        "scope_runner: division %s starting (schedule_miner=%d)",
+        division.code,
+        len(schedule_candidates),
+    )
+    eve_candidates, _, extract_cost = await extract_division_candidates(
         project_id, division, profile, taxonomy
     )
+
+    candidates = list(eve_candidates) + list(schedule_candidates)
 
     if not candidates:
         log.info("scope_runner: division %s — no candidates", division.code)
         await _bump_progress(run_id, completed_inc=1)
         return _DivisionResult(division.code, [], 0, extract_cost)
 
-    # Stage B — 3-vote validation (parallel within division)
+    # Stage B — 3-vote validation (parallel within division). Schedule-miner
+    # candidates skip validation: they came from deterministic Phase-2 data,
+    # not a generative summarizer, so the hallucination check doesn't apply.
     async def validate_one(c: CandidateItem):
+        if c.extraction_method == "schedule_miner":
+            return c, ValidationResult(accept=True, confidence=1.0, votes=[]), 0.0
         result, vcost = await validate_candidate(c, project_id, validator_sem)
         return c, result, vcost
 
@@ -300,6 +318,19 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
         len(divisions_to_process),
     )
 
+    # Stage 0 — Schedule miner pre-pass. Walks every Phase-2 ExtractedSchedule
+    # and converts quantifiable rows into structured CandidateItems. Catches
+    # the per-row enumerations that Sonnet's EVE tends to summarize.
+    t0 = time.perf_counter()
+    schedule_candidates_by_division, schedule_cost = await mine_schedules(
+        project_id, taxonomy
+    )
+    log.info(
+        "scope_runner: schedule miner produced candidates in %d divisions, $%.4f",
+        len(schedule_candidates_by_division),
+        schedule_cost,
+    )
+
     sem_div = asyncio.Semaphore(_DIVISION_CONCURRENCY)
     sem_validate = asyncio.Semaphore(_VALIDATE_CONCURRENCY)
 
@@ -307,17 +338,55 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
         async with sem_div:
             try:
                 return await _process_division(
-                    project_id, division, profile, taxonomy, run_id, sem_validate
+                    project_id,
+                    division,
+                    profile,
+                    taxonomy,
+                    run_id,
+                    sem_validate,
+                    schedule_candidates_by_division.get(division.code, []),
                 )
             except Exception as e:  # noqa: BLE001
                 log.exception("scope_runner: division %s failed", division.code)
                 await _bump_progress(run_id, failed_inc=1)
                 return _DivisionResult(division.code, [], 0, 0.0)
 
-    t0 = time.perf_counter()
     division_results = await asyncio.gather(
         *(process_with_sem(d) for d in divisions_to_process)
     )
+
+    # Surface schedule-miner items whose division wasn't in the relevance set
+    # (e.g. miner classified a schedule into Div 12 but trade filter skipped it).
+    # Don't drop them silently — they're valuable line items.
+    relevant_codes = {d.code for d in divisions_to_process}
+    orphan_divisions = set(schedule_candidates_by_division) - relevant_codes
+    for div_code in orphan_divisions:
+        orphan_cands = schedule_candidates_by_division[div_code]
+        if not orphan_cands:
+            continue
+        log.info(
+            "scope_runner: surfacing %d schedule-miner items in non-relevant div %s",
+            len(orphan_cands),
+            div_code,
+        )
+        # Run them through CSI grounding + dedupe directly (no validation needed)
+        for c in orphan_cands:
+            ground = ground_code(c.csi_code, taxonomy)
+            c.csi_code = ground.code
+            setattr(c, "_votes", [])
+            setattr(c, "_confidence", 1.0)
+            setattr(c, "_ground_method", ground.method)
+            setattr(c, "_ground_note", ground.note)
+        deduped_orphans = await dedupe(orphan_cands)
+        division_results.append(
+            _DivisionResult(
+                division_code=div_code,
+                accepted=deduped_orphans,
+                candidates_total=len(orphan_cands),
+                cost_usd=0.0,  # schedule_cost is already counted
+            )
+        )
+
     total_latency_ms = int((time.perf_counter() - t0) * 1000)
 
     candidates, validated, deduped = await _persist_results(
@@ -325,7 +394,7 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
     )
 
     # Compute final cost from llm_calls for this run window
-    total_cost = sum(d.cost_usd for d in division_results)
+    total_cost = sum(d.cost_usd for d in division_results) + schedule_cost
 
     async with SessionLocal() as db:
         run = await db.get(ScopeExtractionRun, run_id)
