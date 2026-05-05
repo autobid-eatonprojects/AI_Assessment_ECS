@@ -22,12 +22,14 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import io
 import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from PIL import Image
 from pydantic import ValidationError
 
 from ..config import settings
@@ -238,11 +240,65 @@ class VisionResult:
     model: str
 
 
+# Anthropic's images endpoint caps the base64-encoded payload at 5 MiB.
+# Base64 inflates raw bytes by ~33%, so the raw image must stay under
+# ~3.75 MiB. Dense pages (cover sheets, structural notes) overshoot at
+# 150 DPI PNG; JPEG quality 85 is visually identical and 3–5x smaller.
+_RAW_BUDGET_BYTES = int(3.75 * 1024 * 1024)
+
+
+def _encode_for_vision(image_path: Path) -> tuple[str, str]:
+    """Return (base64_data, media_type), re-encoding only if needed."""
+    raw = image_path.read_bytes()
+    if len(raw) <= _RAW_BUDGET_BYTES:
+        return base64.standard_b64encode(raw).decode("ascii"), "image/png"
+
+    # Re-encode as JPEG. Try decreasing quality, then progressive downsizing.
+    img = Image.open(image_path)
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+
+    for scale, quality in [
+        (1.0, 90),
+        (1.0, 85),
+        (1.0, 80),
+        (0.8, 85),
+        (0.65, 85),
+        (0.5, 85),
+    ]:
+        if scale < 1.0:
+            new_size = (int(img.width * scale), int(img.height * scale))
+            candidate = img.resize(new_size, Image.LANCZOS)
+        else:
+            candidate = img
+        buf = io.BytesIO()
+        candidate.save(buf, format="JPEG", quality=quality, optimize=True)
+        if buf.tell() <= _RAW_BUDGET_BYTES:
+            log.info(
+                "vision: re-encoded %s from %d B PNG to %d B JPEG (scale=%.2f, q=%d)",
+                image_path.name,
+                len(raw),
+                buf.tell(),
+                scale,
+                quality,
+            )
+            return base64.standard_b64encode(buf.getvalue()).decode("ascii"), "image/jpeg"
+
+    # Last-ditch: very aggressive downscale. Better than failing the page.
+    candidate = img.resize((int(img.width * 0.4), int(img.height * 0.4)), Image.LANCZOS)
+    buf = io.BytesIO()
+    candidate.save(buf, format="JPEG", quality=80, optimize=True)
+    log.warning(
+        "vision: forced aggressive downscale on %s to %d B", image_path.name, buf.tell()
+    )
+    return base64.standard_b64encode(buf.getvalue()).decode("ascii"), "image/jpeg"
+
+
 def _image_block(image_path: Path) -> dict[str, Any]:
-    data = base64.standard_b64encode(image_path.read_bytes()).decode("ascii")
+    data, media_type = _encode_for_vision(image_path)
     return {
         "type": "image",
-        "source": {"type": "base64", "media_type": "image/png", "data": data},
+        "source": {"type": "base64", "media_type": media_type, "data": data},
     }
 
 
