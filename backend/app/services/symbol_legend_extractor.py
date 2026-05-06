@@ -491,6 +491,20 @@ async def extract_for_project(project_id: str) -> dict:
 
     results = await asyncio.gather(*(with_sem(c) for c in candidates))
 
+    # P4 — backfill csi_section_hint from the canonical industry table
+    # for any glyph the vision pass didn't tag. Project-specific
+    # overrides remain authoritative; this only fills empties.
+    from .symbol_to_csi import backfill_legend_hints
+
+    backfilled = 0
+    for rows in results:
+        backfilled += backfill_legend_hints(rows)
+    if backfilled:
+        log.info(
+            "symbol_legend: backfilled %d csi_section_hint(s) from "
+            "canonical symbol_to_csi table", backfilled,
+        )
+
     # Wipe + insert (idempotent)
     async with SessionLocal() as db:
         await db.execute(

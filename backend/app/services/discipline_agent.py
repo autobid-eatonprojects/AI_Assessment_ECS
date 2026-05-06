@@ -511,6 +511,13 @@ async def run_discipline_agent(
             raw={},
         )
 
+    # P4 — pull the canonical AEC symbol→CSI seed for this discipline
+    # (FALLBACK below project-specific legend; helps when the legend
+    # is partial or hasn't been extracted yet).
+    from .symbol_to_csi import render_canonical_block_for_discipline
+
+    canonical_symbol_block = render_canonical_block_for_discipline(discipline.key)
+
     # Build the cached prompt: discipline corpus first (cached), task
     # framing last (uncached so different downstream calls reuse the
     # same cached corpus).
@@ -520,6 +527,14 @@ async def run_discipline_agent(
         + "\n".join(
             f"  {s['sheet_id']:>8} - {s.get('title') or '?'}"
             for s in corpus.sheet_manifest
+        )
+        + (
+            "\n\n=== CANONICAL AEC SYMBOL TABLE ===\n"
+            "(Industry-standard fallback when project legend is silent. "
+            "Project-specific legend below overrides any conflict.)\n"
+            + canonical_symbol_block
+            if canonical_symbol_block
+            else ""
         )
         + (
             "\n\n=== PROJECT SYMBOL LEGEND ===\n" + corpus.symbol_legend_summary
