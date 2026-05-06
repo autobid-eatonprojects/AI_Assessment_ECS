@@ -664,6 +664,30 @@ async def process_document(document_id: str) -> None:
                 )
             except Exception as e:  # noqa: BLE001
                 log.exception("processor: P2 revision_block_parser failed: %s", e)
+
+            # P3 — project-specific symbol legend (W3 mitigation). Idempotent:
+            # wipes + re-extracts every legend sheet across the project, so
+            # safe to call once per drawing-set document upload. Cost is
+            # ~$0.20-1.00 per project depending on how many G-series /
+            # *-001 cover sheets exist.
+            try:
+                async with SessionLocal() as db:
+                    doc_row = await db.get(Document, document_id)
+                    project_id_for_legend = (
+                        doc_row.project_id if doc_row else None
+                    )
+                if project_id_for_legend:
+                    from .symbol_legend_extractor import extract_for_project
+
+                    leg = await extract_for_project(project_id_for_legend)
+                    log.info(
+                        "processor: P3 symbol_legend — %d entries from %d "
+                        "sheets ($%.4f) for project of %s",
+                        leg["entries"], leg["sheets_processed"],
+                        leg["cost_usd"], filename,
+                    )
+            except Exception as e:  # noqa: BLE001
+                log.exception("processor: P3 symbol_legend failed: %s", e)
     elif doc_type in ("written-spec", "bid-quote", "scope-letter") and pages:
         # Text-bearing docs: OCR any page that lacks native text so the
         # downstream chunker has content to index.

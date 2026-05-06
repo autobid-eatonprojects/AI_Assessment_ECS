@@ -31,6 +31,7 @@ from .review import (
 from .scope import ScopeCitation, ScopeExtractionRun, ScopeItem
 from .sheet_index import SheetIndex
 from .sheet_revision import SheetRevision
+from .symbol_legend import SymbolLegend
 
 __all__ = [
     "AppSetting",
@@ -60,6 +61,7 @@ __all__ = [
     "ScopeItem",
     "SheetIndex",
     "SheetRevision",
+    "SymbolLegend",
     "TradeDivisionRelevance",
     "TradePackage",
     "TradePackageItem",

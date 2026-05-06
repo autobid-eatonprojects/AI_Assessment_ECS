@@ -451,7 +451,12 @@ async def run_discipline_agent(
     yolo_symbols: list[dict] | None = None,
     symbol_legend_summary: str = "",
 ) -> DisciplineAgentResult:
-    """Run one discipline's 4-step agent end-to-end."""
+    """Run one discipline's 4-step agent end-to-end.
+
+    Auto-loads optional context augmentation if the caller didn't supply:
+      - YOLO MEP symbols (W3, FP/P/M/E only — no-op if YOLO not configured)
+      - Project symbol legend (W3 mitigation, all disciplines)
+    """
     client = _get_client()
     if client is None:
         raise RuntimeError("ANTHROPIC_API_KEY not configured")
@@ -459,8 +464,33 @@ async def run_discipline_agent(
     async with SessionLocal() as db:
         corpus = await gather_corpus_for_discipline(db, project_id, discipline)
 
+    # Auto-load YOLO symbols for MEP disciplines (no-op when YOLO not configured)
+    if yolo_symbols is None:
+        from . import yolo_mep
+
+        try:
+            yolo_symbols = await yolo_mep.detect_for_discipline(
+                project_id, discipline.key
+            )
+        except Exception as e:  # noqa: BLE001
+            log.warning("discipline_agent: YOLO detect failed: %s", e)
+            yolo_symbols = []
     if yolo_symbols:
         corpus.yolo_symbols = yolo_symbols
+
+    # Auto-load symbol legend (filtered to this discipline if rows exist)
+    if not symbol_legend_summary:
+        from . import symbol_legend_extractor
+
+        try:
+            symbol_legend_summary = await symbol_legend_extractor.get_legend_summary(
+                project_id, discipline=discipline.key
+            )
+        except Exception as e:  # noqa: BLE001
+            log.warning(
+                "discipline_agent: symbol legend lookup failed: %s", e
+            )
+            symbol_legend_summary = ""
     if symbol_legend_summary:
         corpus.symbol_legend_summary = symbol_legend_summary
 

@@ -301,31 +301,148 @@ async def crop_region(
 # -----------------------------------------------------------------------------
 
 
+# -----------------------------------------------------------------------------
+# HSV color-channel separation (W4 mitigation per design doc).
+# MEP overlap pages frequently print different disciplines in different ink
+# colors (red = fire protection, blue = plumbing, yellow = mechanical,
+# green = electrical) on the same flattened sheet. Separating by color
+# channel lets the discipline agent see ONLY its discipline's symbology
+# without the noise from the other three.
+# -----------------------------------------------------------------------------
+
+
+# Default discipline → HSV hue ranges (degrees, 0-360 OpenCV-mapped to 0-179).
+# Tuned for typical AEC drawing conventions; per-project overrides could
+# come from settings later.
+_DISCIPLINE_HUE_RANGES: dict[str, list[tuple[int, int]]] = {
+    # Red wraps 0/180 in HSV
+    "fire-protection": [(0, 10), (170, 179)],
+    "plumbing":        [(95, 130)],   # blue
+    "mechanical":      [(20, 35)],    # yellow / orange
+    "electrical":      [(40, 80)],    # green
+}
+
+
+def isolate_discipline_color_sync(
+    image_path: Path, discipline_key: str, *, output_dir: Path | None = None
+) -> Path | None:
+    """Mask the rendered page to keep only ink in this discipline's color band.
+
+    Returns the path to the masked image (white background + discipline-
+    color ink). Returns None for disciplines with no defined hue band.
+    """
+    ranges = _DISCIPLINE_HUE_RANGES.get(discipline_key)
+    if not ranges:
+        return None
+    import cv2
+    import numpy as np
+
+    img = cv2.imread(str(image_path))
+    if img is None:
+        return None
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    full_mask = None
+    for h_lo, h_hi in ranges:
+        lo = np.array([h_lo, 60, 60], dtype=np.uint8)
+        hi = np.array([h_hi, 255, 255], dtype=np.uint8)
+        mask = cv2.inRange(hsv, lo, hi)
+        full_mask = mask if full_mask is None else cv2.bitwise_or(full_mask, mask)
+    # Apply mask: white background, original-color where mask is set
+    out = np.full_like(img, 255)
+    out[full_mask > 0] = img[full_mask > 0]
+
+    if output_dir is None:
+        output_dir = image_path.parent
+    out_path = output_dir / (image_path.stem + f"_isolated_{discipline_key}.png")
+    cv2.imwrite(str(out_path), out)
+    return out_path
+
+
+async def isolate_discipline_color(
+    image_path: Path, discipline_key: str, *, output_dir: Path | None = None
+) -> Path | None:
+    async with _render_semaphore:
+        return await asyncio.to_thread(
+            isolate_discipline_color_sync, image_path, discipline_key,
+            output_dir=output_dir,
+        )
+
+
+# Anthropic enforces "5 MB" on the base64-ENCODED payload (the literal
+# JSON string they receive), not on the raw decoded bytes. Base64
+# expands 4/3, so the effective raw cap is 5 MB × 3/4 ≈ 3.75 MB. We
+# leave a small margin for JSON envelope + the "image/jpeg" prefix.
+_VISION_MAX_BASE64_BYTES = 5 * 1024 * 1024
+_VISION_RAW_BYTES_BUDGET = (_VISION_MAX_BASE64_BYTES * 3) // 4 - 1024
+
+
+def _base64_encoded_size(n_raw: int) -> int:
+    """Exact base64 length for n raw bytes (4 chars per 3 raw, padded)."""
+    return ((n_raw + 2) // 3) * 4
+
+
 def read_image_for_vision(
-    image_path: Path, *, max_bytes: int = 5 * 1024 * 1024, max_dim: int = 4000
+    image_path: Path,
+    *,
+    max_base64_bytes: int = _VISION_MAX_BASE64_BYTES,
+    max_dim: int = 4000,
 ) -> tuple[bytes, str]:
-    """Returns (bytes, mime_type) ready to send to a vision API."""
+    """Returns (bytes, mime_type) ready to send to a vision API.
+
+    Anthropic measures the 5 MB cap against the base64-ENCODED string
+    (i.e. the JSON `data` field length), not raw bytes. We measure
+    encoded size at every step. If a single (quality=85, max_dim=4000)
+    JPEG is still oversized — common for 600 DPI MEP sheets that are
+    mostly thin-line vector content — step down quality and dimension
+    together until we fit. Final fallback at quality=60 / 2000px is
+    almost always under cap; if even that fails we raise so the caller
+    can decide what to do.
+    """
     raw = image_path.read_bytes()
-    if len(raw) <= max_bytes:
+    if _base64_encoded_size(len(raw)) <= max_base64_bytes:
         media = (
             "image/png"
             if image_path.suffix.lower() == ".png"
             else "image/jpeg"
         )
         return raw, media
+
     from io import BytesIO
     from PIL import Image as PILImage
 
     img = PILImage.open(image_path)
     if img.mode != "RGB":
         img = img.convert("RGB")
-    if max(img.size) > max_dim:
-        img.thumbnail((max_dim, max_dim), PILImage.LANCZOS)
-    buf = BytesIO()
-    img.save(buf, format="JPEG", quality=85, optimize=True)
-    out = buf.getvalue()
-    log.info(
-        "vision: downsized %s %dKB → %dKB JPEG (Anthropic 5MB cap)",
-        image_path.name, len(raw) // 1024, len(out) // 1024,
+
+    # Quality + max-dim ladder. Each step is a meaningful reduction;
+    # we stop at the first one that fits under the cap.
+    ladder = (
+        (max_dim, 85),
+        (max_dim, 75),
+        (3200, 80),
+        (3200, 70),
+        (2800, 75),
+        (2400, 70),
+        (2400, 60),
+        (2000, 60),
     )
-    return out, "image/jpeg"
+    for dim, q in ladder:
+        work = img.copy()
+        if max(work.size) > dim:
+            work.thumbnail((dim, dim), PILImage.LANCZOS)
+        buf = BytesIO()
+        work.save(buf, format="JPEG", quality=q, optimize=True)
+        out = buf.getvalue()
+        if _base64_encoded_size(len(out)) <= max_base64_bytes:
+            log.info(
+                "vision: downsized %s %dKB raw → %dKB JPEG (dim<=%d, q=%d, b64=%dKB)",
+                image_path.name, len(raw) // 1024, len(out) // 1024,
+                dim, q, _base64_encoded_size(len(out)) // 1024,
+            )
+            return out, "image/jpeg"
+
+    raise RuntimeError(
+        f"vision: cannot fit {image_path.name} under "
+        f"{max_base64_bytes // (1024 * 1024)}MB base64 even at "
+        f"quality=60 / 2000px — page is unusually content-dense"
+    )

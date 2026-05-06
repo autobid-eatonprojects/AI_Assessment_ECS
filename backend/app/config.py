@@ -53,6 +53,13 @@ class Settings(BaseSettings):
     mistral_api_key: str | None = None
     mistral_ocr_model: str = "mistral-ocr-latest"
 
+    # YOLO11 MEP symbol pre-pass (W3 mitigation). Set to a path-on-disk
+    # of a fine-tuned YOLO model (typically `best.pt` from Roboflow or
+    # custom training). When set AND `ultralytics` is installed, the
+    # discipline_agent enriches FP/P/M/E context with structured symbol
+    # detections. When unset, those agents fall back to vision-only.
+    yolo_mep_model_path: str | None = None
+
     # Phase 3 — Indexing + Retrieval
     # Embeddings: voyage-3-large (1024d) per the design doc — best published
     # AEC retrieval scores. Cohere Rerank 3 still does cross-encoder rerank.
