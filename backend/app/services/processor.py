@@ -156,8 +156,22 @@ async def _persist_pages(document_id: str, pages: list[renderer.RenderedPage]) -
 
 
 async def _ocr_pages_if_needed(document_id: str) -> int:
-    """Run Gemini Flash OCR on pages that have no native text. Returns count OCR'd."""
-    from sqlalchemy import update as sql_update
+    """Run Gemini Flash OCR on pages that lack usable native text.
+
+    Picks up pages with NULL text_content AND empty-string text_content.
+    Previously this only caught NULL — but empty strings get persisted
+    when OCR returns no text on the first pass, which made /resume a
+    no-op for previously-failed pages. Empty strings are now treated as
+    needing OCR.
+
+    Each OCR call gets a 90-second hard timeout. Mistral occasionally
+    accepts a request and never responds, which would otherwise block
+    `asyncio.gather()` forever — every other completed task waits on
+    the hung one. Timeout returns None for that page, marks the rest
+    proceed.
+    """
+    from sqlalchemy import or_, update as sql_update
+    from sqlalchemy.sql import func as sql_func
 
     from .ocr import OCRUnavailable, ocr_image
 
@@ -165,7 +179,12 @@ async def _ocr_pages_if_needed(document_id: str) -> int:
         result = await db.execute(
             select(DocumentPage)
             .where(DocumentPage.document_id == document_id)
-            .where(DocumentPage.text_content.is_(None))
+            .where(
+                or_(
+                    DocumentPage.text_content.is_(None),
+                    sql_func.length(DocumentPage.text_content) == 0,
+                )
+            )
             .order_by(DocumentPage.page_number)
         )
         pages = list(result.scalars().all())
@@ -179,7 +198,10 @@ async def _ocr_pages_if_needed(document_id: str) -> int:
     async def _one(page_id: str, page_number: int, image_rel: str):
         image_path = storage.absolute_path(image_rel)
         try:
-            r = await ocr_image(image_path)
+            r = await asyncio.wait_for(ocr_image(image_path), timeout=90.0)
+        except asyncio.TimeoutError:
+            log.warning("ocr: page %d timed out after 90s — skipping", page_number)
+            return None
         except OCRUnavailable:
             log.warning("ocr: GOOGLE_API_KEY not set — skipping page %d", page_number)
             return None
@@ -190,17 +212,17 @@ async def _ocr_pages_if_needed(document_id: str) -> int:
             await db.execute(
                 sql_update(DocumentPage)
                 .where(DocumentPage.id == page_id)
-                .values(text_content=r.text, text_source="ocr-gemini")
+                .values(text_content=r.text, text_source=f"ocr-{r.provider}")
             )
             await record_call(
                 db,
                 purpose="ocr",
-                model="gemini-2.5-flash",
+                model="gemini-2.5-flash" if r.provider == "gemini" else "mistral-ocr-latest",
                 usage=r.usage,
                 latency_ms=r.latency_ms,
                 project_id=project_id,
                 document_id=document_id,
-                provider="google",
+                provider=r.provider,
             )
             await db.commit()
         return r
