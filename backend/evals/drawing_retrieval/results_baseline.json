@@ -1,0 +1,2473 @@
+{
+  "queries": [
+    {
+      "id": "d01",
+      "text": "What's on sheet A1.1?",
+      "difficulty": "sheet_named",
+      "relevant": [
+        "A1.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "A1.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "A1.1",
+          "page": 14,
+          "rrf": 0.0315,
+          "hit": true,
+          "snippet": "Sheet A1.1 FLOOR PLANS \u2014 Discipline: architectural \u2014 Scale: 1/8\" = 1'-0\""
+        },
+        {
+          "rank": 2,
+          "sheet": ".CVR",
+          "page": 1,
+          "rrf": 0.0297,
+          "hit": false,
+          "snippet": "Cross-reference to A1.1: FLOOR PLANS"
+        },
+        {
+          "rank": 3,
+          "sheet": "A1.1",
+          "page": 14,
+          "rrf": 0.0164,
+          "hit": true,
+          "snippet": "[material] WALL PARTITION - 2X4(S) OR 2X6(S) WOOD STUDS AT 16\" O.C. W/ 5/8\" GYP. BD. ON EACH SIDE"
+        },
+        {
+          "rank": 4,
+          "sheet": ".CVR",
+          "page": 1,
+          "rrf": 0.0161,
+          "hit": false,
+          "snippet": "Cross-reference to A0.1: GENERAL NOTES AND ACCESSIBILITY DETAILS"
+        },
+        {
+          "rank": 5,
+          "sheet": "A4.1",
+          "page": 17,
+          "rrf": 0.0161,
+          "hit": false,
+          "snippet": "Cross-reference to S/A1.1: METAL 3D LED BACKLIT SIGNAGE TO READ 'ELKS COMMUNITY ENRICHMENT CENTER'. SEE S/A1.1 FOR SIZIN"
+        }
+      ]
+    },
+    {
+      "id": "d02",
+      "text": "Show me the door schedule sheet",
+      "difficulty": "sheet_named",
+      "relevant": [
+        "A2.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "A2.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "A2.1",
+          "page": 15,
+          "rrf": 0.0328,
+          "hit": true,
+          "snippet": "Sheet A2.1 DOOR SCHEDULE, DOOR/FRAME ELEVATIONS & DETAILS \u2014 Discipline: architectural \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 2,
+          "sheet": "A2.1",
+          "page": 15,
+          "rrf": 0.0302,
+          "hit": true,
+          "snippet": "[material] FRP ({\"applies_to\": \"Door panel material (multiple doors in schedule)\"})"
+        },
+        {
+          "rank": 3,
+          "sheet": "A2.1",
+          "page": 15,
+          "rrf": 0.03,
+          "hit": true,
+          "snippet": "Cross-reference to A2.1 / detail SEE SCHEDULE: Window/storefront elevation reference to schedule on same sheet"
+        },
+        {
+          "rank": 4,
+          "sheet": "A2.1",
+          "page": 15,
+          "rrf": 0.0291,
+          "hit": true,
+          "snippet": "[other] DOOR PER SCHEDULE / METAL DOOR FRAME (BEYOND) / ALUMINUM THRESHOLD ({\"applies_to\": \"Storefront threshold and ext"
+        },
+        {
+          "rank": 5,
+          "sheet": "A2.1",
+          "page": 15,
+          "rrf": 0.0279,
+          "hit": true,
+          "snippet": "[symbol] DOOR TYPE - numbered 1 through 6 (door elevation types) ({\"applies_to\": \"Door type elevation legend\"})"
+        }
+      ]
+    },
+    {
+      "id": "d03",
+      "text": "Life safety plan",
+      "difficulty": "sheet_named",
+      "relevant": [
+        "A0.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "A0.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "A0.1",
+          "page": 13,
+          "rrf": 0.0315,
+          "hit": true,
+          "snippet": "[code] IBC 2024"
+        },
+        {
+          "rank": 2,
+          "sheet": "A0.1",
+          "page": 13,
+          "rrf": 0.0296,
+          "hit": true,
+          "snippet": "[code] NFPA 13"
+        },
+        {
+          "rank": 3,
+          "sheet": "A0.1",
+          "page": 13,
+          "rrf": 0.0296,
+          "hit": true,
+          "snippet": "Sheet A0.1 LIFE SAFETY PLAN \u2014 Discipline: architectural \u2014 Scale: 1/8\" = 1'-0\""
+        },
+        {
+          "rank": 4,
+          "sheet": "A0.1",
+          "page": 13,
+          "rrf": 0.0277,
+          "hit": true,
+          "snippet": "[code] NFPA 14"
+        },
+        {
+          "rank": 5,
+          "sheet": "A0.1",
+          "page": 13,
+          "rrf": 0.0276,
+          "hit": true,
+          "snippet": "[code] NFPA 72"
+        }
+      ]
+    },
+    {
+      "id": "d04",
+      "text": "Foundation plan",
+      "difficulty": "sheet_named",
+      "relevant": [
+        "S1.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "S1.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "S1.1",
+          "page": 30,
+          "rrf": 0.0323,
+          "hit": true,
+          "snippet": "[other] DRAWING TITLE: FOUNDATION PLANS"
+        },
+        {
+          "rank": 2,
+          "sheet": "S1.1",
+          "page": 30,
+          "rrf": 0.0315,
+          "hit": true,
+          "snippet": "FOUNDATION PLAN NOTES"
+        },
+        {
+          "rank": 3,
+          "sheet": "S1.1",
+          "page": 30,
+          "rrf": 0.0306,
+          "hit": true,
+          "snippet": "[material] 8\" MASONRY FOUNDATION RIBBON"
+        },
+        {
+          "rank": 4,
+          "sheet": "S1.1",
+          "page": 30,
+          "rrf": 0.0297,
+          "hit": true,
+          "snippet": "Sheet S1.1 FOUNDATION PLANS \u2014 Discipline: structural \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 5,
+          "sheet": "S1.1",
+          "page": 30,
+          "rrf": 0.0272,
+          "hit": true,
+          "snippet": "[equipment] WF2.0"
+        }
+      ]
+    },
+    {
+      "id": "d05",
+      "text": "Roof framing plan",
+      "difficulty": "sheet_named",
+      "relevant": [
+        "S1.2"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "S1.2"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "S1.2",
+          "page": 31,
+          "rrf": 0.0311,
+          "hit": true,
+          "snippet": "Sheet S1.2 ROOF FRAMING PLAN \u2014 Discipline: structural \u2014 Scale: 3/16\" = 1'-4\""
+        },
+        {
+          "rank": 2,
+          "sheet": "S1.2",
+          "page": 31,
+          "rrf": 0.0293,
+          "hit": true,
+          "snippet": "EDGE OF UPPER ROOF"
+        },
+        {
+          "rank": 3,
+          "sheet": "S1.2",
+          "page": 31,
+          "rrf": 0.029,
+          "hit": true,
+          "snippet": "[material] (3) 1-3/4\"x9-1/4\" LVLs cantilevered at roof overhang, TYP."
+        },
+        {
+          "rank": 4,
+          "sheet": "S1.2",
+          "page": 31,
+          "rrf": 0.0285,
+          "hit": true,
+          "snippet": "(3) 1-3/4\"x9-1/4\" LVLs CANTILEVERED LVLs AT ROOF OVERHANG, TYP."
+        },
+        {
+          "rank": 5,
+          "sheet": "S1.2",
+          "page": 31,
+          "rrf": 0.0283,
+          "hit": true,
+          "snippet": "[material] (3) 2x8"
+        }
+      ]
+    },
+    {
+      "id": "d06",
+      "text": "Lighting plan",
+      "difficulty": "sheet_named",
+      "relevant": [
+        "E1.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "E1.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "E1.1",
+          "page": 40,
+          "rrf": 0.0328,
+          "hit": true,
+          "snippet": "[other] LIGHTING PLAN"
+        },
+        {
+          "rank": 2,
+          "sheet": "E1.1",
+          "page": 40,
+          "rrf": 0.0323,
+          "hit": true,
+          "snippet": "Sheet E1.1 LIGHTING PLAN \u2014 Discipline: electrical \u2014 Scale: 1/8\" = 1'-0\""
+        },
+        {
+          "rank": 3,
+          "sheet": "E1.1",
+          "page": 40,
+          "rrf": 0.0315,
+          "hit": true,
+          "snippet": "[equipment] LED"
+        },
+        {
+          "rank": 4,
+          "sheet": "E1.1",
+          "page": 40,
+          "rrf": 0.0298,
+          "hit": true,
+          "snippet": "[room] LOBBY"
+        },
+        {
+          "rank": 5,
+          "sheet": "E1.1",
+          "page": 40,
+          "rrf": 0.0289,
+          "hit": true,
+          "snippet": "[room] OFFICE 100"
+        }
+      ]
+    },
+    {
+      "id": "d10",
+      "text": "Door schedule with sizes and types",
+      "difficulty": "schedule",
+      "relevant": [
+        "A2.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 19,
+      "sheets_covered": [
+        "A2.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "A2.1",
+          "page": 15,
+          "rrf": 0.0323,
+          "hit": true,
+          "snippet": "[symbol] DOOR TYPE - numbered 1 through 6 (door elevation types) ({\"applies_to\": \"Door type elevation legend\"})"
+        },
+        {
+          "rank": 2,
+          "sheet": "A2.1",
+          "page": 15,
+          "rrf": 0.0299,
+          "hit": true,
+          "snippet": "Sheet A2.1 DOOR SCHEDULE, DOOR/FRAME ELEVATIONS & DETAILS \u2014 Discipline: architectural \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 3,
+          "sheet": "A2.1",
+          "page": 15,
+          "rrf": 0.0275,
+          "hit": true,
+          "snippet": "[other] DOOR PER SCHEDULE / METAL DOOR FRAME (BEYOND) / ALUMINUM THRESHOLD ({\"applies_to\": \"Storefront threshold and ext"
+        },
+        {
+          "rank": 4,
+          "sheet": "A2.1",
+          "page": 15,
+          "rrf": 0.0273,
+          "hit": true,
+          "snippet": "[material] FRP ({\"applies_to\": \"Door panel material (multiple doors in schedule)\"})"
+        },
+        {
+          "rank": 5,
+          "sheet": "A2.1",
+          "page": 15,
+          "rrf": 0.026,
+          "hit": true,
+          "snippet": "[material] INSULATED METAL DOOR ({\"applies_to\": \"Exterior door detail\"})"
+        }
+      ]
+    },
+    {
+      "id": "d11",
+      "text": "Plumbing fixture schedule",
+      "difficulty": "schedule",
+      "relevant": [
+        "P0.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "P0.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "P0.1",
+          "page": 50,
+          "rrf": 0.0323,
+          "hit": true,
+          "snippet": "Schedule: PLUMBING FIXTURE SCHEDULE Columns: DESIGNATION | FIXTURE TYPE | MANUFACTURER | MODEL # | DESCRIPTION | NOTES R"
+        },
+        {
+          "rank": 2,
+          "sheet": "P0.1",
+          "page": 50,
+          "rrf": 0.0315,
+          "hit": true,
+          "snippet": "Schedule: [typed:fixture] PLUMBING FIXTURE SCHEDULE Columns: tag | description | manufacturer | flush_type | mounting | "
+        },
+        {
+          "rank": 3,
+          "sheet": "P0.1",
+          "page": 50,
+          "rrf": 0.0298,
+          "hit": true,
+          "snippet": "1. FIXTURES AND WATER DISTRIBUTION PIPING ABOVE AND BELOW GRADE SHALL BE SCHEDULE 40 PVC DRAIN PLASTIC PIPE AND FITTINGS"
+        },
+        {
+          "rank": 4,
+          "sheet": "P0.1",
+          "page": 50,
+          "rrf": 0.0288,
+          "hit": true,
+          "snippet": "[material] SCHEDULE 40 PVC DRAIN PLASTIC PIPE"
+        },
+        {
+          "rank": 5,
+          "sheet": "P0.1",
+          "page": 50,
+          "rrf": 0.0287,
+          "hit": true,
+          "snippet": "Sheet P0.1 PLUMBING SCHEDULES, NOTES & DETAILS \u2014 Discipline: plumbing \u2014 Scale: AS NOTED"
+        }
+      ]
+    },
+    {
+      "id": "d12",
+      "text": "Electrical panel schedule",
+      "difficulty": "schedule",
+      "relevant": [
+        "E0.3"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "E0.3"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 2,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "E0.1",
+          "page": 37,
+          "rrf": 0.0308,
+          "hit": false,
+          "snippet": "13. PANELBOARD SCHEDULE (PB LIST): THIS 'LABEL' IS FIRST PANELBOARD DESCRIPTION PRIOR TO EACH SECTION PANEL IN ACCORDANC"
+        },
+        {
+          "rank": 2,
+          "sheet": "E0.3",
+          "page": 39,
+          "rrf": 0.0303,
+          "hit": true,
+          "snippet": "Schedule: PANEL #50 - SUMMARY Columns: DESCRIPTION | VALUE | UNIT Row 1: DESCRIPTION=BUS RATING; VALUE=200; UNIT=AMP Row"
+        },
+        {
+          "rank": 3,
+          "sheet": "E0.3",
+          "page": 39,
+          "rrf": 0.0299,
+          "hit": true,
+          "snippet": "[equipment] PANEL A1"
+        },
+        {
+          "rank": 4,
+          "sheet": "E0.3",
+          "page": 39,
+          "rrf": 0.0289,
+          "hit": true,
+          "snippet": "[equipment] PANEL #50"
+        },
+        {
+          "rank": 5,
+          "sheet": "E0.3",
+          "page": 39,
+          "rrf": 0.0287,
+          "hit": true,
+          "snippet": "[equipment] PANEL A2"
+        }
+      ]
+    },
+    {
+      "id": "d13",
+      "text": "HVAC equipment schedule",
+      "difficulty": "schedule",
+      "relevant": [
+        "M0.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "M0.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 2,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "M0.2",
+          "page": 48,
+          "rrf": 0.0307,
+          "hit": false,
+          "snippet": "[equipment] PACKAGED HVAC UNIT"
+        },
+        {
+          "rank": 2,
+          "sheet": "M0.1",
+          "page": 47,
+          "rrf": 0.0306,
+          "hit": true,
+          "snippet": "Schedule: [typed:equipment] ELECTRIC HEATER SCHEDULE Columns: tag | amps | voltage | weight | make | model | description"
+        },
+        {
+          "rank": 3,
+          "sheet": "M0.1",
+          "page": 47,
+          "rrf": 0.0296,
+          "hit": true,
+          "snippet": "Schedule: [typed:equipment] PACKAGED HEAT PUMP UNIT WITH ELECTRIC HEAT SCHEDULE Columns: tag | capacity | voltage | amps"
+        },
+        {
+          "rank": 4,
+          "sheet": "M0.2",
+          "page": 48,
+          "rrf": 0.0263,
+          "hit": false,
+          "snippet": "[equipment] AIR COOLED HEAT PUMP"
+        },
+        {
+          "rank": 5,
+          "sheet": "M0.1",
+          "page": 47,
+          "rrf": 0.0164,
+          "hit": true,
+          "snippet": "[equipment] SHS - Electric Split System Heat Pump Unit"
+        }
+      ]
+    },
+    {
+      "id": "d14",
+      "text": "Lighting fixture schedule with model numbers",
+      "difficulty": "schedule",
+      "relevant": [
+        "E0.3",
+        "E1.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [],
+      "sheets_missing": [
+        "E0.3",
+        "E1.1"
+      ],
+      "recall": 0.0,
+      "rank_of_first_hit": null,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "E0.1",
+          "page": 37,
+          "rrf": 0.0298,
+          "hit": false,
+          "snippet": "Schedule: [typed:equipment] LIGHTING FIXTURE SCHEDULE Columns: tag | description Row 1: tag=<UNKNOWN>; description=COMBI"
+        },
+        {
+          "rank": 2,
+          "sheet": "E0.1",
+          "page": 37,
+          "rrf": 0.0298,
+          "hit": false,
+          "snippet": "LIGHTING CONTROL NOTES: 1. THE NUMBERS OF ALL FIXTURES NOTED BY # / % IN MODEL NUMBER SHALL BE VERIFIED WITH AND APPROVE"
+        },
+        {
+          "rank": 3,
+          "sheet": "A0.0",
+          "page": 12,
+          "rrf": 0.0286,
+          "hit": false,
+          "snippet": "Schedule: [typed:fixture] GENERAL NOTES / ACCESSIBILITY Columns: tag | description Row 1: tag=<UNKNOWN>; description=No "
+        },
+        {
+          "rank": 4,
+          "sheet": "E0.1",
+          "page": 37,
+          "rrf": 0.0164,
+          "hit": false,
+          "snippet": "Schedule: LIGHTING FIXTURE SCHEDULE Columns: SYM | COMPANY | CATALOG NUMBER / MODEL NUMBER | WATTS | TEMP IN K | MINORS "
+        },
+        {
+          "rank": 5,
+          "sheet": "E0.1",
+          "page": 37,
+          "rrf": 0.0164,
+          "hit": false,
+          "snippet": "Schedule: SPRINKLER MONITORING DEVICE LEGEND Columns: SYMBOL | DESCRIPTION OF DEVICE | DEVICE/MODEL NUMBERS | HEIGHT Row"
+        }
+      ]
+    },
+    {
+      "id": "d15",
+      "text": "Fire protection equipment list",
+      "difficulty": "schedule",
+      "relevant": [
+        "FP0.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "FP0.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "FP0.1",
+          "page": 45,
+          "rrf": 0.032,
+          "hit": true,
+          "snippet": "[equipment] ELECTRONIC BELL"
+        },
+        {
+          "rank": 2,
+          "sheet": "FP0.1",
+          "page": 45,
+          "rrf": 0.0311,
+          "hit": true,
+          "snippet": "[equipment] FIRE ALARM PANEL"
+        },
+        {
+          "rank": 3,
+          "sheet": "FP0.1",
+          "page": 45,
+          "rrf": 0.0305,
+          "hit": true,
+          "snippet": "[equipment] HYDRAULIC CALCULATOR"
+        },
+        {
+          "rank": 4,
+          "sheet": "FP1.1",
+          "page": 46,
+          "rrf": 0.0298,
+          "hit": false,
+          "snippet": "[room] FIRE ROOM"
+        },
+        {
+          "rank": 5,
+          "sheet": "FP0.1",
+          "page": 45,
+          "rrf": 0.0288,
+          "hit": true,
+          "snippet": "[equipment] INSPECTOR TEST & DRAIN"
+        }
+      ]
+    },
+    {
+      "id": "d16",
+      "text": "Finish schedule for floors and walls",
+      "difficulty": "schedule",
+      "relevant": [
+        "F1.1",
+        "F2.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 18,
+      "sheets_covered": [
+        "F1.1",
+        "F2.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "F2.1",
+          "page": 27,
+          "rrf": 0.029,
+          "hit": true,
+          "snippet": "2. PAINT FINISHES: \u2022 WALLS: SATIN \u2022 CEILINGS: EGGSHELL \u2022 TRIM: SEMI-GLOSS \u2022 RESTROOMS: SEMI-GLOSS"
+        },
+        {
+          "rank": 2,
+          "sheet": "F1.1",
+          "page": 26,
+          "rrf": 0.029,
+          "hit": true,
+          "snippet": "Schedule: FINISH LEGEND Columns: SYMBOL | FINISH CODE Row 1: SYMBOL=Light pattern fill; FINISH CODE=LVT1 Row 2: SYMBOL=M"
+        },
+        {
+          "rank": 3,
+          "sheet": "M0.1",
+          "page": 47,
+          "rrf": 0.0282,
+          "hit": false,
+          "snippet": "Cross-reference to Architectural: SEE ARCHITECTURAL FOR FINISH SCHEDULE AND REFLECTED CEILING PLAN FOR ROOM FINISH TYPES"
+        },
+        {
+          "rank": 4,
+          "sheet": "F2.1",
+          "page": 27,
+          "rrf": 0.0164,
+          "hit": true,
+          "snippet": "Schedule: [typed:finish] FINISH SCHEDULE Columns: room | room_number Row 1: room=FLOORING Row 2: room=LVT1; room_number="
+        },
+        {
+          "rank": 5,
+          "sheet": "A1.1",
+          "page": 14,
+          "rrf": 0.0164,
+          "hit": false,
+          "snippet": "Schedule: OPAQUE THERMAL ENVELOPE REQUIREMENTS Columns: CATEGORY | REQUIREMENT Row 1: CATEGORY=ROOFS; REQUIREMENT=INSULA"
+        }
+      ]
+    },
+    {
+      "id": "d20",
+      "text": "Wall section details",
+      "difficulty": "detail",
+      "relevant": [
+        "A5.2",
+        "A5.3"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "A5.2",
+        "A5.3"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "A5.2",
+          "page": 20,
+          "rrf": 0.0303,
+          "hit": true,
+          "snippet": "Cross-reference to A0.3 / detail 7: Section bubble 7/A0.3 - Wall Section 7 reference"
+        },
+        {
+          "rank": 2,
+          "sheet": "A5.2",
+          "page": 20,
+          "rrf": 0.0302,
+          "hit": true,
+          "snippet": "Cross-reference to A0.3 / detail 13: Section bubble 13/A0.3 - Wall Section 13 reference"
+        },
+        {
+          "rank": 3,
+          "sheet": "A5.2",
+          "page": 20,
+          "rrf": 0.0301,
+          "hit": true,
+          "snippet": "Cross-reference to A0.3 / detail 8: Section bubble 8/A0.3 - Wall Section 8 reference"
+        },
+        {
+          "rank": 4,
+          "sheet": "A5.2",
+          "page": 20,
+          "rrf": 0.0301,
+          "hit": true,
+          "snippet": "Cross-reference to A0.3 / detail 9: Section bubble 9/A0.3 - Wall Section 9 reference"
+        },
+        {
+          "rank": 5,
+          "sheet": "A5.2",
+          "page": 20,
+          "rrf": 0.0299,
+          "hit": true,
+          "snippet": "Cross-reference to A0.3 / detail 1: Section bubble 1/A0.3 - Wall Section 1 reference"
+        }
+      ]
+    },
+    {
+      "id": "d21",
+      "text": "Building cross sections",
+      "difficulty": "detail",
+      "relevant": [
+        "A5.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "A5.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "A5.1",
+          "page": 19,
+          "rrf": 0.0325,
+          "hit": true,
+          "snippet": "Sheet A5.1 BUILDING SECTIONS \u2014 Discipline: architectural \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 2,
+          "sheet": "A5.1",
+          "page": 19,
+          "rrf": 0.0323,
+          "hit": true,
+          "snippet": "Cross-reference to A7.1 / detail 3: Detail bubble 3/A7.1 referenced in Building Section 4"
+        },
+        {
+          "rank": 3,
+          "sheet": "A5.1",
+          "page": 19,
+          "rrf": 0.0292,
+          "hit": true,
+          "snippet": "[symbol] Building Section 4 - 1/8\" = 1'-0\""
+        },
+        {
+          "rank": 4,
+          "sheet": "A5.1",
+          "page": 19,
+          "rrf": 0.029,
+          "hit": true,
+          "snippet": "[symbol] Building Section 3 - 1/8\" = 1'-0\""
+        },
+        {
+          "rank": 5,
+          "sheet": "A5.1",
+          "page": 19,
+          "rrf": 0.0286,
+          "hit": true,
+          "snippet": "[symbol] Building Section 1 - 1/8\" = 1'-0\""
+        }
+      ]
+    },
+    {
+      "id": "d22",
+      "text": "Foundation details and sections",
+      "difficulty": "detail",
+      "relevant": [
+        "S2.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "S2.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "S2.1",
+          "page": 33,
+          "rrf": 0.0303,
+          "hit": true,
+          "snippet": "[material] #5 CONTINUOUS ({\"detail\": \"Detail 6, top\"})"
+        },
+        {
+          "rank": 2,
+          "sheet": "S2.1",
+          "page": 33,
+          "rrf": 0.0301,
+          "hit": true,
+          "snippet": "[dimension] 0'-8\" ({\"detail\": \"Detail 8\"})"
+        },
+        {
+          "rank": 3,
+          "sheet": "S2.1",
+          "page": 33,
+          "rrf": 0.0292,
+          "hit": true,
+          "snippet": "Sheet S2.1 FOUNDATION SECTIONS AND DETAILS \u2014 Discipline: structural \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 4,
+          "sheet": "S2.1",
+          "page": 33,
+          "rrf": 0.0285,
+          "hit": true,
+          "snippet": "[material] TOOLED EDGE ({\"detail\": \"Detail 6\"})"
+        },
+        {
+          "rank": 5,
+          "sheet": ".CVR",
+          "page": 1,
+          "rrf": 0.0284,
+          "hit": false,
+          "snippet": "Cross-reference to S3.1: FOUNDATION SECTIONS AND DETAILS"
+        }
+      ]
+    },
+    {
+      "id": "d23",
+      "text": "Reflected ceiling plan",
+      "difficulty": "detail",
+      "relevant": [
+        "A7.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "A7.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "A7.1",
+          "page": 23,
+          "rrf": 0.0318,
+          "hit": true,
+          "snippet": "[material] TONGUE AND GROOVE CEILING ({\"context\": \"Reflected Ceiling Legend\"})"
+        },
+        {
+          "rank": 2,
+          "sheet": "A7.1",
+          "page": 23,
+          "rrf": 0.0317,
+          "hit": true,
+          "snippet": "[material] 1/8\" GYP. BOARD CEILING ({\"context\": \"Reflected Ceiling Legend\"})"
+        },
+        {
+          "rank": 3,
+          "sheet": "A7.1",
+          "page": 23,
+          "rrf": 0.0306,
+          "hit": true,
+          "snippet": "[material] WOOD SLAT CEILING / TBD ({\"context\": \"Reflected Ceiling Legend\"})"
+        },
+        {
+          "rank": 4,
+          "sheet": "A7.1",
+          "page": 23,
+          "rrf": 0.0305,
+          "hit": true,
+          "snippet": "Sheet A7.1 REFLECTED CEILING PLAN AND DETAILS \u2014 Discipline: architectural \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 5,
+          "sheet": "A7.1",
+          "page": 23,
+          "rrf": 0.0299,
+          "hit": true,
+          "snippet": "[symbol] 8\" PENDANT ({\"context\": \"Reflected Ceiling Legend\"})"
+        }
+      ]
+    },
+    {
+      "id": "d24",
+      "text": "Millwork sections and details",
+      "difficulty": "detail",
+      "relevant": [
+        "F3.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 19,
+      "sheets_covered": [
+        "F3.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "F3.1",
+          "page": 28,
+          "rrf": 0.032,
+          "hit": true,
+          "snippet": "Sheet F3.1 MILLWORK SECTIONS \u2014 Discipline: interior \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 2,
+          "sheet": "F3.1",
+          "page": 28,
+          "rrf": 0.03,
+          "hit": true,
+          "snippet": "[symbol] Detail circle \u2463 - EXAM ROOM MILLWORK SECTION 1 1/2\" = 1'-0\""
+        },
+        {
+          "rank": 3,
+          "sheet": "F3.1",
+          "page": 28,
+          "rrf": 0.0292,
+          "hit": true,
+          "snippet": "[symbol] Detail circle \u2462 - EXAM ROOM MILLWORK SECTION 1 1/2\" = 1'-0\""
+        },
+        {
+          "rank": 4,
+          "sheet": "F3.1",
+          "page": 28,
+          "rrf": 0.0276,
+          "hit": true,
+          "snippet": "Cross-reference to F3.1 / detail 4: EXAM ROOM MILLWORK SECTION 1 1/2\" = 1'-0\""
+        },
+        {
+          "rank": 5,
+          "sheet": "F3.1",
+          "page": 28,
+          "rrf": 0.0265,
+          "hit": true,
+          "snippet": "Cross-reference to F3.1 / detail 1: EXAM ROOM 2 MILLWORK SECTION 1 1/2\" = 1'-0\""
+        }
+      ]
+    },
+    {
+      "id": "d25",
+      "text": "Site civil details",
+      "difficulty": "detail",
+      "relevant": [
+        "C800",
+        "C801",
+        "C902"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "C800",
+        "C801"
+      ],
+      "sheets_missing": [
+        "C902"
+      ],
+      "recall": 0.6666666666666666,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "C800",
+          "page": 7,
+          "rrf": 0.0323,
+          "hit": true,
+          "snippet": "Sheet C800 SITE DETAILS \u2014 Discipline: civil \u2014 Scale: NOT TO SCALE"
+        },
+        {
+          "rank": 2,
+          "sheet": "C801",
+          "page": 8,
+          "rrf": 0.0323,
+          "hit": true,
+          "snippet": "Sheet C801 SITE DETAILS \u2014 Discipline: civil \u2014 Scale: NOT TO SCALE"
+        },
+        {
+          "rank": 3,
+          "sheet": "AS2.1",
+          "page": 25,
+          "rrf": 0.0313,
+          "hit": false,
+          "snippet": "Cross-reference to CIVIL: NEW 6\" CONCRETE BUMPER BLOCK SECURED WITH (2) #4 BARS 4' LONG. SEE CIVIL."
+        },
+        {
+          "rank": 4,
+          "sheet": "C800",
+          "page": 7,
+          "rrf": 0.0286,
+          "hit": true,
+          "snippet": "[material] Prepared Subgrade"
+        },
+        {
+          "rank": 5,
+          "sheet": "C801",
+          "page": 8,
+          "rrf": 0.0281,
+          "hit": true,
+          "snippet": "[material] SEPARATOR"
+        }
+      ]
+    },
+    {
+      "id": "d30",
+      "text": "All electrical sheets in the drawing set",
+      "difficulty": "discipline",
+      "relevant": [
+        "E0.1",
+        "E0.2",
+        "E0.3",
+        "E1.1",
+        "E2.1",
+        "E3.1",
+        "E4.1",
+        "ES0.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "E0.1",
+        "E0.2",
+        "E0.3",
+        "E2.1",
+        "E3.1",
+        "ES0.1"
+      ],
+      "sheets_missing": [
+        "E1.1",
+        "E4.1"
+      ],
+      "recall": 0.75,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "E2.1",
+          "page": 41,
+          "rrf": 0.0164,
+          "hit": true,
+          "snippet": "Sheet E2.1 POWER PLAN \u2014 Discipline: electrical \u2014 Scale: 1/8\" = 1'-0\""
+        },
+        {
+          "rank": 2,
+          "sheet": "C001",
+          "page": 2,
+          "rrf": 0.0164,
+          "hit": false,
+          "snippet": "13. THE CONTRACTOR SHALL REFER TO OTHER PLANS WITHIN THIS CONSTRUCTION SET FOR OTHER PERTINENT INFORMATION. IT IS NOT TH"
+        },
+        {
+          "rank": 3,
+          "sheet": "E0.3",
+          "page": 39,
+          "rrf": 0.0161,
+          "hit": true,
+          "snippet": "Sheet E0.3 ELECTRICAL SCHEDULES \u2014 Discipline: electrical \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 4,
+          "sheet": "A5.1",
+          "page": 19,
+          "rrf": 0.0161,
+          "hit": false,
+          "snippet": "THIS DRAWING IS ISSUED FOR CONSTRUCTION DOCUMENTS. ALL COPYRIGHT RESERVED BY THE ARCHITECTURE COLLABORATIVE LLC. THIS DR"
+        },
+        {
+          "rank": 5,
+          "sheet": "E0.2",
+          "page": 38,
+          "rrf": 0.0159,
+          "hit": true,
+          "snippet": "Sheet E0.2 ELECTRICAL NOTES \u2014 Discipline: electrical \u2014 Scale: AS NOTED"
+        }
+      ]
+    },
+    {
+      "id": "d31",
+      "text": "Plumbing drawings",
+      "difficulty": "discipline",
+      "relevant": [
+        "P0.1",
+        "P1.1",
+        "P1.2",
+        "P2.1",
+        "P2.2"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "P0.1",
+        "P1.1",
+        "P1.2",
+        "P2.1",
+        "P2.2"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "P2.2",
+          "page": 54,
+          "rrf": 0.0311,
+          "hit": true,
+          "snippet": "Cross-reference to P-PLUMBING FIXTURES: TO PLUMBING FIXTURES"
+        },
+        {
+          "rank": 2,
+          "sheet": "P2.2",
+          "page": 54,
+          "rrf": 0.031,
+          "hit": true,
+          "snippet": "Cross-reference to P-PLUMBING FIXTURES: TO PLUMBING FIXTURES"
+        },
+        {
+          "rank": 3,
+          "sheet": "P2.2",
+          "page": 54,
+          "rrf": 0.0164,
+          "hit": true,
+          "snippet": "Sheet P2.2 DOMESTIC WATER ISOMETRIC \u2014 Discipline: plumbing \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 4,
+          "sheet": "P0.1",
+          "page": 50,
+          "rrf": 0.0164,
+          "hit": true,
+          "snippet": "PLUMBING NOTES:"
+        },
+        {
+          "rank": 5,
+          "sheet": "A6.1",
+          "page": 22,
+          "rrf": 0.0161,
+          "hit": false,
+          "snippet": "Cross-reference to PLUMBING DRAWINGS: HIGH-LOW WATER COOLER PER PLUMBING DRAWINGS"
+        }
+      ]
+    },
+    {
+      "id": "d32",
+      "text": "Civil site drawings",
+      "difficulty": "discipline",
+      "relevant": [
+        "C001",
+        "C100",
+        "C200",
+        "C300",
+        "C500",
+        "C800",
+        "C801",
+        "C900",
+        "C901",
+        "C902"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "C200",
+        "C300",
+        "C500",
+        "C800",
+        "C801"
+      ],
+      "sheets_missing": [
+        "C001",
+        "C100",
+        "C900",
+        "C901",
+        "C902"
+      ],
+      "recall": 0.5,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "C801",
+          "page": 8,
+          "rrf": 0.0325,
+          "hit": true,
+          "snippet": "Sheet C801 SITE DETAILS \u2014 Discipline: civil \u2014 Scale: NOT TO SCALE"
+        },
+        {
+          "rank": 2,
+          "sheet": "C800",
+          "page": 7,
+          "rrf": 0.0325,
+          "hit": true,
+          "snippet": "Sheet C800 SITE DETAILS \u2014 Discipline: civil \u2014 Scale: NOT TO SCALE"
+        },
+        {
+          "rank": 3,
+          "sheet": "C200",
+          "page": 4,
+          "rrf": 0.031,
+          "hit": true,
+          "snippet": "Sheet C200 SITE LAYOUT PLAN \u2014 Discipline: civil \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 4,
+          "sheet": "C300",
+          "page": 5,
+          "rrf": 0.0308,
+          "hit": true,
+          "snippet": "Sheet C300 SITE GRADING AND DRAINAGE PLAN \u2014 Discipline: civil \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 5,
+          "sheet": "C500",
+          "page": 6,
+          "rrf": 0.0306,
+          "hit": true,
+          "snippet": "Sheet C500 SITE UTILITY PLAN \u2014 Discipline: civil \u2014 Scale: AS NOTED"
+        }
+      ]
+    },
+    {
+      "id": "d33",
+      "text": "Structural drawings",
+      "difficulty": "discipline",
+      "relevant": [
+        "S0.1",
+        "S1.1",
+        "S1.2",
+        "S1.3",
+        "S2.1",
+        "S3.1",
+        "S3.2",
+        "S4.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "S0.1",
+        "S1.2",
+        "S3.1",
+        "S3.2"
+      ],
+      "sheets_missing": [
+        "S1.1",
+        "S1.3",
+        "S2.1",
+        "S4.1"
+      ],
+      "recall": 0.5,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "S0.1",
+          "page": 29,
+          "rrf": 0.0311,
+          "hit": true,
+          "snippet": "3.21 REFER TO DRAWINGS OF OTHER TRADES AND VENDOR DRAWINGS FOR EMBEDDED ITEMS AND RECESSES NOT SHOWN ON THE STRUCTURAL D"
+        },
+        {
+          "rank": 2,
+          "sheet": "S0.1",
+          "page": 29,
+          "rrf": 0.0307,
+          "hit": true,
+          "snippet": "6.06 PROVIDE OFFICIAL DESIGN DRAWINGS FOR CORNERS, GIRDERS, HEADERS, ETC."
+        },
+        {
+          "rank": 3,
+          "sheet": "S0.1",
+          "page": 29,
+          "rrf": 0.0288,
+          "hit": true,
+          "snippet": "1.02 DRAWINGS SHOW TYPICAL AND CERTAIN SPECIFIC CONDITIONS ONLY. FOR DETAILS NOT SPECIFICALLY SHOWN, PROVIDE DETAILS SIM"
+        },
+        {
+          "rank": 4,
+          "sheet": "S0.1",
+          "page": 29,
+          "rrf": 0.0284,
+          "hit": true,
+          "snippet": "Sheet S0.1 STRUCTURAL NOTES \u2014 Discipline: structural \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 5,
+          "sheet": "S1.2",
+          "page": 31,
+          "rrf": 0.0278,
+          "hit": true,
+          "snippet": "9. IF THERE IS A DISCREPANCY BETWEEN ARCHITECTURAL PLANS/SECTIONS AND STRUCTURAL PLANS/SECTIONS, STRUCTURAL DRAWINGS SHA"
+        }
+      ]
+    },
+    {
+      "id": "d34",
+      "text": "Architectural drawings",
+      "difficulty": "discipline",
+      "relevant": [
+        "A0.0",
+        "A0.1",
+        "A1.1",
+        "A2.1",
+        "A3.1",
+        "A4.1",
+        "A4.2",
+        "A5.1",
+        "A5.2",
+        "A5.3",
+        "A6.1",
+        "A7.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "A4.1",
+        "A4.2",
+        "A5.1",
+        "A5.2",
+        "A6.1"
+      ],
+      "sheets_missing": [
+        "A0.0",
+        "A0.1",
+        "A1.1",
+        "A2.1",
+        "A3.1",
+        "A5.3",
+        "A7.1"
+      ],
+      "recall": 0.4166666666666667,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "A5.2",
+          "page": 20,
+          "rrf": 0.0311,
+          "hit": true,
+          "snippet": "TPO DRAWINGS IS ISSUED FOR CONSTRUCTION DOCUMENTS"
+        },
+        {
+          "rank": 2,
+          "sheet": "S1.1",
+          "page": 30,
+          "rrf": 0.0287,
+          "hit": false,
+          "snippet": "Cross-reference to ARCHITECTURAL: SEE ARCHITECTURAL DRAWINGS FOR ELEVATIONS, WALL SECTIONS, AND DIMENSIONS NOT SHOWN"
+        },
+        {
+          "rank": 3,
+          "sheet": "A4.1",
+          "page": 17,
+          "rrf": 0.0281,
+          "hit": true,
+          "snippet": "Sheet A4.1 EXTERIOR ELEVATIONS \u2014 Discipline: architectural \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 4,
+          "sheet": "S1.2",
+          "page": 31,
+          "rrf": 0.0256,
+          "hit": false,
+          "snippet": "8. SEE ARCHITECTURAL DRAWINGS FOR ELEVATIONS, WALL SECTIONS, AND DIMENSIONS NOT SHOWN."
+        },
+        {
+          "rank": 5,
+          "sheet": "S0.1",
+          "page": 29,
+          "rrf": 0.0164,
+          "hit": false,
+          "snippet": "Cross-reference to ARCHITECTURAL: FOR MISC. CONCRETE PADS NOT SHOWN ON THE STRUCTURAL DRAWINGS, SEE ARCHITECTURAL DRAWIN"
+        }
+      ]
+    },
+    {
+      "id": "d40",
+      "text": "Where are the floor drains shown?",
+      "difficulty": "element",
+      "relevant": [
+        "P1.1",
+        "P0.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "P0.1",
+        "P1.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "P1.1",
+          "page": 51,
+          "rrf": 0.0164,
+          "hit": true,
+          "snippet": "[equipment] FLOOR DRAIN FOR PLUMBING (enlarged plan)"
+        },
+        {
+          "rank": 2,
+          "sheet": "C001",
+          "page": 2,
+          "rrf": 0.0164,
+          "hit": false,
+          "snippet": "5. ROOF DRAINS, FOUNDATION DRAINS AND ALL OTHER CLEAN WATER CONNECTIONS TO THE SANITARY SEWER SYSTEM ARE PROHIBITED."
+        },
+        {
+          "rank": 3,
+          "sheet": "P0.1",
+          "page": 50,
+          "rrf": 0.0161,
+          "hit": true,
+          "snippet": "[other] FLOOR DRAIN DETAIL - NOT TO SCALE"
+        },
+        {
+          "rank": 4,
+          "sheet": "S0.1",
+          "page": 29,
+          "rrf": 0.0161,
+          "hit": false,
+          "snippet": "3.09 PROVIDE CONTINUOUS REINFORCEMENT WHEREVER POSSIBLE. SPLICE ONLY AS SHOWN OR DETAILED. STAGGER SPLICE WHERE POSSIBLE"
+        },
+        {
+          "rank": 5,
+          "sheet": "P0.1",
+          "page": 50,
+          "rrf": 0.0159,
+          "hit": true,
+          "snippet": "[symbol] PLUMBING LEGEND - symbols shown for: FLOOR DRAIN, FLOOR CLEANOUT, WALL CLEANOUT, CLEANOUT - APP, SANITARY SEWER"
+        }
+      ]
+    },
+    {
+      "id": "d41",
+      "text": "Fire alarm devices and notification appliances",
+      "difficulty": "element",
+      "relevant": [
+        "E4.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "E4.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 2,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "E0.1",
+          "page": 37,
+          "rrf": 0.0328,
+          "hit": false,
+          "snippet": "SPRINKLER MONITORING WIRING STATEMENTS: FIRE AND METAL CONDUIT SYSTEM OR SPRINKLER MONITORING SYSTEM AS DESCRIBED HEREIN"
+        },
+        {
+          "rank": 2,
+          "sheet": "E4.1",
+          "page": 43,
+          "rrf": 0.0312,
+          "hit": true,
+          "snippet": "[symbol] Circled number symbols on plan indicating ERRC/fire alarm device locations"
+        },
+        {
+          "rank": 3,
+          "sheet": "E4.1",
+          "page": 43,
+          "rrf": 0.0306,
+          "hit": true,
+          "snippet": "[equipment] FACP (Fire Alarm Control Panel)"
+        },
+        {
+          "rank": 4,
+          "sheet": "FP0.1",
+          "page": 45,
+          "rrf": 0.0305,
+          "hit": false,
+          "snippet": "[equipment] FIRE ALARM PANEL"
+        },
+        {
+          "rank": 5,
+          "sheet": "E4.1",
+          "page": 43,
+          "rrf": 0.0282,
+          "hit": true,
+          "snippet": "12. SHALL NOT 20 AMPERE/ALL BATTERY BACKUP AND SHALL HAVE INSIDE SYSTEM STATUS AS WELL AS PROVIDE CONTACT CLOSURE SIGNAL"
+        }
+      ]
+    },
+    {
+      "id": "d42",
+      "text": "Site grading and drainage",
+      "difficulty": "element",
+      "relevant": [
+        "C300"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "C300"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "C300",
+          "page": 5,
+          "rrf": 0.0325,
+          "hit": true,
+          "snippet": "Sheet C300 SITE GRADING AND DRAINAGE PLAN \u2014 Discipline: civil \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 2,
+          "sheet": "C300",
+          "page": 5,
+          "rrf": 0.0311,
+          "hit": true,
+          "snippet": "[material] 18\" HOPE PIPE @ 1%"
+        },
+        {
+          "rank": 3,
+          "sheet": "C300",
+          "page": 5,
+          "rrf": 0.0295,
+          "hit": true,
+          "snippet": "[dimension] INV. OUT (18\"SE)=908.00"
+        },
+        {
+          "rank": 4,
+          "sheet": "C300",
+          "page": 5,
+          "rrf": 0.0279,
+          "hit": true,
+          "snippet": "[dimension] INV. OUT (15\"NW)=905.00"
+        },
+        {
+          "rank": 5,
+          "sheet": "C300",
+          "page": 5,
+          "rrf": 0.0278,
+          "hit": true,
+          "snippet": "[dimension] INV. OUT (15\"NW)=908.87"
+        }
+      ]
+    },
+    {
+      "id": "d43",
+      "text": "Existing site conditions",
+      "difficulty": "element",
+      "relevant": [
+        "C100"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "C100"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 2,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "C001",
+          "page": 2,
+          "rrf": 0.0328,
+          "hit": false,
+          "snippet": "GENERAL NOTES: 1. EXISTING CONDITIONS AS DEPICTED ON THESE PLANS ARE GENERAL AND ILLUSTRATIVE IN NATURE. IT IS THE RESPO"
+        },
+        {
+          "rank": 2,
+          "sheet": "C100",
+          "page": 3,
+          "rrf": 0.032,
+          "hit": true,
+          "snippet": "EXISTING GRAVEL TO BE REMOVED (TYP.)"
+        },
+        {
+          "rank": 3,
+          "sheet": "C100",
+          "page": 3,
+          "rrf": 0.0289,
+          "hit": true,
+          "snippet": "Sheet C100 EXISTING CONDITIONS PLAN \u2014 Discipline: civil \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 4,
+          "sheet": "C100",
+          "page": 3,
+          "rrf": 0.0273,
+          "hit": true,
+          "snippet": "[other] COMM & GUTTER (label on plan)"
+        },
+        {
+          "rank": 5,
+          "sheet": "C300",
+          "page": 5,
+          "rrf": 0.0159,
+          "hit": false,
+          "snippet": "BASIS OF BEARING: EXISTING BOUNDARIES AND TOPOGRAPHIC INFORMATION FROM SURVEY FILES PROVIDED BY PROFESSIONALS LAND SYSTE"
+        }
+      ]
+    },
+    {
+      "id": "d44",
+      "text": "EPSC erosion control plan",
+      "difficulty": "element",
+      "relevant": [
+        "C900",
+        "C901"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "C900",
+        "C901"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "C901",
+          "page": 10,
+          "rrf": 0.0328,
+          "hit": true,
+          "snippet": "PROVIDE EROSION CONTROL BLANKET ON SLOPES 3:1 OR STEEPER (TYP.)"
+        },
+        {
+          "rank": 2,
+          "sheet": "C901",
+          "page": 10,
+          "rrf": 0.032,
+          "hit": true,
+          "snippet": "[symbol] Erosion Control Blanket on Slopes 3:1 or Steeper (TYP.) \u2014 hatched area on northwest slope"
+        },
+        {
+          "rank": 3,
+          "sheet": "C900",
+          "page": 9,
+          "rrf": 0.032,
+          "hit": true,
+          "snippet": "[symbol] Proposed Silt Fence (TYP) \u2014 dashed boundary line indicating erosion control perimeter"
+        },
+        {
+          "rank": 4,
+          "sheet": "C801",
+          "page": 8,
+          "rrf": 0.0301,
+          "hit": false,
+          "snippet": "[symbol] EROSION CONTROL PLAN LEGEND"
+        },
+        {
+          "rank": 5,
+          "sheet": "C902",
+          "page": 11,
+          "rrf": 0.0288,
+          "hit": false,
+          "snippet": "EROSION CONTROL PLAN LEGEND: SILT FENCE"
+        }
+      ]
+    },
+    {
+      "id": "d45",
+      "text": "Shear wall details",
+      "difficulty": "element",
+      "relevant": [
+        "S4.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "S4.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "S4.1",
+          "page": 36,
+          "rrf": 0.0308,
+          "hit": true,
+          "snippet": "Sheet S4.1 SHEAR WALL DETAILS \u2014 Discipline: structural \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 2,
+          "sheet": "S4.1",
+          "page": 36,
+          "rrf": 0.0288,
+          "hit": true,
+          "snippet": "Cross-reference to S4.1 / detail 2: TYPICAL SHEAR WALL ELEVATION - DETAIL 2/S4.1, SCALE: 3/8\" = 1'-0\""
+        },
+        {
+          "rank": 3,
+          "sheet": "S4.1",
+          "page": 36,
+          "rrf": 0.0271,
+          "hit": true,
+          "snippet": "Cross-reference to S4.1 / detail 1: SHEAR WALL PLAN - DETAIL 1/S4.1, SCALE: 1/8\" = 1'-0\""
+        },
+        {
+          "rank": 4,
+          "sheet": "S4.1",
+          "page": 36,
+          "rrf": 0.0267,
+          "hit": true,
+          "snippet": "Schedule: SHEAR WALL SCHEDULE Columns: SHEAR WALL TYPE | SHEATHING | PANEL EDGE ATTACHMENTS | INTERMEDIATE FRAMING MEMBE"
+        },
+        {
+          "rank": 5,
+          "sheet": "S4.1",
+          "page": 36,
+          "rrf": 0.0265,
+          "hit": true,
+          "snippet": "[material] SOLID BLOCKING AT WALL CORNER"
+        }
+      ]
+    },
+    {
+      "id": "d46",
+      "text": "Site utility connections",
+      "difficulty": "element",
+      "relevant": [
+        "C500"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "C500"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "C500",
+          "page": 6,
+          "rrf": 0.0305,
+          "hit": true,
+          "snippet": "Sheet C500 SITE UTILITY PLAN \u2014 Discipline: civil \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 2,
+          "sheet": "C500",
+          "page": 6,
+          "rrf": 0.0288,
+          "hit": true,
+          "snippet": "[other] DOMESTIC WATER LINE AND METER"
+        },
+        {
+          "rank": 3,
+          "sheet": "C001",
+          "page": 2,
+          "rrf": 0.0287,
+          "hit": false,
+          "snippet": "UTILITY NOTES: 1. ALL PROPOSED UTILITY LINES EXTENSIONS ARE TO BE CONSTRUCTED IN ACCORDANCE WITH THE LOCAL UTILITY SPECI"
+        },
+        {
+          "rank": 4,
+          "sheet": ".CVR",
+          "page": 1,
+          "rrf": 0.0285,
+          "hit": false,
+          "snippet": "Cross-reference to C4.0: SITE UTILITY PLAN"
+        },
+        {
+          "rank": 5,
+          "sheet": "C500",
+          "page": 6,
+          "rrf": 0.0284,
+          "hit": true,
+          "snippet": "UTILITY NOTE: THE EXACT LOCATION OF UNDERGROUND FEATURES CANNOT BE GUARANTEED. UNDERGROUND UTILITIES AND BELOW GRADE CON"
+        }
+      ]
+    },
+    {
+      "id": "d47",
+      "text": "Domestic water distribution",
+      "difficulty": "element",
+      "relevant": [
+        "P2.1",
+        "P2.2"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "P2.1",
+        "P2.2"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "P2.2",
+          "page": 54,
+          "rrf": 0.0325,
+          "hit": true,
+          "snippet": "[room] DOMESTIC WATER ISOMETRIC"
+        },
+        {
+          "rank": 2,
+          "sheet": "P2.1",
+          "page": 53,
+          "rrf": 0.0306,
+          "hit": true,
+          "snippet": "Sheet P2.1 DOMESTIC WATER PLAN \u2014 Discipline: plumbing \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 3,
+          "sheet": "P2.2",
+          "page": 54,
+          "rrf": 0.0301,
+          "hit": true,
+          "snippet": "[other] COLD WATER SUPPLY PIPING SYSTEM"
+        },
+        {
+          "rank": 4,
+          "sheet": "P2.1",
+          "page": 53,
+          "rrf": 0.03,
+          "hit": true,
+          "snippet": "[dimension] 1/8\" = 1'-0\" (Domestic Water Plan overall)"
+        },
+        {
+          "rank": 5,
+          "sheet": "P2.1",
+          "page": 53,
+          "rrf": 0.0289,
+          "hit": true,
+          "snippet": "[dimension] 1/4\" = 1'-0\" (Domestic Water Plan - Enlarged right)"
+        }
+      ]
+    },
+    {
+      "id": "d50",
+      "text": "Sanitary plumbing \u2014 plan and isometric views",
+      "difficulty": "cross_sheet",
+      "relevant": [
+        "P1.1",
+        "P1.2"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "P1.1",
+        "P1.2"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "P1.2",
+          "page": 52,
+          "rrf": 0.0328,
+          "hit": true,
+          "snippet": "Sheet P1.2 SANITARY ISOMETRIC \u2014 Discipline: plumbing \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 2,
+          "sheet": "P1.2",
+          "page": 52,
+          "rrf": 0.0323,
+          "hit": true,
+          "snippet": "[other] SANITARY ISOMETRIC"
+        },
+        {
+          "rank": 3,
+          "sheet": "P1.2",
+          "page": 52,
+          "rrf": 0.0308,
+          "hit": true,
+          "snippet": "[equipment] WC (Water Closet) - multiple locations shown on isometric"
+        },
+        {
+          "rank": 4,
+          "sheet": "P1.2",
+          "page": 52,
+          "rrf": 0.0301,
+          "hit": true,
+          "snippet": "[equipment] S (Sink/Slop Sink) - locations shown on isometric"
+        },
+        {
+          "rank": 5,
+          "sheet": "P1.2",
+          "page": 52,
+          "rrf": 0.03,
+          "hit": true,
+          "snippet": "[equipment] UR (Urinal) - locations shown on isometric"
+        }
+      ]
+    },
+    {
+      "id": "d51",
+      "text": "Domestic water plan and riser diagram",
+      "difficulty": "cross_sheet",
+      "relevant": [
+        "P2.1",
+        "P2.2"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "P2.1",
+        "P2.2"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "P2.1",
+          "page": 53,
+          "rrf": 0.0323,
+          "hit": true,
+          "snippet": "[equipment] SPRINKLER RISER"
+        },
+        {
+          "rank": 2,
+          "sheet": "P2.1",
+          "page": 53,
+          "rrf": 0.0323,
+          "hit": true,
+          "snippet": "[equipment] SPRINKLER RISER"
+        },
+        {
+          "rank": 3,
+          "sheet": "P2.1",
+          "page": 53,
+          "rrf": 0.0313,
+          "hit": true,
+          "snippet": "[dimension] 1/8\" = 1'-0\" (Domestic Water Plan overall)"
+        },
+        {
+          "rank": 4,
+          "sheet": "P2.1",
+          "page": 53,
+          "rrf": 0.0308,
+          "hit": true,
+          "snippet": "Sheet P2.1 DOMESTIC WATER PLAN \u2014 Discipline: plumbing \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 5,
+          "sheet": "P2.1",
+          "page": 53,
+          "rrf": 0.0306,
+          "hit": true,
+          "snippet": "[dimension] 1/4\" = 1'-0\" (Domestic Water Plan - Enlarged right)"
+        }
+      ]
+    },
+    {
+      "id": "d52",
+      "text": "Building exterior \u2014 elevations and 3D views",
+      "difficulty": "cross_sheet",
+      "relevant": [
+        "A4.1",
+        "A4.2"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "A4.1",
+        "A4.2"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "A4.2",
+          "page": 18,
+          "rrf": 0.032,
+          "hit": true,
+          "snippet": "[symbol] 1 - 3D ORTHO VIEW (bottom-left)"
+        },
+        {
+          "rank": 2,
+          "sheet": "A4.2",
+          "page": 18,
+          "rrf": 0.0318,
+          "hit": true,
+          "snippet": "[symbol] 3 - 3D PERSPECTIVE VIEW (top-left)"
+        },
+        {
+          "rank": 3,
+          "sheet": "A4.2",
+          "page": 18,
+          "rrf": 0.0315,
+          "hit": true,
+          "snippet": "Sheet A4.2 3D VIEWS \u2014 Discipline: architectural \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 4,
+          "sheet": "A4.2",
+          "page": 18,
+          "rrf": 0.0313,
+          "hit": true,
+          "snippet": "[symbol] 2 - 3D ORTHO VIEW (bottom-right)"
+        },
+        {
+          "rank": 5,
+          "sheet": "A4.2",
+          "page": 18,
+          "rrf": 0.031,
+          "hit": true,
+          "snippet": "[symbol] 4 - 3D PERSPECTIVE VIEW (top-right)"
+        }
+      ]
+    },
+    {
+      "id": "d53",
+      "text": "All wall section information across sheets",
+      "difficulty": "cross_sheet",
+      "relevant": [
+        "A5.2",
+        "A5.3"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "A5.2",
+        "A5.3"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "A5.2",
+          "page": 20,
+          "rrf": 0.0271,
+          "hit": true,
+          "snippet": "Cross-reference to A0.3 / detail 1: Section bubble 1/A0.3 - Wall Section 1 reference"
+        },
+        {
+          "rank": 2,
+          "sheet": "A5.2",
+          "page": 20,
+          "rrf": 0.0267,
+          "hit": true,
+          "snippet": "Cross-reference to A0.3 / detail 4: Section bubble 4/A0.3 - Wall Section 4 reference"
+        },
+        {
+          "rank": 3,
+          "sheet": "A5.2",
+          "page": 20,
+          "rrf": 0.0265,
+          "hit": true,
+          "snippet": "Cross-reference to A0.3 / detail 2: Section bubble 2/A0.3 - Wall Section 2 reference"
+        },
+        {
+          "rank": 4,
+          "sheet": "A5.2",
+          "page": 20,
+          "rrf": 0.0262,
+          "hit": true,
+          "snippet": "Cross-reference to A0.3 / detail 8: Section bubble 8/A0.3 - Wall Section 8 reference"
+        },
+        {
+          "rank": 5,
+          "sheet": "A5.2",
+          "page": 20,
+          "rrf": 0.0256,
+          "hit": true,
+          "snippet": "Cross-reference to A0.3 / detail 9: Section bubble 9/A0.3 - Wall Section 9 reference"
+        }
+      ]
+    },
+    {
+      "id": "d54",
+      "text": "Electrical site plan and lighting",
+      "difficulty": "cross_sheet",
+      "relevant": [
+        "ES0.1",
+        "E1.1"
+      ],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [
+        "E1.1",
+        "ES0.1"
+      ],
+      "sheets_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "ES0.1",
+          "page": 44,
+          "rrf": 0.0323,
+          "hit": true,
+          "snippet": "[symbol] SITE LIGHTING POLE"
+        },
+        {
+          "rank": 2,
+          "sheet": "ES0.1",
+          "page": 44,
+          "rrf": 0.0315,
+          "hit": true,
+          "snippet": "[symbol] SITE LIGHTING POLE SYMBOL (circled cross) - appears multiple times on site plan"
+        },
+        {
+          "rank": 3,
+          "sheet": "ES0.1",
+          "page": 44,
+          "rrf": 0.0305,
+          "hit": true,
+          "snippet": "GENERAL SHEET NOTES 1. ALL SITE LIGHTING SHALL BE CERTIFIED DARK SKY COMPLIANT, FULL CUT-OFF IN ACCORDANCE WITH THE CITY"
+        },
+        {
+          "rank": 4,
+          "sheet": "E1.1",
+          "page": 40,
+          "rrf": 0.0303,
+          "hit": true,
+          "snippet": "[other] LIGHTING PLAN"
+        },
+        {
+          "rank": 5,
+          "sheet": "E1.1",
+          "page": 40,
+          "rrf": 0.0289,
+          "hit": true,
+          "snippet": "Sheet E1.1 LIGHTING PLAN \u2014 Discipline: electrical \u2014 Scale: 1/8\" = 1'-0\""
+        }
+      ]
+    },
+    {
+      "id": "d90",
+      "text": "Elevator pit details and machine room",
+      "difficulty": "no_match",
+      "relevant": [],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [],
+      "sheets_missing": [],
+      "recall": null,
+      "rank_of_first_hit": null,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "A5.1",
+          "page": 19,
+          "rrf": 0.0164,
+          "hit": false,
+          "snippet": "[room] MECHANICAL 137 SF"
+        },
+        {
+          "rank": 2,
+          "sheet": "AS2.1",
+          "page": 25,
+          "rrf": 0.0164,
+          "hit": false,
+          "snippet": "9. NEW 6\" MACHINE FORMED CONCRETE CURB."
+        },
+        {
+          "rank": 3,
+          "sheet": "P0.1",
+          "page": 50,
+          "rrf": 0.0161,
+          "hit": false,
+          "snippet": "4. EACH SOIL, WATER CLOSET AND SMALL SEAT ARE GRADING LOCATED AT THE FIXTURES."
+        },
+        {
+          "rank": 4,
+          "sheet": "AS2.1",
+          "page": 25,
+          "rrf": 0.0161,
+          "hit": false,
+          "snippet": "[material] New 6\" machine formed concrete curb"
+        },
+        {
+          "rank": 5,
+          "sheet": "A0.0",
+          "page": 12,
+          "rrf": 0.0159,
+          "hit": false,
+          "snippet": "[dimension] 4\" MIN. A.F.F. - COVED WALL BASE IN TOILET ROOMS"
+        }
+      ]
+    },
+    {
+      "id": "d91",
+      "text": "Helipad markings and clearances",
+      "difficulty": "no_match",
+      "relevant": [],
+      "candidates_total": 20,
+      "candidates_in_drawings": 18,
+      "sheets_covered": [],
+      "sheets_missing": [],
+      "recall": null,
+      "rank_of_first_hit": null,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "A0.0",
+          "page": 12,
+          "rrf": 0.0267,
+          "hit": false,
+          "snippet": "NOTES (DOOR CLEARANCES): 1. WHERE A SIGN CONTAINING RAISED CHARACTERS AND BRAILLE IS PROVIDED AT A DOOR, THE SIGN SHALL "
+        },
+        {
+          "rank": 2,
+          "sheet": "C800",
+          "page": 7,
+          "rrf": 0.0164,
+          "hit": false,
+          "snippet": "[dimension] 60\" minimum height above finished grade for lowest accessible parking sign"
+        },
+        {
+          "rank": 3,
+          "sheet": "A0.0",
+          "page": 12,
+          "rrf": 0.0164,
+          "hit": false,
+          "snippet": "[dimension] 1/4\" = 1'-0\" (Corridor Clearances)"
+        },
+        {
+          "rank": 4,
+          "sheet": "A3.1",
+          "page": 16,
+          "rrf": 0.0161,
+          "hit": false,
+          "snippet": "[dimension] MIN. 6\" AROUND PIPE"
+        },
+        {
+          "rank": 5,
+          "sheet": "A0.0",
+          "page": 12,
+          "rrf": 0.0161,
+          "hit": false,
+          "snippet": "[dimension] 1/4\" = 1'-0\" (Door Clearances)"
+        }
+      ]
+    },
+    {
+      "id": "d92",
+      "text": "Solar PV array layout",
+      "difficulty": "no_match",
+      "relevant": [],
+      "candidates_total": 20,
+      "candidates_in_drawings": 20,
+      "sheets_covered": [],
+      "sheets_missing": [],
+      "recall": null,
+      "rank_of_first_hit": null,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "E0.3",
+          "page": 39,
+          "rrf": 0.0164,
+          "hit": false,
+          "snippet": "Schedule: PANEL #50 Columns: # | BKR | POLE | DESCRIPTION | LOAD | A | B | C | LOAD | DESCRIPTION | POLE | BKR | # Row 1"
+        },
+        {
+          "rank": 2,
+          "sheet": "C200",
+          "page": 4,
+          "rrf": 0.0164,
+          "hit": false,
+          "snippet": "Sheet C200 SITE LAYOUT PLAN \u2014 Discipline: civil \u2014 Scale: AS NOTED"
+        },
+        {
+          "rank": 3,
+          "sheet": "E0.3",
+          "page": 39,
+          "rrf": 0.0161,
+          "hit": false,
+          "snippet": "Schedule: PANEL A1 Columns: # | BKR | POLE | DESCRIPTION | LOAD | A | B | C | LOAD | DESCRIPTION | POLE | BKR | # Row 1:"
+        },
+        {
+          "rank": 4,
+          "sheet": "C200",
+          "page": 4,
+          "rrf": 0.0161,
+          "hit": false,
+          "snippet": "[room] WILBERFORCE AVE"
+        },
+        {
+          "rank": 5,
+          "sheet": "E0.3",
+          "page": 39,
+          "rrf": 0.0159,
+          "hit": false,
+          "snippet": "Schedule: [typed:equipment] Panel Schedule (Partial) Columns: tag | description | capacity | location | remarks Row 1: t"
+        }
+      ]
+    },
+    {
+      "id": "d93",
+      "text": "Greenhouse glazing details",
+      "difficulty": "no_match",
+      "relevant": [],
+      "candidates_total": 20,
+      "candidates_in_drawings": 9,
+      "sheets_covered": [],
+      "sheets_missing": [],
+      "recall": null,
+      "rank_of_first_hit": null,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "sheet": "A2.1",
+          "page": 15,
+          "rrf": 0.0315,
+          "hit": false,
+          "snippet": "Schedule: [typed:window] GLAZING SCHEDULE Columns: mark | glazing Row 1: mark=IG; glazing=1\" THICK INSULATED GLASS WITH "
+        },
+        {
+          "rank": 2,
+          "sheet": "A2.1",
+          "page": 15,
+          "rrf": 0.0306,
+          "hit": false,
+          "snippet": "[symbol] G - 1\" THICK INSULATED GLASS WITH 1/2\" AIR SPACE AND TWO 1/4\" LITES ({\"schedule\": \"GLAZING SCHEDULE\"})"
+        },
+        {
+          "rank": 3,
+          "sheet": "A2.1",
+          "page": 15,
+          "rrf": 0.0302,
+          "hit": false,
+          "snippet": "Schedule: GLAZING SCHEDULE Columns: Symbol | Description Row 1: Symbol=G; Description=1\" THICK INSULATED GLASS WITH 1/2\""
+        },
+        {
+          "rank": 4,
+          "sheet": "A0.0",
+          "page": 12,
+          "rrf": 0.0299,
+          "hit": false,
+          "snippet": "26. GLAZING IN DOORS AND ADJACENT PANELS MUST BE TEMPERED. RESPONSIBILITY OF GLAZING SUBCONTRACTOR TO VERIFY & PLACE TEM"
+        },
+        {
+          "rank": 5,
+          "sheet": "A2.1",
+          "page": 15,
+          "rrf": 0.0299,
+          "hit": false,
+          "snippet": "[symbol] IG-T - 1\" THICK INSULATED GLASS WITH 1/2\" AIR SPACE AND TWO 1/4\" LITES, FULLY TEMPERED ({\"schedule\": \"GLAZING S"
+        }
+      ]
+    }
+  ]
+}

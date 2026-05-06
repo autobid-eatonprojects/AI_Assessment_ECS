@@ -1,0 +1,2668 @@
+{
+  "page_ranges": {
+    "00 01 10": [
+      2,
+      4
+    ],
+    "00 01 15": [
+      5,
+      5
+    ],
+    "00 01 17": [
+      6,
+      6
+    ],
+    "00 11 10": [
+      7,
+      7
+    ],
+    "00 11 16": [
+      8,
+      20
+    ],
+    "00 41 13": [
+      21,
+      23
+    ],
+    "00 43 13": [
+      24,
+      24
+    ],
+    "00 45 13": [
+      25,
+      26
+    ],
+    "00 45 20": [
+      27,
+      27
+    ],
+    "00 48 60": [
+      28,
+      28
+    ],
+    "00 48 61": [
+      29,
+      29
+    ],
+    "00 61 13": [
+      30,
+      31
+    ],
+    "00 61 14": [
+      32,
+      33
+    ],
+    "00 63 25": [
+      34,
+      34
+    ],
+    "00 72 00": [
+      35,
+      74
+    ],
+    "00 73 00": [
+      75,
+      82
+    ],
+    "00 73 46": [
+      83,
+      90
+    ],
+    "01 10 00": [
+      91,
+      92
+    ],
+    "01 16 00": [
+      93,
+      94
+    ],
+    "01 31 00": [
+      95,
+      95
+    ],
+    "01 31 19": [
+      96,
+      96
+    ],
+    "01 32 50": [
+      97,
+      98
+    ],
+    "01 33 00": [
+      99,
+      106
+    ],
+    "01 35 00": [
+      107,
+      109
+    ],
+    "01 42 19": [
+      110,
+      115
+    ],
+    "01 50 00": [
+      116,
+      118
+    ],
+    "01 60 00": [
+      119,
+      150
+    ],
+    "04 22 00": [
+      151,
+      168
+    ],
+    "04 43 13": [
+      169,
+      174
+    ],
+    "05 50 00": [
+      175,
+      180
+    ],
+    "06 10 00": [
+      181,
+      186
+    ],
+    "06 16 00": [
+      187,
+      190
+    ],
+    "06 20 23": [
+      191,
+      193
+    ],
+    "06 22 00": [
+      194,
+      193
+    ],
+    "07 92 00": [
+      194,
+      202
+    ],
+    "06 73 00": [
+      203,
+      207
+    ],
+    "07 21 00": [
+      208,
+      212
+    ],
+    "07 25 00": [
+      213,
+      216
+    ],
+    "07 26 00": [
+      217,
+      240
+    ],
+    "07 84 13": [
+      241,
+      245
+    ],
+    "07 84 43": [
+      246,
+      258
+    ],
+    "07 92 19": [
+      259,
+      267
+    ],
+    "08 14 16": [
+      268,
+      273
+    ],
+    "08 41 13": [
+      274,
+      283
+    ],
+    "08 71 00": [
+      284,
+      297
+    ],
+    "08 80 00": [
+      298,
+      306
+    ],
+    "08 83 00": [
+      307,
+      311
+    ],
+    "08 95 16": [
+      312,
+      313
+    ],
+    "09 29 00": [
+      314,
+      318
+    ],
+    "09 30 13": [
+      319,
+      325
+    ],
+    "09 51 23": [
+      326,
+      329
+    ],
+    "09 54 46": [
+      330,
+      339
+    ],
+    "09 65 19": [
+      340,
+      342
+    ],
+    "09 91 13": [
+      343,
+      345
+    ],
+    "09 91 23": [
+      346,
+      351
+    ],
+    "10 28 00": [
+      352,
+      356
+    ],
+    "10 73 00": [
+      357,
+      359
+    ],
+    "12 36 61": [
+      360,
+      361
+    ],
+    "32 12 16": [
+      362,
+      366
+    ],
+    "32 17 13": [
+      367,
+      368
+    ],
+    "32 17 23": [
+      369,
+      370
+    ]
+  },
+  "queries": [
+    {
+      "id": "q01",
+      "text": "What's the specification for water closets / toilets?",
+      "difficulty": "direct",
+      "relevant": [
+        "10 28 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 4,
+      "csi_covered": [],
+      "csi_missing": [
+        "10 28 00"
+      ],
+      "recall": 0.0,
+      "rank_of_first_hit": null,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 151,
+          "rrf": 0.0164,
+          "hit": [],
+          "snippet": "SECTION 04 22 00 CONCRETE UNIT MASONRY  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Concrete masonry units 2 Stee"
+        },
+        {
+          "rank": 2,
+          "page": 60,
+          "rrf": 0.0161,
+          "hit": [],
+          "snippet": "\u00a7 9.3.1.2 Applications for Payment shall not include requests for payment for portions of the Work for which the Contrac"
+        },
+        {
+          "rank": 3,
+          "page": 94,
+          "rrf": 0.0156,
+          "hit": [],
+          "snippet": "1 07 STORM WATER DISCHARGE PERMIT A If Construction Operations will disturb the ground the Contractor must file a Notice"
+        },
+        {
+          "rank": 4,
+          "page": 56,
+          "rrf": 0.0143,
+          "hit": [],
+          "snippet": "\u00a7 5.4.3 Upon assignment to the Owner under this Section 5.4, the Owner may further assign the subcontract to a successor"
+        }
+      ]
+    },
+    {
+      "id": "q02",
+      "text": "Ceramic tile installation requirements",
+      "difficulty": "direct",
+      "relevant": [
+        "09 30 13"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 11,
+      "csi_covered": [
+        "09 30 13"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 319,
+          "rrf": 0.032,
+          "hit": [
+            "09 30 13"
+          ],
+          "snippet": "SECTION 09 30 13 CERAMIC TILING  PART 1 - GENERAL  1 1 SUMMARY  A Section Includes 1 Porcelain Tile 2 Thresholds 3 Water"
+        },
+        {
+          "rank": 2,
+          "page": 341,
+          "rrf": 0.0315,
+          "hit": [],
+          "snippet": "4 Roppe Corporation, Roppe Holding Company 5 Shaw Industries Group, Inc, Berkshire Hathaway Company 6 Cobalt Surfaces B "
+        },
+        {
+          "rank": 3,
+          "page": 340,
+          "rrf": 0.0315,
+          "hit": [],
+          "snippet": "SECTION 09 65 19 RESILIENT TILE FLOORING  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Solid vinyl floor tile  1 2"
+        },
+        {
+          "rank": 4,
+          "page": 342,
+          "rrf": 0.0311,
+          "hit": [],
+          "snippet": "a Anhydrous Calcium Chlonde Test ASTM F1869 Proceed with installation   only after substrates have maximum moisture-vapo"
+        },
+        {
+          "rank": 5,
+          "page": 322,
+          "rrf": 0.0292,
+          "hit": [
+            "09 30 13"
+          ],
+          "snippet": "C Crack Isolation Membrane Fluid Applied Liquid-latex rubber or elastomeric polymer  2.6 SETTING MATERIALS A Portland Ce"
+        }
+      ]
+    },
+    {
+      "id": "q03",
+      "text": "Specification for flush wood doors",
+      "difficulty": "direct",
+      "relevant": [
+        "08 14 16"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 8,
+      "csi_covered": [
+        "08 14 16"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 268,
+          "rrf": 0.0328,
+          "hit": [
+            "08 14 16"
+          ],
+          "snippet": "SECTION 08 14 16 FLUSH WOOD DOORS  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Five-ply flush wood veneer-faced d"
+        },
+        {
+          "rank": 2,
+          "page": 270,
+          "rrf": 0.032,
+          "hit": [
+            "08 14 16"
+          ],
+          "snippet": "22 FLUSH WOOD DOORS AND FRAMES GENERAL A Quality Standard In addition to requirements specified, comply with Architectur"
+        },
+        {
+          "rank": 3,
+          "page": 271,
+          "rrf": 0.032,
+          "hit": [
+            "08 14 16"
+          ],
+          "snippet": "a Species As Scheduled b Cut Rotary cut c Match between Veneer Leaves Book match d Room Match 1) Provide door faces of c"
+        },
+        {
+          "rank": 4,
+          "page": 272,
+          "rrf": 0.0305,
+          "hit": [
+            "08 14 16"
+          ],
+          "snippet": "2 5 FACTORY FINISHING A Comply with referenced quality standard for factory finishing 1 Complete fabrication including f"
+        },
+        {
+          "rank": 5,
+          "page": 296,
+          "rrf": 0.0286,
+          "hit": [],
+          "snippet": "3 8 DOOR HARDWARE SCHEDULE A Hardware Set 1 (Double Glass Doors) Each door to have the following \u2022 8 Hinges \u2022 2 Door Clo"
+        }
+      ]
+    },
+    {
+      "id": "q04",
+      "text": "Door hardware schedule and requirements",
+      "difficulty": "direct",
+      "relevant": [
+        "08 71 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 13,
+      "csi_covered": [
+        "08 71 00"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 286,
+          "rrf": 0.0325,
+          "hit": [
+            "08 71 00"
+          ],
+          "snippet": "submissions of product data, Samples, and Shop Drawings Coordinate submission of door hardware schedule with scheduling "
+        },
+        {
+          "rank": 2,
+          "page": 296,
+          "rrf": 0.032,
+          "hit": [
+            "08 71 00"
+          ],
+          "snippet": "3 8 DOOR HARDWARE SCHEDULE A Hardware Set 1 (Double Glass Doors) Each door to have the following \u2022 8 Hinges \u2022 2 Door Clo"
+        },
+        {
+          "rank": 3,
+          "page": 284,
+          "rrf": 0.0315,
+          "hit": [
+            "08 71 00"
+          ],
+          "snippet": "SECTION 08 71 00 DOOR HARDWARE PART 1 - GENERAL 1.1 SUMMARY A Section Includes   1 Hinges   2 Self-closing hinges and pi"
+        },
+        {
+          "rank": 4,
+          "page": 285,
+          "rrf": 0.0304,
+          "hit": [
+            "08 71 00"
+          ],
+          "snippet": "1 Conference participants must include Installers Architectural Hardware Consultant and Owners security consultant B Key"
+        },
+        {
+          "rank": 5,
+          "page": 268,
+          "rrf": 0.0299,
+          "hit": [],
+          "snippet": "SECTION 08 14 16 FLUSH WOOD DOORS  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Five-ply flush wood veneer-faced d"
+        }
+      ]
+    },
+    {
+      "id": "q05",
+      "text": "Asphalt paving requirements",
+      "difficulty": "direct",
+      "relevant": [
+        "32 12 16"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 6,
+      "csi_covered": [
+        "32 12 16"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 362,
+          "rrf": 0.0328,
+          "hit": [
+            "32 12 16"
+          ],
+          "snippet": "SECTION 32 12 16 ASPHALT PAVING  PART 1 - GENERAL  1.1 SUMMARY A Section Includes   1 Hot-mix asphalt paving   2 Hot-mix"
+        },
+        {
+          "rank": 2,
+          "page": 365,
+          "rrf": 0.0323,
+          "hit": [
+            "32 12 16"
+          ],
+          "snippet": "segregation of mix Place each course to required grade cross section and thickness when compacted 1 Place hot mix asphal"
+        },
+        {
+          "rank": 3,
+          "page": 366,
+          "rrf": 0.0315,
+          "hit": [
+            "32 12 16"
+          ],
+          "snippet": "D Finish Rolling Finish roll paved surfaces to remove roller marks while hot-mix asphalt is    still warm E Edge Shaping"
+        },
+        {
+          "rank": 4,
+          "page": 363,
+          "rrf": 0.0315,
+          "hit": [
+            "32 12 16"
+          ],
+          "snippet": "PART 2 - PRODUCTS  2.1 AGGREGATES A Mineral Filler ASTM D242/D242M or AASHTO M 17 rock or slag dust hydraulic cement or "
+        },
+        {
+          "rank": 5,
+          "page": 370,
+          "rrf": 0.0285,
+          "hit": [],
+          "snippet": "1 Color As indicated on drawings B Pavement Marking Paint, Acrylic. Acrylic, waterborne emulsion lead and chromate free "
+        }
+      ]
+    },
+    {
+      "id": "q06",
+      "text": "Aluminum-framed entrances and storefronts",
+      "difficulty": "direct",
+      "relevant": [
+        "08 41 13"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 5,
+      "csi_covered": [
+        "08 41 13"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 278,
+          "rrf": 0.0315,
+          "hit": [
+            "08 41 13"
+          ],
+          "snippet": "G Windborne-Debris Impact Resistance Passes ASTM E1886 missile-impact and cyclic- pressure tests in accordance with ASTM"
+        },
+        {
+          "rank": 2,
+          "page": 274,
+          "rrf": 0.0315,
+          "hit": [
+            "08 41 13"
+          ],
+          "snippet": "SECTION 08 41 13 ALUMINUM FRAMED ENTRANCES AND STOREFRONTS  PART 1 - GENERAL  1.1 SUMMARY A Section Includes   1 Aluminu"
+        },
+        {
+          "rank": 3,
+          "page": 283,
+          "rrf": 0.0299,
+          "hit": [
+            "08 41 13"
+          ],
+          "snippet": "2 Field-Installed Entrance Door Hardware Install surface-mounted entrance door   hardware in accordance with entrance do"
+        },
+        {
+          "rank": 4,
+          "page": 313,
+          "rrf": 0.0279,
+          "hit": [],
+          "snippet": "a Construction Specialties Inc b Ruskin, Air Distribution Technologies Inc , Johnson Controls, Inc c Sunvent Industries "
+        },
+        {
+          "rank": 5,
+          "page": 284,
+          "rrf": 0.0161,
+          "hit": [],
+          "snippet": "SECTION 08 71 00 DOOR HARDWARE PART 1 - GENERAL 1.1 SUMMARY A Section Includes   1 Hinges   2 Self-closing hinges and pi"
+        }
+      ]
+    },
+    {
+      "id": "q07",
+      "text": "Concrete masonry unit specifications",
+      "difficulty": "direct",
+      "relevant": [
+        "04 22 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 5,
+      "csi_covered": [
+        "04 22 00"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 151,
+          "rrf": 0.0328,
+          "hit": [
+            "04 22 00"
+          ],
+          "snippet": "SECTION 04 22 00 CONCRETE UNIT MASONRY  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Concrete masonry units 2 Stee"
+        },
+        {
+          "rank": 2,
+          "page": 169,
+          "rrf": 0.0313,
+          "hit": [],
+          "snippet": "SECTION 04 43 13 16 ADHERED STONE MASONRY VENEER  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Stone masonry adher"
+        },
+        {
+          "rank": 3,
+          "page": 168,
+          "rrf": 0.031,
+          "hit": [
+            "04 22 00"
+          ],
+          "snippet": "D Place cavity drainage material in airspace behind veneers to comply with configuratio   requirements for cavity draina"
+        },
+        {
+          "rank": 4,
+          "page": 160,
+          "rrf": 0.029,
+          "hit": [
+            "04 22 00"
+          ],
+          "snippet": "C Damp-cure parging for at least 24 hours and protect parging until cured  3 10 REPAIRING POINTING AND CLEANING  A In Pr"
+        },
+        {
+          "rank": 5,
+          "page": 163,
+          "rrf": 0.0156,
+          "hit": [
+            "04 22 00"
+          ],
+          "snippet": "a Cemex S.A.B. de C.V b Holcim (US) Inc c Sakrete, CRH Americas Oldcastle APG  E Preblended Dry Mortar Mix Packaged blen"
+        }
+      ]
+    },
+    {
+      "id": "q08",
+      "text": "Acoustical ceiling tile installation",
+      "difficulty": "direct",
+      "relevant": [
+        "09 51 23",
+        "09 54 46"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 9,
+      "csi_covered": [
+        "09 51 23",
+        "09 54 46"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 329,
+          "rrf": 0.0315,
+          "hit": [
+            "09 51 23"
+          ],
+          "snippet": "B Install edge moldings and trim of type indicated at perimeter of acoustical ceiling area   and where necessary to conc"
+        },
+        {
+          "rank": 2,
+          "page": 328,
+          "rrf": 0.0313,
+          "hit": [
+            "09 51 23"
+          ],
+          "snippet": "C Direct-Hung, Double-Web Suspension System. Main and cross runners roll formed from and capped with cold-rolled steel s"
+        },
+        {
+          "rank": 3,
+          "page": 326,
+          "rrf": 0.0298,
+          "hit": [
+            "09 51 23"
+          ],
+          "snippet": "SECTION 09 51 23 ACOUSTICAL TILE CEILINGS  PART 1 - GENERAL  1.1 SUMMARY     A Section Includes         1 Acoustical til"
+        },
+        {
+          "rank": 4,
+          "page": 333,
+          "rrf": 0.0289,
+          "hit": [
+            "09 54 46"
+          ],
+          "snippet": "d) Equal products from the following manufacturer are also acceptable     a. Armstrong, or third Manufacturer as approve"
+        },
+        {
+          "rank": 5,
+          "page": 334,
+          "rrf": 0.0284,
+          "hit": [
+            "09 54 46"
+          ],
+          "snippet": "b) Proper designs for both supply air and return air, maintenance of the HVAC     filters and building interior space ar"
+        }
+      ]
+    },
+    {
+      "id": "q09",
+      "text": "Rough carpentry framing specifications",
+      "difficulty": "direct",
+      "relevant": [
+        "06 10 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 4,
+      "csi_covered": [
+        "06 10 00"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 181,
+          "rrf": 0.0328,
+          "hit": [
+            "06 10 00"
+          ],
+          "snippet": "SECTION 06 10 00 ROUGH CARPENTRY  PART 1 - GENERAL  1.1 SUMMARY A Section Includes 1 Framing with dimension lumber 2 Fra"
+        },
+        {
+          "rank": 2,
+          "page": 184,
+          "rrf": 0.0304,
+          "hit": [
+            "06 10 00"
+          ],
+          "snippet": "2.4 DIMENSION LUMBER FRAMING A Non Load Bearing Interior Partitions by Grade No 2 grade 1 Application All interior parti"
+        },
+        {
+          "rank": 3,
+          "page": 192,
+          "rrf": 0.0161,
+          "hit": [],
+          "snippet": "B Moldings for Opaque Finish (Painted Finish) Made to patterns included in MMPAs WM/Series Softwood Moulding Patterns 1 "
+        },
+        {
+          "rank": 4,
+          "page": 193,
+          "rrf": 0.0145,
+          "hit": [],
+          "snippet": "5 Coordinate interior finish carpentry with materials and systems in or adjacent to it   Provide cutouts for mechanical "
+        }
+      ]
+    },
+    {
+      "id": "q30",
+      "text": "Sheathing material requirements",
+      "difficulty": "direct",
+      "relevant": [
+        "06 16 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 4,
+      "csi_covered": [
+        "06 16 00"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 188,
+          "rrf": 0.0313,
+          "hit": [
+            "06 16 00"
+          ],
+          "snippet": "C Application Treat all plywood unless otherwise indicated  23 FIRE-RETARDANT-TREATED PLYWOOD  A General Where fire reta"
+        },
+        {
+          "rank": 2,
+          "page": 189,
+          "rrf": 0.0164,
+          "hit": [
+            "06 16 00"
+          ],
+          "snippet": "2 7 SUBFLOORING AND UNDERLAYMENT A Oriented Strand Board Combination Subfloor Underlayment DOC PS 2, Exposure 1 single-f"
+        },
+        {
+          "rank": 3,
+          "page": 187,
+          "rrf": 0.0152,
+          "hit": [
+            "06 16 00"
+          ],
+          "snippet": "SECTION 06 16 00 SHEATHING  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Wall sheathing 2 Roof sheathing 3 Parapet"
+        },
+        {
+          "rank": 4,
+          "page": 215,
+          "rrf": 0.0147,
+          "hit": [],
+          "snippet": "aluminum foil or spunbonded polyolefin to produce an overall thickness of not less than 0.025 inch (0.6 mm)  1 Manufactu"
+        }
+      ]
+    },
+    {
+      "id": "q31",
+      "text": "Composite decking and railing specifications",
+      "difficulty": "direct",
+      "relevant": [
+        "06 73 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 4,
+      "csi_covered": [
+        "06 73 00"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 203,
+          "rrf": 0.0328,
+          "hit": [
+            "06 73 00"
+          ],
+          "snippet": "SECTION 06 73 00 - COMPOSITE DECKING AND RAILINGS  PART 1 GENERAL  1.1 SECTION INCLUDES A Composite Decking B Composite "
+        },
+        {
+          "rank": 2,
+          "page": 206,
+          "rrf": 0.0323,
+          "hit": [
+            "06 73 00"
+          ],
+          "snippet": "k Modulus of Elasticity ASTM D4761 412,000psi ultimate 200 000 psi design l Modulus of Rupture, ASTM D4761 3280 psi ulti"
+        },
+        {
+          "rank": 3,
+          "page": 205,
+          "rrf": 0.0315,
+          "hit": [
+            "06 73 00"
+          ],
+          "snippet": "A Structural Performance 1 Deck Uniform Load - 100lbf/sq ft 2 Tread of Stairs Concentrated Load 750 lbf on area of 4 sq "
+        },
+        {
+          "rank": 4,
+          "page": 358,
+          "rrf": 0.0154,
+          "hit": [],
+          "snippet": "*   TN Valley Metals *   Mitchell Metals  2 2 COMPONENTS  A. Deck beam, and column components shall be 6063 alloy T6 ext"
+        }
+      ]
+    },
+    {
+      "id": "q32",
+      "text": "Metal fabrications spec \u2014 handrails, ornamental metal",
+      "difficulty": "direct",
+      "relevant": [
+        "05 50 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 7,
+      "csi_covered": [
+        "05 50 00"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 175,
+          "rrf": 0.0323,
+          "hit": [
+            "05 50 00"
+          ],
+          "snippet": "SECTION 05 50 00 METAL FABRICATIONS  PART 1 - GENERAL  1.1 SUMMARY  A Section Includes 1 Miscellaneous steel trim 2 Pipe"
+        },
+        {
+          "rank": 2,
+          "page": 178,
+          "rrf": 0.0161,
+          "hit": [
+            "05 50 00"
+          ],
+          "snippet": "26 MISCELLANEOUS STEEL TRIM A Unless otherwise indicated fabricate units from steel shapes plates and bars of profiles  "
+        },
+        {
+          "rank": 3,
+          "page": 206,
+          "rrf": 0.0159,
+          "hit": [],
+          "snippet": "k Modulus of Elasticity ASTM D4761 412,000psi ultimate 200 000 psi design l Modulus of Rupture, ASTM D4761 3280 psi ulti"
+        },
+        {
+          "rank": 4,
+          "page": 179,
+          "rrf": 0.0154,
+          "hit": [
+            "05 50 00"
+          ],
+          "snippet": "D Shop Priming Apply shop primer to comply with SSPC-PA 1 Paint Application Specification No 1 Shop Field, and Maintenan"
+        },
+        {
+          "rank": 5,
+          "page": 177,
+          "rrf": 0.0152,
+          "hit": [
+            "05 50 00"
+          ],
+          "snippet": "maintain structural value of joined pieces Clearly mark units for reassembly and coordinated installation B Cut drill an"
+        }
+      ]
+    },
+    {
+      "id": "q10",
+      "text": "Insulation thickness and R-value requirements",
+      "difficulty": "material",
+      "relevant": [
+        "07 21 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 2,
+      "csi_covered": [
+        "07 21 00"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 209,
+          "rrf": 0.0325,
+          "hit": [
+            "07 21 00"
+          ],
+          "snippet": "D Labeling. Provide identification of mark indicating R-value of each piece of insulation 12   inches (305 mm) and wider"
+        },
+        {
+          "rank": 2,
+          "page": 208,
+          "rrf": 0.0284,
+          "hit": [
+            "07 21 00"
+          ],
+          "snippet": "SECTION 07 21 00 THERMAL INSULATION  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Extruded polystyrene foam-plasti"
+        }
+      ]
+    },
+    {
+      "id": "q11",
+      "text": "Vapor barrier requirements for the building envelope",
+      "difficulty": "material",
+      "relevant": [
+        "07 26 00",
+        "07 25 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 5,
+      "csi_covered": [
+        "07 25 00",
+        "07 26 00"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 213,
+          "rrf": 0.0328,
+          "hit": [
+            "07 25 00"
+          ],
+          "snippet": "SECTION 07 25 00 WEATHER BARRIERS 1 1 SUMMARY A Section Includes 1 Building paper 2 Building wrap 3 Drainage wrap 4 Flex"
+        },
+        {
+          "rank": 2,
+          "page": 217,
+          "rrf": 0.0323,
+          "hit": [
+            "07 26 00"
+          ],
+          "snippet": "SECTION 07 26 00 VAPOR RETARDERS  PART 1 - GENERAL  1 1 SUMMARY A Section Includes   1 Polyethylene vapor retarders   2 "
+        },
+        {
+          "rank": 3,
+          "page": 215,
+          "rrf": 0.0274,
+          "hit": [
+            "07 25 00"
+          ],
+          "snippet": "aluminum foil or spunbonded polyolefin to produce an overall thickness of not less than 0.025 inch (0.6 mm)  1 Manufactu"
+        },
+        {
+          "rank": 4,
+          "page": 214,
+          "rrf": 0.0156,
+          "hit": [
+            "07 25 00"
+          ],
+          "snippet": "D Drainage Wrap ASTM E2556/E2556M Type I dimensional water-resistive barrier that also creates a drainage plane with fla"
+        },
+        {
+          "rank": 5,
+          "page": 218,
+          "rrf": 0.0152,
+          "hit": [
+            "07 26 00"
+          ],
+          "snippet": "PART 3 - EXECUTION  3.1 INSTALLATION OF VAPOR RETARDERS ON FRAMING  A Extend vapor retarders to extremities of areas to "
+        }
+      ]
+    },
+    {
+      "id": "q12",
+      "text": "Pavement marking colors and stripe widths",
+      "difficulty": "material",
+      "relevant": [
+        "32 17 23"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 2,
+      "csi_covered": [
+        "32 17 23"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 370,
+          "rrf": 0.0328,
+          "hit": [
+            "32 17 23"
+          ],
+          "snippet": "1 Color As indicated on drawings B Pavement Marking Paint, Acrylic. Acrylic, waterborne emulsion lead and chromate free "
+        },
+        {
+          "rank": 2,
+          "page": 369,
+          "rrf": 0.0315,
+          "hit": [
+            "32 17 23"
+          ],
+          "snippet": "SECTION 32 17 23 PAVEMENT MARKINGS  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Painted markings applied to aspha"
+        }
+      ]
+    },
+    {
+      "id": "q13",
+      "text": "Specifications for wood framing lumber",
+      "difficulty": "material",
+      "relevant": [
+        "06 10 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 4,
+      "csi_covered": [
+        "06 10 00"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 181,
+          "rrf": 0.0323,
+          "hit": [
+            "06 10 00"
+          ],
+          "snippet": "SECTION 06 10 00 ROUGH CARPENTRY  PART 1 - GENERAL  1.1 SUMMARY A Section Includes 1 Framing with dimension lumber 2 Fra"
+        },
+        {
+          "rank": 2,
+          "page": 184,
+          "rrf": 0.0323,
+          "hit": [
+            "06 10 00"
+          ],
+          "snippet": "2.4 DIMENSION LUMBER FRAMING A Non Load Bearing Interior Partitions by Grade No 2 grade 1 Application All interior parti"
+        },
+        {
+          "rank": 3,
+          "page": 191,
+          "rrf": 0.0156,
+          "hit": [],
+          "snippet": "SECTION 06 20 23 INTERIOR FINISH CARPENTRY  PART 1 - GENERAL  1.1 SUMMARY A. Section Includes 1. Interior trim including"
+        },
+        {
+          "rank": 4,
+          "page": 190,
+          "rrf": 0.0154,
+          "hit": [],
+          "snippet": "3 2 WOOD STRUCTURAL PANEL INSTALLATION A General Comply with applicable recommendations in APA Form No E30 Engineered Wo"
+        }
+      ]
+    },
+    {
+      "id": "q14",
+      "text": "Resilient flooring specifications",
+      "difficulty": "material",
+      "relevant": [
+        "09 65 19"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 6,
+      "csi_covered": [
+        "09 65 19"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 340,
+          "rrf": 0.0323,
+          "hit": [
+            "09 65 19"
+          ],
+          "snippet": "SECTION 09 65 19 RESILIENT TILE FLOORING  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Solid vinyl floor tile  1 2"
+        },
+        {
+          "rank": 2,
+          "page": 341,
+          "rrf": 0.0156,
+          "hit": [
+            "09 65 19"
+          ],
+          "snippet": "4 Roppe Corporation, Roppe Holding Company 5 Shaw Industries Group, Inc, Berkshire Hathaway Company 6 Cobalt Surfaces B "
+        },
+        {
+          "rank": 3,
+          "page": 189,
+          "rrf": 0.0154,
+          "hit": [],
+          "snippet": "2 7 SUBFLOORING AND UNDERLAYMENT A Oriented Strand Board Combination Subfloor Underlayment DOC PS 2, Exposure 1 single-f"
+        },
+        {
+          "rank": 4,
+          "page": 342,
+          "rrf": 0.0149,
+          "hit": [
+            "09 65 19"
+          ],
+          "snippet": "a Anhydrous Calcium Chlonde Test ASTM F1869 Proceed with installation   only after substrates have maximum moisture-vapo"
+        },
+        {
+          "rank": 5,
+          "page": 4,
+          "rrf": 0.0147,
+          "hit": [],
+          "snippet": "09 30 13 Ceramic Tiling 09 30 13 1-7 09 51 23 Acoustical Tile Ceilings 09 51 23 1-4 09 54 46 Open Cell Acoustical Ceilin"
+        }
+      ]
+    },
+    {
+      "id": "q15",
+      "text": "Exterior paint schedule and product requirements",
+      "difficulty": "material",
+      "relevant": [
+        "09 91 13"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 7,
+      "csi_covered": [
+        "09 91 13"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 343,
+          "rrf": 0.0328,
+          "hit": [
+            "09 91 13"
+          ],
+          "snippet": "SECTION 09 91 13 EXTERIOR PAINTING  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Primers 2 Finish coatings  1 2 AC"
+        },
+        {
+          "rank": 2,
+          "page": 346,
+          "rrf": 0.0323,
+          "hit": [],
+          "snippet": "SECTION 09 91 23 INTERIOR PAINTING  PART 1 - GENERAL  1.1 RELATED DOCUMENTS A Drawings and general provisions of the Con"
+        },
+        {
+          "rank": 3,
+          "page": 369,
+          "rrf": 0.0308,
+          "hit": [],
+          "snippet": "SECTION 32 17 23 PAVEMENT MARKINGS  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Painted markings applied to aspha"
+        },
+        {
+          "rank": 4,
+          "page": 176,
+          "rrf": 0.0267,
+          "hit": [],
+          "snippet": "2 2 FASTENERS A General Unless otherwise indicated provide Type 304 stainless steel fasteners for exterior use and zinc-"
+        },
+        {
+          "rank": 5,
+          "page": 370,
+          "rrf": 0.0156,
+          "hit": [],
+          "snippet": "1 Color As indicated on drawings B Pavement Marking Paint, Acrylic. Acrylic, waterborne emulsion lead and chromate free "
+        }
+      ]
+    },
+    {
+      "id": "q16",
+      "text": "Interior paint product requirements",
+      "difficulty": "material",
+      "relevant": [
+        "09 91 23"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 5,
+      "csi_covered": [
+        "09 91 23"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 346,
+          "rrf": 0.0325,
+          "hit": [
+            "09 91 23"
+          ],
+          "snippet": "SECTION 09 91 23 INTERIOR PAINTING  PART 1 - GENERAL  1.1 RELATED DOCUMENTS A Drawings and general provisions of the Con"
+        },
+        {
+          "rank": 2,
+          "page": 343,
+          "rrf": 0.0317,
+          "hit": [],
+          "snippet": "SECTION 09 91 13 EXTERIOR PAINTING  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Primers 2 Finish coatings  1 2 AC"
+        },
+        {
+          "rank": 3,
+          "page": 369,
+          "rrf": 0.0305,
+          "hit": [],
+          "snippet": "SECTION 32 17 23 PAVEMENT MARKINGS  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Painted markings applied to aspha"
+        },
+        {
+          "rank": 4,
+          "page": 191,
+          "rrf": 0.0268,
+          "hit": [],
+          "snippet": "SECTION 06 20 23 INTERIOR FINISH CARPENTRY  PART 1 - GENERAL  1.1 SUMMARY A. Section Includes 1. Interior trim including"
+        },
+        {
+          "rank": 5,
+          "page": 326,
+          "rrf": 0.0137,
+          "hit": [],
+          "snippet": "SECTION 09 51 23 ACOUSTICAL TILE CEILINGS  PART 1 - GENERAL  1.1 SUMMARY     A Section Includes         1 Acoustical til"
+        }
+      ]
+    },
+    {
+      "id": "q33",
+      "text": "Stone masonry veneer details",
+      "difficulty": "material",
+      "relevant": [
+        "04 43 13"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 2,
+      "csi_covered": [
+        "04 43 13"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 169,
+          "rrf": 0.0325,
+          "hit": [
+            "04 43 13"
+          ],
+          "snippet": "SECTION 04 43 13 16 ADHERED STONE MASONRY VENEER  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Stone masonry adher"
+        },
+        {
+          "rank": 2,
+          "page": 173,
+          "rrf": 0.0164,
+          "hit": [
+            "04 43 13"
+          ],
+          "snippet": "H Place weep holes in joints where moisture may accumulate including above shelf angles   and at flashing    1 Use mesh "
+        }
+      ]
+    },
+    {
+      "id": "q34",
+      "text": "Solid surface countertop fabrication",
+      "difficulty": "material",
+      "relevant": [
+        "12 36 61"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 7,
+      "csi_covered": [
+        "12 36 61"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 360,
+          "rrf": 0.0328,
+          "hit": [
+            "12 36 61"
+          ],
+          "snippet": "SECTION 12 36 61 16 SOLID SURFACING COUNTERTOPS  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Solid surface materi"
+        },
+        {
+          "rank": 2,
+          "page": 361,
+          "rrf": 0.0318,
+          "hit": [
+            "12 36 61"
+          ],
+          "snippet": "B Countertops 1 1/2 inch (12 7 mm) thick solid surface material with front edge built up with same material C Backsplash"
+        },
+        {
+          "rank": 3,
+          "page": 198,
+          "rrf": 0.0274,
+          "hit": [],
+          "snippet": "a Edges of Plastic-Laminate Shelves PVC edge banding, 0.12 inch (3 mm)   thick, matching laminate in color, pattern, and"
+        },
+        {
+          "rank": 4,
+          "page": 194,
+          "rrf": 0.0159,
+          "hit": [],
+          "snippet": "SECTION 06 22 00 \u2013 MILLWORK  PART 1 GENERAL  1 01 SCOPE  A Furnish all labor, materials, equipment and supervision neces"
+        },
+        {
+          "rank": 5,
+          "page": 201,
+          "rrf": 0.0156,
+          "hit": [],
+          "snippet": "B Assemble woodwork and complete fabrication at Project site to comply with requirements for fabrication in Part 2, to e"
+        }
+      ]
+    },
+    {
+      "id": "q35",
+      "text": "Mirror specifications",
+      "difficulty": "material",
+      "relevant": [
+        "08 83 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 7,
+      "csi_covered": [
+        "08 83 00"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 307,
+          "rrf": 0.0328,
+          "hit": [
+            "08 83 00"
+          ],
+          "snippet": "SECTION 08 83 00 MIRRORS PART 1 - GENERAL 1 1 SUMMARY A Section Includes 1 Silvered flat glass mirrors 1 2 ACTION SUBMIT"
+        },
+        {
+          "rank": 2,
+          "page": 309,
+          "rrf": 0.031,
+          "hit": [
+            "08 83 00"
+          ],
+          "snippet": "D Film Backing for Safety Mirrors Film backing and pressure-sensitive adhesive both   compatible with mirror backing pai"
+        },
+        {
+          "rank": 3,
+          "page": 308,
+          "rrf": 0.0299,
+          "hit": [
+            "08 83 00"
+          ],
+          "snippet": "1 6 WARRANTY A Special Warranty. Manufacturer agrees to replace mirrors that deteriorate within specified warranty perio"
+        },
+        {
+          "rank": 4,
+          "page": 310,
+          "rrf": 0.0296,
+          "hit": [
+            "08 83 00"
+          ],
+          "snippet": "C Film-Backed Safety Mirrors Apply film backing with adhesive coating over mirror backing paint, as recommended in writi"
+        },
+        {
+          "rank": 5,
+          "page": 355,
+          "rrf": 0.0156,
+          "hit": [],
+          "snippet": "F Mirror Unit 1 Manufacturers Subject to compliance with requirements, provide products by one of the following a ASI-Am"
+        }
+      ]
+    },
+    {
+      "id": "q20",
+      "text": "Fire-rated assemblies and firestopping requirements",
+      "difficulty": "cross_csi",
+      "relevant": [
+        "07 84 13",
+        "07 84 43"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 13,
+      "csi_covered": [
+        "07 84 13",
+        "07 84 43"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 241,
+          "rrf": 0.0323,
+          "hit": [
+            "07 84 13"
+          ],
+          "snippet": "SECTION 07 84 13 PENETRATION FIRESTOPPING  PART 1 - GENERAL  1.1 SUMMARY A Section Includes 1 Penetrations in fire-resis"
+        },
+        {
+          "rank": 2,
+          "page": 247,
+          "rrf": 0.0318,
+          "hit": [
+            "07 84 43"
+          ],
+          "snippet": "1 6 QUALITY ASSURANCE A Installer Qualifications A firm that has been approved by FM Approvals according to   FM Approva"
+        },
+        {
+          "rank": 3,
+          "page": 242,
+          "rrf": 0.0311,
+          "hit": [
+            "07 84 13"
+          ],
+          "snippet": "1 6 QUALITY ASSURANCE A Installer Qualifications A firm that has been approved by FM Approvals according to FM Approvals"
+        },
+        {
+          "rank": 4,
+          "page": 248,
+          "rrf": 0.0309,
+          "hit": [
+            "07 84 43"
+          ],
+          "snippet": "2 Fire-Resistance Rating Equal to or exceeding the fire-resistance rating of the wall floor, or roof in or between which"
+        },
+        {
+          "rank": 5,
+          "page": 269,
+          "rrf": 0.0301,
+          "hit": [],
+          "snippet": "1 Fire-Rated Door Inspector. Submit documentation of compliance with NFPA 80   Section 5 2 3 1 2 Egress Door Inspector. "
+        }
+      ]
+    },
+    {
+      "id": "q21",
+      "text": "Joint sealants for interior and exterior applications",
+      "difficulty": "cross_csi",
+      "relevant": [
+        "07 92 00",
+        "07 92 19"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 14,
+      "csi_covered": [
+        "07 92 19"
+      ],
+      "csi_missing": [
+        "07 92 00"
+      ],
+      "recall": 0.5,
+      "rank_of_first_hit": 4,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 251,
+          "rrf": 0.032,
+          "hit": [],
+          "snippet": "SECTION 07 92 00 JOINT SEALANTS  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Silicone joint sealants 2 Nonstainin"
+        },
+        {
+          "rank": 2,
+          "page": 315,
+          "rrf": 0.0318,
+          "hit": [],
+          "snippet": "a Armstrong Ceiling & Wall Solutions b CertainTeed, SAINT-GOBAIN c Georgia Pacific Gypsum LLC d Gold Bond Building Produ"
+        },
+        {
+          "rank": 3,
+          "page": 258,
+          "rrf": 0.0307,
+          "hit": [],
+          "snippet": "1 Field-Adhesion Testing Field test joint-sealant adhesion to joint substrates as follows  a Extent of Testing Test comp"
+        },
+        {
+          "rank": 4,
+          "page": 259,
+          "rrf": 0.0304,
+          "hit": [
+            "07 92 19"
+          ],
+          "snippet": "SECTION 07 92 19 ACOUSTICAL JOINT SEALANTS  PART 1 - GENERAL  1.1 SUMMARY A Section Includes 1 Acoustical joint sealants"
+        },
+        {
+          "rank": 5,
+          "page": 254,
+          "rrf": 0.0303,
+          "hit": [],
+          "snippet": "D Silicone Nonstaining S NS 100/50 T NT Nonstaining single-component nonsag     plus 100 percent and minus 50 percent mo"
+        }
+      ]
+    },
+    {
+      "id": "q22",
+      "text": "Glazing and mirror specifications",
+      "difficulty": "cross_csi",
+      "relevant": [
+        "08 80 00",
+        "08 83 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 9,
+      "csi_covered": [
+        "08 80 00",
+        "08 83 00"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 307,
+          "rrf": 0.032,
+          "hit": [
+            "08 83 00"
+          ],
+          "snippet": "SECTION 08 83 00 MIRRORS PART 1 - GENERAL 1 1 SUMMARY A Section Includes 1 Silvered flat glass mirrors 1 2 ACTION SUBMIT"
+        },
+        {
+          "rank": 2,
+          "page": 309,
+          "rrf": 0.0315,
+          "hit": [
+            "08 83 00"
+          ],
+          "snippet": "D Film Backing for Safety Mirrors Film backing and pressure-sensitive adhesive both   compatible with mirror backing pai"
+        },
+        {
+          "rank": 3,
+          "page": 298,
+          "rrf": 0.0311,
+          "hit": [
+            "08 80 00"
+          ],
+          "snippet": "SECTION 08 80 00 GLAZING  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Glass products 2 Insulating glass 3 Glazing"
+        },
+        {
+          "rank": 4,
+          "page": 300,
+          "rrf": 0.0297,
+          "hit": [
+            "08 80 00"
+          ],
+          "snippet": "D Thermal and Optical Performance Properties Provide glass with performance properties    specified as indicated in manu"
+        },
+        {
+          "rank": 5,
+          "page": 308,
+          "rrf": 0.0294,
+          "hit": [
+            "08 83 00"
+          ],
+          "snippet": "1 6 WARRANTY A Special Warranty. Manufacturer agrees to replace mirrors that deteriorate within specified warranty perio"
+        }
+      ]
+    },
+    {
+      "id": "q23",
+      "text": "Submittal procedures and timing requirements",
+      "difficulty": "cross_csi",
+      "relevant": [
+        "01 33 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 16,
+      "csi_covered": [
+        "01 33 00"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 104,
+          "rrf": 0.032,
+          "hit": [
+            "01 33 00"
+          ],
+          "snippet": "Contractor desire a sample returned he shall submit a sufficient number in order for the Architect to retain one (1) sam"
+        },
+        {
+          "rank": 2,
+          "page": 100,
+          "rrf": 0.0318,
+          "hit": [
+            "01 33 00"
+          ],
+          "snippet": "1 04 GENERAL SUBMITTAL REQUIREMENTS A Coordination and Sequencing Coordinate the preparation and processing of submittal"
+        },
+        {
+          "rank": 3,
+          "page": 101,
+          "rrf": 0.0303,
+          "hit": [
+            "01 33 00"
+          ],
+          "snippet": "1 07 CONTRACTORS PROGRESS SCHEDULE A Use HUD Form No. 5372 B Coordinate the Contractors Progress Schedule with the Sched"
+        },
+        {
+          "rank": 4,
+          "page": 99,
+          "rrf": 0.0295,
+          "hit": [
+            "01 33 00"
+          ],
+          "snippet": "SECTION 01 33 00 \u2013 SUBMITTALS  PART 1 GENERAL  1 01 GENERAL  A Work Included  1 Wherever possible, throughout the Contra"
+        },
+        {
+          "rank": 5,
+          "page": 285,
+          "rrf": 0.0289,
+          "hit": [],
+          "snippet": "1 Conference participants must include Installers Architectural Hardware Consultant and Owners security consultant B Key"
+        }
+      ]
+    },
+    {
+      "id": "q24",
+      "text": "Wood interior finish trim and millwork",
+      "difficulty": "cross_csi",
+      "relevant": [
+        "06 20 23",
+        "06 22 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 5,
+      "csi_covered": [
+        "06 20 23"
+      ],
+      "csi_missing": [
+        "06 22 00"
+      ],
+      "recall": 0.5,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 191,
+          "rrf": 0.0301,
+          "hit": [
+            "06 20 23"
+          ],
+          "snippet": "SECTION 06 20 23 INTERIOR FINISH CARPENTRY  PART 1 - GENERAL  1.1 SUMMARY A. Section Includes 1. Interior trim including"
+        },
+        {
+          "rank": 2,
+          "page": 192,
+          "rrf": 0.0161,
+          "hit": [
+            "06 20 23"
+          ],
+          "snippet": "B Moldings for Opaque Finish (Painted Finish) Made to patterns included in MMPAs WM/Series Softwood Moulding Patterns 1 "
+        },
+        {
+          "rank": 3,
+          "page": 200,
+          "rrf": 0.0159,
+          "hit": [],
+          "snippet": "check measurements of assemblies against field measurements indicated on Shop Drawings before disassembling for shipment"
+        },
+        {
+          "rank": 4,
+          "page": 193,
+          "rrf": 0.0156,
+          "hit": [
+            "06 20 23"
+          ],
+          "snippet": "5 Coordinate interior finish carpentry with materials and systems in or adjacent to it   Provide cutouts for mechanical "
+        },
+        {
+          "rank": 5,
+          "page": 194,
+          "rrf": 0.0152,
+          "hit": [],
+          "snippet": "SECTION 06 22 00 \u2013 MILLWORK  PART 1 GENERAL  1 01 SCOPE  A Furnish all labor, materials, equipment and supervision neces"
+        }
+      ]
+    },
+    {
+      "id": "q40",
+      "text": "Painting requirements throughout the building",
+      "difficulty": "cross_csi",
+      "relevant": [
+        "09 91 13",
+        "09 91 23"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 2,
+      "csi_covered": [
+        "09 91 23"
+      ],
+      "csi_missing": [
+        "09 91 13"
+      ],
+      "recall": 0.5,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 346,
+          "rrf": 0.0306,
+          "hit": [
+            "09 91 23"
+          ],
+          "snippet": "SECTION 09 91 23 INTERIOR PAINTING  PART 1 - GENERAL  1.1 RELATED DOCUMENTS A Drawings and general provisions of the Con"
+        },
+        {
+          "rank": 2,
+          "page": 4,
+          "rrf": 0.0152,
+          "hit": [],
+          "snippet": "09 30 13 Ceramic Tiling 09 30 13 1-7 09 51 23 Acoustical Tile Ceilings 09 51 23 1-4 09 54 46 Open Cell Acoustical Ceilin"
+        }
+      ]
+    },
+    {
+      "id": "q41",
+      "text": "Site work \u2014 paving, marking, parking",
+      "difficulty": "cross_csi",
+      "relevant": [
+        "32 12 16",
+        "32 17 13",
+        "32 17 23"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 3,
+      "csi_covered": [
+        "32 12 16",
+        "32 17 23"
+      ],
+      "csi_missing": [
+        "32 17 13"
+      ],
+      "recall": 0.6666666666666666,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 370,
+          "rrf": 0.0323,
+          "hit": [
+            "32 17 23"
+          ],
+          "snippet": "1 Color As indicated on drawings B Pavement Marking Paint, Acrylic. Acrylic, waterborne emulsion lead and chromate free "
+        },
+        {
+          "rank": 2,
+          "page": 369,
+          "rrf": 0.0161,
+          "hit": [
+            "32 17 23"
+          ],
+          "snippet": "SECTION 32 17 23 PAVEMENT MARKINGS  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Painted markings applied to aspha"
+        },
+        {
+          "rank": 3,
+          "page": 362,
+          "rrf": 0.0143,
+          "hit": [
+            "32 12 16"
+          ],
+          "snippet": "SECTION 32 12 16 ASPHALT PAVING  PART 1 - GENERAL  1.1 SUMMARY A Section Includes   1 Hot-mix asphalt paving   2 Hot-mix"
+        }
+      ]
+    },
+    {
+      "id": "q42",
+      "text": "Wood-related sections in the spec",
+      "difficulty": "cross_csi",
+      "relevant": [
+        "06 10 00",
+        "06 16 00",
+        "06 20 23",
+        "06 22 00",
+        "06 73 00",
+        "08 14 16"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 8,
+      "csi_covered": [
+        "06 10 00",
+        "06 20 23"
+      ],
+      "csi_missing": [
+        "06 16 00",
+        "06 22 00",
+        "06 73 00",
+        "08 14 16"
+      ],
+      "recall": 0.3333333333333333,
+      "rank_of_first_hit": 3,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 196,
+          "rrf": 0.0284,
+          "hit": [],
+          "snippet": "E Cabinet manufacturer shall have a proven history of producing fine quality millwork. If   requested by the Architect, "
+        },
+        {
+          "rank": 2,
+          "page": 194,
+          "rrf": 0.0263,
+          "hit": [],
+          "snippet": "SECTION 06 22 00 \u2013 MILLWORK  PART 1 GENERAL  1 01 SCOPE  A Furnish all labor, materials, equipment and supervision neces"
+        },
+        {
+          "rank": 3,
+          "page": 181,
+          "rrf": 0.0164,
+          "hit": [
+            "06 10 00"
+          ],
+          "snippet": "SECTION 06 10 00 ROUGH CARPENTRY  PART 1 - GENERAL  1.1 SUMMARY A Section Includes 1 Framing with dimension lumber 2 Fra"
+        },
+        {
+          "rank": 4,
+          "page": 191,
+          "rrf": 0.0161,
+          "hit": [
+            "06 20 23"
+          ],
+          "snippet": "SECTION 06 20 23 INTERIOR FINISH CARPENTRY  PART 1 - GENERAL  1.1 SUMMARY A. Section Includes 1. Interior trim including"
+        },
+        {
+          "rank": 5,
+          "page": 106,
+          "rrf": 0.0161,
+          "hit": [],
+          "snippet": "Environmental Response, Compensation and Liability Act of 1980 (CERCLA) or Environmental Protection Agency (EPA) regulat"
+        }
+      ]
+    },
+    {
+      "id": "q43",
+      "text": "Building envelope \u2014 barriers, insulation, sealants",
+      "difficulty": "cross_csi",
+      "relevant": [
+        "07 21 00",
+        "07 25 00",
+        "07 26 00",
+        "07 92 00",
+        "07 92 19"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 7,
+      "csi_covered": [
+        "07 21 00",
+        "07 25 00",
+        "07 26 00",
+        "07 92 19"
+      ],
+      "csi_missing": [
+        "07 92 00"
+      ],
+      "recall": 0.8,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 213,
+          "rrf": 0.032,
+          "hit": [
+            "07 25 00"
+          ],
+          "snippet": "SECTION 07 25 00 WEATHER BARRIERS 1 1 SUMMARY A Section Includes 1 Building paper 2 Building wrap 3 Drainage wrap 4 Flex"
+        },
+        {
+          "rank": 2,
+          "page": 208,
+          "rrf": 0.0288,
+          "hit": [
+            "07 21 00"
+          ],
+          "snippet": "SECTION 07 21 00 THERMAL INSULATION  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Extruded polystyrene foam-plasti"
+        },
+        {
+          "rank": 3,
+          "page": 214,
+          "rrf": 0.0161,
+          "hit": [
+            "07 25 00"
+          ],
+          "snippet": "D Drainage Wrap ASTM E2556/E2556M Type I dimensional water-resistive barrier that also creates a drainage plane with fla"
+        },
+        {
+          "rank": 4,
+          "page": 251,
+          "rrf": 0.0152,
+          "hit": [],
+          "snippet": "SECTION 07 92 00 JOINT SEALANTS  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Silicone joint sealants 2 Nonstainin"
+        },
+        {
+          "rank": 5,
+          "page": 258,
+          "rrf": 0.0149,
+          "hit": [],
+          "snippet": "1 Field-Adhesion Testing Field test joint-sealant adhesion to joint substrates as follows  a Extent of Testing Test comp"
+        }
+      ]
+    },
+    {
+      "id": "q50",
+      "text": "What are the toilet accessories and partitions?",
+      "difficulty": "ambiguous",
+      "relevant": [
+        "10 28 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 5,
+      "csi_covered": [
+        "10 28 00"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 352,
+          "rrf": 0.031,
+          "hit": [
+            "10 28 00"
+          ],
+          "snippet": "SECTION 10 28 00 TOILET BATH, AND LAUNDRY ACCESSORIES  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Public-use was"
+        },
+        {
+          "rank": 2,
+          "page": 353,
+          "rrf": 0.0306,
+          "hit": [
+            "10 28 00"
+          ],
+          "snippet": "PART 2 - PRODUCTS  2.1 PERFORMANCE REQUIREMENTS A Electrical Components Devices, and Accessories Listed and labeled as d"
+        },
+        {
+          "rank": 3,
+          "page": 116,
+          "rrf": 0.0159,
+          "hit": [],
+          "snippet": "SECTION 01 50 00 \u2013 CONSTRUCTION FACILITIES AND TEMPORARY CONTROLS  PART I GENERAL  1 01 UTILITIES SERVICES FOR CONSTRUCT"
+        },
+        {
+          "rank": 4,
+          "page": 355,
+          "rrf": 0.0149,
+          "hit": [
+            "10 28 00"
+          ],
+          "snippet": "F Mirror Unit 1 Manufacturers Subject to compliance with requirements, provide products by one of the following a ASI-Am"
+        },
+        {
+          "rank": 5,
+          "page": 184,
+          "rrf": 0.0149,
+          "hit": [],
+          "snippet": "2.4 DIMENSION LUMBER FRAMING A Non Load Bearing Interior Partitions by Grade No 2 grade 1 Application All interior parti"
+        }
+      ]
+    },
+    {
+      "id": "q51",
+      "text": "Window specifications",
+      "difficulty": "ambiguous",
+      "relevant": [
+        "08 41 13"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 1,
+      "csi_covered": [],
+      "csi_missing": [
+        "08 41 13"
+      ],
+      "recall": 0.0,
+      "rank_of_first_hit": null,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 298,
+          "rrf": 0.0135,
+          "hit": [],
+          "snippet": "SECTION 08 80 00 GLAZING  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Glass products 2 Insulating glass 3 Glazing"
+        }
+      ]
+    },
+    {
+      "id": "q52",
+      "text": "Flooring specifications",
+      "difficulty": "ambiguous",
+      "relevant": [
+        "09 30 13",
+        "09 65 19"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 1,
+      "csi_covered": [
+        "09 65 19"
+      ],
+      "csi_missing": [
+        "09 30 13"
+      ],
+      "recall": 0.5,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 340,
+          "rrf": 0.0147,
+          "hit": [
+            "09 65 19"
+          ],
+          "snippet": "SECTION 09 65 19 RESILIENT TILE FLOORING  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Solid vinyl floor tile  1 2"
+        }
+      ]
+    },
+    {
+      "id": "q53",
+      "text": "Wall finishes",
+      "difficulty": "ambiguous",
+      "relevant": [
+        "09 29 00",
+        "09 91 23"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 1,
+      "csi_covered": [],
+      "csi_missing": [
+        "09 29 00",
+        "09 91 23"
+      ],
+      "recall": 0.0,
+      "rank_of_first_hit": null,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 312,
+          "rrf": 0.0164,
+          "hit": [],
+          "snippet": "SECTION 08 95 16 WALL VENTS  PART 1 - GENERAL  1 1 SUMMARY A Section includes wall vents  1 2 ACTION SUBMITTALS A Produc"
+        }
+      ]
+    },
+    {
+      "id": "q54",
+      "text": "What's required for life safety?",
+      "difficulty": "ambiguous",
+      "relevant": [
+        "07 84 13",
+        "07 84 43"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 0,
+      "csi_covered": [],
+      "csi_missing": [
+        "07 84 13",
+        "07 84 43"
+      ],
+      "recall": 0.0,
+      "rank_of_first_hit": null,
+      "top_5_chunks": []
+    },
+    {
+      "id": "q60",
+      "text": "Specifications for both door hardware and door finishes",
+      "difficulty": "compound",
+      "relevant": [
+        "08 71 00",
+        "08 14 16",
+        "09 91 23"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 14,
+      "csi_covered": [
+        "08 14 16",
+        "08 71 00"
+      ],
+      "csi_missing": [
+        "09 91 23"
+      ],
+      "recall": 0.6666666666666666,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 268,
+          "rrf": 0.032,
+          "hit": [
+            "08 14 16"
+          ],
+          "snippet": "SECTION 08 14 16 FLUSH WOOD DOORS  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Five-ply flush wood veneer-faced d"
+        },
+        {
+          "rank": 2,
+          "page": 296,
+          "rrf": 0.0318,
+          "hit": [
+            "08 71 00"
+          ],
+          "snippet": "3 8 DOOR HARDWARE SCHEDULE A Hardware Set 1 (Double Glass Doors) Each door to have the following \u2022 8 Hinges \u2022 2 Door Clo"
+        },
+        {
+          "rank": 3,
+          "page": 286,
+          "rrf": 0.0318,
+          "hit": [
+            "08 71 00"
+          ],
+          "snippet": "submissions of product data, Samples, and Shop Drawings Coordinate submission of door hardware schedule with scheduling "
+        },
+        {
+          "rank": 4,
+          "page": 284,
+          "rrf": 0.0297,
+          "hit": [
+            "08 71 00"
+          ],
+          "snippet": "SECTION 08 71 00 DOOR HARDWARE PART 1 - GENERAL 1.1 SUMMARY A Section Includes   1 Hinges   2 Self-closing hinges and pi"
+        },
+        {
+          "rank": 5,
+          "page": 285,
+          "rrf": 0.0292,
+          "hit": [
+            "08 71 00"
+          ],
+          "snippet": "1 Conference participants must include Installers Architectural Hardware Consultant and Owners security consultant B Key"
+        }
+      ]
+    },
+    {
+      "id": "q61",
+      "text": "Insulation and weather barriers for the wall assembly",
+      "difficulty": "compound",
+      "relevant": [
+        "07 21 00",
+        "07 25 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 9,
+      "csi_covered": [
+        "07 21 00",
+        "07 25 00"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 3,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 97,
+          "rrf": 0.0164,
+          "hit": [],
+          "snippet": "SECTION 01 32 50 \u2013 WEATHER DELAYS  PART 1 GENERAL  1 01 DESCRIPTION  A Work Included Prepare and submit request for exte"
+        },
+        {
+          "rank": 2,
+          "page": 116,
+          "rrf": 0.0161,
+          "hit": [],
+          "snippet": "SECTION 01 50 00 \u2013 CONSTRUCTION FACILITIES AND TEMPORARY CONTROLS  PART I GENERAL  1 01 UTILITIES SERVICES FOR CONSTRUCT"
+        },
+        {
+          "rank": 3,
+          "page": 208,
+          "rrf": 0.0159,
+          "hit": [
+            "07 21 00"
+          ],
+          "snippet": "SECTION 07 21 00 THERMAL INSULATION  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Extruded polystyrene foam-plasti"
+        },
+        {
+          "rank": 4,
+          "page": 212,
+          "rrf": 0.0154,
+          "hit": [
+            "07 21 00"
+          ],
+          "snippet": "3 3 INSTALLATION OF INSULATION IN FRAMED CONSTRUCTION A Blanket Insulation Install in cavities formed by framing members"
+        },
+        {
+          "rank": 5,
+          "page": 228,
+          "rrf": 0.0152,
+          "hit": [],
+          "snippet": "2 Cut substrate board to fit tight around penetrations and projections and to fit tight to intersecting sloping roof dec"
+        }
+      ]
+    },
+    {
+      "id": "q62",
+      "text": "Concrete masonry walls plus stone veneer",
+      "difficulty": "compound",
+      "relevant": [
+        "04 22 00",
+        "04 43 13"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 2,
+      "csi_covered": [
+        "04 43 13"
+      ],
+      "csi_missing": [
+        "04 22 00"
+      ],
+      "recall": 0.5,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 169,
+          "rrf": 0.0328,
+          "hit": [
+            "04 43 13"
+          ],
+          "snippet": "SECTION 04 43 13 16 ADHERED STONE MASONRY VENEER  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Stone masonry adher"
+        },
+        {
+          "rank": 2,
+          "page": 173,
+          "rrf": 0.0135,
+          "hit": [
+            "04 43 13"
+          ],
+          "snippet": "H Place weep holes in joints where moisture may accumulate including above shelf angles   and at flashing    1 Use mesh "
+        }
+      ]
+    },
+    {
+      "id": "q63",
+      "text": "Asphalt paving and pavement markings",
+      "difficulty": "compound",
+      "relevant": [
+        "32 12 16",
+        "32 17 23"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 7,
+      "csi_covered": [
+        "32 12 16",
+        "32 17 23"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 370,
+          "rrf": 0.0325,
+          "hit": [
+            "32 17 23"
+          ],
+          "snippet": "1 Color As indicated on drawings B Pavement Marking Paint, Acrylic. Acrylic, waterborne emulsion lead and chromate free "
+        },
+        {
+          "rank": 2,
+          "page": 362,
+          "rrf": 0.0317,
+          "hit": [
+            "32 12 16"
+          ],
+          "snippet": "SECTION 32 12 16 ASPHALT PAVING  PART 1 - GENERAL  1.1 SUMMARY A Section Includes   1 Hot-mix asphalt paving   2 Hot-mix"
+        },
+        {
+          "rank": 3,
+          "page": 369,
+          "rrf": 0.0313,
+          "hit": [
+            "32 17 23"
+          ],
+          "snippet": "SECTION 32 17 23 PAVEMENT MARKINGS  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Painted markings applied to aspha"
+        },
+        {
+          "rank": 4,
+          "page": 366,
+          "rrf": 0.0295,
+          "hit": [
+            "32 12 16"
+          ],
+          "snippet": "D Finish Rolling Finish roll paved surfaces to remove roller marks while hot-mix asphalt is    still warm E Edge Shaping"
+        },
+        {
+          "rank": 5,
+          "page": 363,
+          "rrf": 0.0277,
+          "hit": [
+            "32 12 16"
+          ],
+          "snippet": "PART 2 - PRODUCTS  2.1 AGGREGATES A Mineral Filler ASTM D242/D242M or AASHTO M 17 rock or slag dust hydraulic cement or "
+        }
+      ]
+    },
+    {
+      "id": "q70",
+      "text": "GWB partition specs",
+      "difficulty": "abbrev",
+      "relevant": [
+        "09 29 00"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 1,
+      "csi_covered": [],
+      "csi_missing": [
+        "09 29 00"
+      ],
+      "recall": 0.0,
+      "rank_of_first_hit": null,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 154,
+          "rrf": 0.0154,
+          "hit": [],
+          "snippet": "3 Wire Size for Cross Rods 0.148-inch (3.77-mm) diameter 4 Spacing of Cross Rods Not more than 16 inches (407 mm) o.c. 5"
+        }
+      ]
+    },
+    {
+      "id": "q71",
+      "text": "Spec for ACT ceilings",
+      "difficulty": "abbrev",
+      "relevant": [
+        "09 51 23",
+        "09 54 46"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 4,
+      "csi_covered": [
+        "09 51 23",
+        "09 54 46"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 331,
+          "rrf": 0.0164,
+          "hit": [
+            "09 54 46"
+          ],
+          "snippet": "5 ASTM E795 Standard Practices for Mounting Test Specimens During     Sound Absorption Tests 6 International Building Co"
+        },
+        {
+          "rank": 2,
+          "page": 333,
+          "rrf": 0.0156,
+          "hit": [
+            "09 54 46"
+          ],
+          "snippet": "d) Equal products from the following manufacturer are also acceptable     a. Armstrong, or third Manufacturer as approve"
+        },
+        {
+          "rank": 3,
+          "page": 327,
+          "rrf": 0.0149,
+          "hit": [
+            "09 51 23"
+          ],
+          "snippet": "PART 2 - PRODUCTS  2 1 PERFORMANCE REQUIREMENTS  A Surface Burning Characteristics Comply with ASTM E84, testing by a qu"
+        },
+        {
+          "rank": 4,
+          "page": 328,
+          "rrf": 0.0147,
+          "hit": [
+            "09 51 23"
+          ],
+          "snippet": "C Direct-Hung, Double-Web Suspension System. Main and cross runners roll formed from and capped with cold-rolled steel s"
+        }
+      ]
+    },
+    {
+      "id": "q72",
+      "text": "VCT or LVT flooring",
+      "difficulty": "abbrev",
+      "relevant": [
+        "09 65 19"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 1,
+      "csi_covered": [
+        "09 65 19"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 340,
+          "rrf": 0.0296,
+          "hit": [
+            "09 65 19"
+          ],
+          "snippet": "SECTION 09 65 19 RESILIENT TILE FLOORING  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Solid vinyl floor tile  1 2"
+        }
+      ]
+    },
+    {
+      "id": "q73",
+      "text": "MFI or HM door specifications",
+      "difficulty": "abbrev",
+      "relevant": [
+        "08 14 16"
+      ],
+      "candidates_total": 20,
+      "candidates_in_spec": 7,
+      "csi_covered": [
+        "08 14 16"
+      ],
+      "csi_missing": [],
+      "recall": 1.0,
+      "rank_of_first_hit": 1,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 268,
+          "rrf": 0.032,
+          "hit": [
+            "08 14 16"
+          ],
+          "snippet": "SECTION 08 14 16 FLUSH WOOD DOORS  PART 1 - GENERAL  1 1 SUMMARY A Section Includes 1 Five-ply flush wood veneer-faced d"
+        },
+        {
+          "rank": 2,
+          "page": 273,
+          "rrf": 0.0161,
+          "hit": [
+            "08 14 16"
+          ],
+          "snippet": "2 Machine doors for hardware 3 Seal edges of doors, edges of cutouts, and mortises after fitting and machining 4 Clearan"
+        },
+        {
+          "rank": 3,
+          "page": 271,
+          "rrf": 0.0159,
+          "hit": [
+            "08 14 16"
+          ],
+          "snippet": "a Species As Scheduled b Cut Rotary cut c Match between Veneer Leaves Book match d Room Match 1) Provide door faces of c"
+        },
+        {
+          "rank": 4,
+          "page": 288,
+          "rrf": 0.0154,
+          "hit": [],
+          "snippet": "door will take at least 5 seconds to move to a position of 12 degrees from the latch 5 Adjust spring hinges so that, fro"
+        },
+        {
+          "rank": 5,
+          "page": 292,
+          "rrf": 0.0152,
+          "hit": [],
+          "snippet": "1 Manufacturers Subject to compliance with requirements provide products by one   of the following   a dormakaba USA Inc"
+        }
+      ]
+    },
+    {
+      "id": "q90",
+      "text": "Elevator car capacity and machine room requirements",
+      "difficulty": "no_match",
+      "relevant": [],
+      "candidates_total": 20,
+      "candidates_in_spec": 1,
+      "csi_covered": [],
+      "csi_missing": [],
+      "recall": null,
+      "rank_of_first_hit": null,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 353,
+          "rrf": 0.0318,
+          "hit": [],
+          "snippet": "PART 2 - PRODUCTS  2.1 PERFORMANCE REQUIREMENTS A Electrical Components Devices, and Accessories Listed and labeled as d"
+        }
+      ]
+    },
+    {
+      "id": "q91",
+      "text": "Cooling tower water treatment specifications",
+      "difficulty": "no_match",
+      "relevant": [],
+      "candidates_total": 20,
+      "candidates_in_spec": 1,
+      "csi_covered": [],
+      "csi_missing": [],
+      "recall": null,
+      "rank_of_first_hit": null,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 163,
+          "rrf": 0.0154,
+          "hit": [],
+          "snippet": "a Cemex S.A.B. de C.V b Holcim (US) Inc c Sakrete, CRH Americas Oldcastle APG  E Preblended Dry Mortar Mix Packaged blen"
+        }
+      ]
+    },
+    {
+      "id": "q92",
+      "text": "Site stormwater detention pond requirements",
+      "difficulty": "no_match",
+      "relevant": [],
+      "candidates_total": 20,
+      "candidates_in_spec": 1,
+      "csi_covered": [],
+      "csi_missing": [],
+      "recall": null,
+      "rank_of_first_hit": null,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 94,
+          "rrf": 0.0137,
+          "hit": [],
+          "snippet": "1 07 STORM WATER DISCHARGE PERMIT A If Construction Operations will disturb the ground the Contractor must file a Notice"
+        }
+      ]
+    },
+    {
+      "id": "q93",
+      "text": "Solar panel specifications and installation",
+      "difficulty": "no_match",
+      "relevant": [],
+      "candidates_total": 20,
+      "candidates_in_spec": 3,
+      "csi_covered": [],
+      "csi_missing": [],
+      "recall": null,
+      "rank_of_first_hit": null,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 221,
+          "rrf": 0.0152,
+          "hit": [],
+          "snippet": "B Nominal Thickness Not less than 5/16 inch (8 mm) C Pattern 12 inch (300 mm) , 16 inch (400 mm) , or 24 inch (600 mm ) "
+        },
+        {
+          "rank": 2,
+          "page": 316,
+          "rrf": 0.0149,
+          "hit": [],
+          "snippet": "1 Prefilling At open joints and damaged surface areas use setting-type taping   compound 2 Embedding and First Coat For "
+        },
+        {
+          "rank": 3,
+          "page": 358,
+          "rrf": 0.0147,
+          "hit": [],
+          "snippet": "*   TN Valley Metals *   Mitchell Metals  2 2 COMPONENTS  A. Deck beam, and column components shall be 6063 alloy T6 ext"
+        }
+      ]
+    },
+    {
+      "id": "q94",
+      "text": "Kitchen equipment specifications",
+      "difficulty": "no_match",
+      "relevant": [],
+      "candidates_total": 20,
+      "candidates_in_spec": 0,
+      "csi_covered": [],
+      "csi_missing": [],
+      "recall": null,
+      "rank_of_first_hit": null,
+      "top_5_chunks": []
+    },
+    {
+      "id": "q95",
+      "text": "Audio-visual equipment installation",
+      "difficulty": "no_match",
+      "relevant": [],
+      "candidates_total": 20,
+      "candidates_in_spec": 1,
+      "csi_covered": [],
+      "csi_missing": [],
+      "recall": null,
+      "rank_of_first_hit": null,
+      "top_5_chunks": [
+        {
+          "rank": 1,
+          "page": 334,
+          "rrf": 0.0145,
+          "hit": [],
+          "snippet": "b) Proper designs for both supply air and return air, maintenance of the HVAC     filters and building interior space ar"
+        }
+      ]
+    }
+  ]
+}
