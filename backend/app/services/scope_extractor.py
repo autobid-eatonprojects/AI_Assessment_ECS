@@ -272,10 +272,14 @@ async def _extract_one_query(
     )
 
     t0 = time.perf_counter()
+    # Cache the tool schema. Each scope run makes ~3 calls per division
+    # × ~14 relevant divisions = ~42 calls — cache pays for itself starting
+    # at call 2.
+    cached_tool = {**_EXTRACT_TOOL, "cache_control": {"type": "ephemeral"}}
     response = await client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=8192,
-        tools=[_EXTRACT_TOOL],
+        tools=[cached_tool],
         tool_choice={"type": "tool", "name": "extract_scope_items"},
         messages=[{"role": "user", "content": prompt}],
     )

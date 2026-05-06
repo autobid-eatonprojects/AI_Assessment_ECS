@@ -120,10 +120,14 @@ async def _vote_once(
     client, item: CandidateItem, framing: str, project_id: str
 ) -> tuple[dict, Usage, int]:
     t0 = time.perf_counter()
+    # Cache the tool schema. The framing string varies across the 3 votes
+    # so it stays in the user message (uncached); the schema is reused
+    # across thousands of validator calls per run.
+    cached_tool = {**_VALIDATE_TOOL, "cache_control": {"type": "ephemeral"}}
     msg = await client.messages.create(
         model=settings.classifier_model,  # Haiku 4.5
         max_tokens=512,
-        tools=[_VALIDATE_TOOL],
+        tools=[cached_tool],
         tool_choice={"type": "tool", "name": "judge_scope_item"},
         messages=[
             {"role": "user", "content": _build_validate_prompt(item, framing)}

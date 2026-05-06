@@ -156,10 +156,14 @@ def _build_prompt(ctx: _ItemCtx) -> str:
 
 async def _judge_one(client, ctx: _ItemCtx, project_id: str) -> tuple[list[dict], float]:
     t0 = time.perf_counter()
+    # Cache the tool schema across the per-item judge calls in this run.
+    # ~600 items per project means cache hit on calls 2..N — break-even
+    # at 2 calls, so essentially every project benefits.
+    cached_tool = {**_LINK_JUDGE_TOOL, "cache_control": {"type": "ephemeral"}}
     msg = await client.messages.create(
         model=settings.classifier_model,  # Haiku 4.5
         max_tokens=2048,
-        tools=[_LINK_JUDGE_TOOL],
+        tools=[cached_tool],
         tool_choice={"type": "tool", "name": "judge_citations"},
         messages=[{"role": "user", "content": _build_prompt(ctx)}],
     )

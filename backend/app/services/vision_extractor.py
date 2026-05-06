@@ -364,7 +364,17 @@ async def extract_page(
                 # 4.6's 64k output cap and gives headroom for the densest
                 # pages we've seen.
                 max_tokens=16384,
-                system=SYSTEM_PROMPT,
+                # Cache the system prompt + tool schema so every page in a
+                # drawing set reuses the cached prefix. Sonnet 4.6's 1024-
+                # token minimum is satisfied by SYSTEM_PROMPT (~600 tok) +
+                # _EXTRACT_TOOL JSON schema (~2k tok).
+                system=[
+                    {
+                        "type": "text",
+                        "text": SYSTEM_PROMPT,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
                 tools=[_EXTRACT_TOOL],
                 tool_choice={"type": "tool", "name": "extract_page"},
                 messages=[{"role": "user", "content": user_blocks}],

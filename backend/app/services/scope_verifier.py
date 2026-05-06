@@ -175,10 +175,13 @@ async def _verify_one(
 ) -> tuple[ScopeItem, dict | None, Usage, int]:
     async with sem:
         t0 = time.perf_counter()
+        # Cache the tool schema across flagged items in this run. Opus
+        # has a 1024-tok cache minimum which the schema satisfies.
+        cached_tool = {**_VERIFY_TOOL, "cache_control": {"type": "ephemeral"}}
         msg = await client.messages.create(
             model=_VERIFIER_MODEL,
             max_tokens=2048,
-            tools=[_VERIFY_TOOL],
+            tools=[cached_tool],
             tool_choice={"type": "tool", "name": "judge_and_revise"},
             messages=[{"role": "user", "content": _build_prompt(flagged)}],
         )

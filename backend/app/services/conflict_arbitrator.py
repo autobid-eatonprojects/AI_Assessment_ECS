@@ -229,10 +229,14 @@ def _eligible_for_auto(ctx: _ArbCtx) -> bool:
 
 async def _arbitrate_one(client, ctx: _ArbCtx, project_id: str) -> tuple[dict, float]:
     t0 = time.perf_counter()
+    # Cache the tool schema. Opus has a 1024-tok cache minimum which the
+    # schema satisfies; per-conflict prompts vary so the user message
+    # stays uncached.
+    cached_tool = {**_ARBITRATE_TOOL, "cache_control": {"type": "ephemeral"}}
     msg = await client.messages.create(
         model=_ARBITRATOR_MODEL,
         max_tokens=1024,
-        tools=[_ARBITRATE_TOOL],
+        tools=[cached_tool],
         tool_choice={"type": "tool", "name": "arbitrate_conflict"},
         messages=[{"role": "user", "content": _build_prompt(ctx)}],
     )

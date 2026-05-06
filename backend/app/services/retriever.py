@@ -43,10 +43,36 @@ async def hybrid_retrieve(
     project_id: str,
     query: str,
     top_k: int = 50,
+    *,
+    filter: dict | None = None,
 ) -> list[RetrievedChunk]:
-    """Run dense + sparse, fuse with RRF, hydrate with chunk rows."""
-    dense_results = await embedder.query_collection(project_id, query, top_k=top_k)
+    """Run dense + sparse, fuse with RRF, hydrate with chunk rows.
+
+    `filter` is a dict of {column: value} pairs ANDed into the dense lookup
+    and post-applied to the sparse results. Used by bid coverage to scope a
+    query to a single bid document, and by the discipline agents to scope
+    to one CSI section.
+    """
+    dense_results = await embedder.query_chunks(
+        db, project_id, query, top_k=top_k, where=filter
+    )
     sparse_results = bm25_index.search(project_id, query, top_k=top_k)
+    # Sparse results are unfiltered — apply the same filter post-hoc by
+    # joining against the chunks the dense filter would have allowed.
+    if filter and sparse_results:
+        allowed_ids = {cid for cid, _, _ in dense_results}
+        # Also pull any sparse-only IDs that match the filter via SQL
+        # (since dense may have missed them).
+        from sqlalchemy import select as sql_select
+        candidate_ids = [cid for cid, _ in sparse_results]
+        if candidate_ids:
+            q = sql_select(Chunk.id).where(Chunk.id.in_(candidate_ids))
+            for col, val in filter.items():
+                if hasattr(Chunk, col):
+                    q = q.where(getattr(Chunk, col) == val)
+            allowed = (await db.execute(q)).scalars().all()
+            allowed_ids = allowed_ids.union(allowed)
+        sparse_results = [(cid, s) for cid, s in sparse_results if cid in allowed_ids]
 
     dense_scores = {cid: s for cid, s, _ in dense_results}
     sparse_scores = {cid: s for cid, s in sparse_results}

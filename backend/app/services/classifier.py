@@ -508,10 +508,15 @@ async def classify(
         settings.classifier_model,
     )
 
+    # Cache the tool schema (~15KB, well over Haiku's 4096-token min) so
+    # every doc in a session reuses the cached prefix. Cache miss on first
+    # call costs 1.25× input, every subsequent call costs 0.1× — break-even
+    # at N=2 docs. Realistic projects classify 10-50 docs.
+    cached_tool = {**tool, "cache_control": {"type": "ephemeral"}}
     response = await client.messages.create(
         model=settings.classifier_model,
         max_tokens=512,
-        tools=[tool],
+        tools=[cached_tool],
         tool_choice={"type": "tool", "name": "classify_document"},
         messages=[{"role": "user", "content": content}],
     )

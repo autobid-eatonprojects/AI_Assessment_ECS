@@ -14,7 +14,10 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_port: int = 8000
 
-    database_url: str = "sqlite+aiosqlite:///./data/app.db"
+    # Postgres 16+ with the pgvector extension — single store for relational
+    # rows + ACID joins to embedding vectors. Override via DATABASE_URL env
+    # to point at a managed Postgres (Supabase / RDS / Neon) in production.
+    database_url: str = "postgresql+asyncpg://nvp@localhost:5432/ecs_estimator"
     storage_root: Path = Path("./data/uploads")
 
     dev_user_email: str = "admin@ecs.local"
@@ -43,10 +46,13 @@ class Settings(BaseSettings):
     google_api_key: str | None = None
     gemini_vision_model: str = "gemini-2.5-pro"
 
-    # Phase 3 — Indexing + Retrieval (Cohere Embed v4 + Cohere Rerank 3)
+    # Phase 3 — Indexing + Retrieval
+    # Embeddings: voyage-3-large (1024d) per the design doc — best published
+    # AEC retrieval scores. Cohere Rerank 3 still does cross-encoder rerank.
     openai_api_key: str | None = None  # reserved for future / fallback
-    embedding_model: str = "embed-v4.0"
-    embedding_dim: int = 1536
+    voyage_api_key: str | None = None
+    embedding_model: str = "voyage-3-large"
+    embedding_dim: int = 1024
 
     cohere_api_key: str | None = None
     rerank_model: str = "rerank-v3.5"

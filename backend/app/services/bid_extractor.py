@@ -260,10 +260,13 @@ async def extract_one_bid(
     )
 
     t0 = time.perf_counter()
+    # Cache the tool schema across bids in this run. Even small projects
+    # have multiple bids; cache pays for itself starting at bid #2.
+    cached_tool = {**_EXTRACT_TOOL, "cache_control": {"type": "ephemeral"}}
     msg = await client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=8192,
-        tools=[_EXTRACT_TOOL],
+        tools=[cached_tool],
         tool_choice={"type": "tool", "name": "extract_bid"},
         messages=[{"role": "user", "content": prompt}],
     )

@@ -31,6 +31,9 @@ from dataclasses import dataclass
 
 from sqlalchemy import select
 
+import hashlib
+
+from ..config import settings as app_settings
 from ..database import SessionLocal
 from ..models import (
     Document,
@@ -297,6 +300,56 @@ async def _persist_results(
     return candidates_total, validated_total, deduped_total
 
 
+async def _compute_input_pdf_hash(project_id: str) -> str:
+    """SHA-256 over all project_document SHA-256s in lexical order.
+
+    Captures the project's input state: any change to a document's content
+    (which would change its sha256) flips this hash. Used together with
+    model_versions to make runs deterministic-input for drift detection.
+    """
+    async with SessionLocal() as db:
+        rows = (
+            await db.execute(
+                select(Document.sha256)
+                .where(Document.project_id == project_id)
+                .where(Document.source == "project_document")
+                .order_by(Document.sha256)
+            )
+        ).scalars().all()
+    h = hashlib.sha256()
+    for sha in rows:
+        h.update(sha.encode("ascii"))
+        h.update(b"\n")
+    return h.hexdigest()
+
+
+def _capture_model_versions() -> dict:
+    """Snapshot every model the pipeline currently uses.
+
+    Recorded on the run row so a future re-run with different model
+    versions produces a comparable diff (model change vs. input change).
+    """
+    return {
+        # Extraction + validation
+        "extractor": "claude-sonnet-4-6",
+        "validator": app_settings.classifier_model,
+        "verifier": "claude-opus-4-7",
+        "schedule_miner": app_settings.classifier_model,
+        # Stage 3
+        "link_judge": app_settings.classifier_model,
+        "conflict_arbitrator": "claude-opus-4-7",
+        # Phase 1/2
+        "classifier": app_settings.classifier_model,
+        "vision": app_settings.vision_model,
+        "vision_provider": app_settings.vision_provider,
+        # Phase 3 (retrieval)
+        "embedding_model": app_settings.embedding_model,
+        "embedding_dim": app_settings.embedding_dim,
+        "rerank_model": app_settings.rerank_model,
+        "contextualizer_model": app_settings.contextualizer_model,
+    }
+
+
 async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
     """Orchestrate Phase 4.3 end-to-end. Persists a ScopeExtractionRun row."""
     # Pre-conditions
@@ -336,6 +389,11 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
     if not divisions_to_process:
         raise ScopeRunnerUnavailable("no relevant divisions to process")
 
+    # Reproducibility snapshot — pinned at run start so even if config or
+    # env vars change mid-run, this row knows exactly what was used.
+    pdf_hash = await _compute_input_pdf_hash(project_id)
+    model_versions = _capture_model_versions()
+
     # Create the run row
     async with SessionLocal() as db:
         run = ScopeExtractionRun(
@@ -350,11 +408,18 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
                 "votes_per_candidate": 3,
                 "dedupe_threshold": 0.92,
             },
+            model_versions=model_versions,
+            input_pdf_hash=pdf_hash,
         )
         db.add(run)
         await db.commit()
         await db.refresh(run)
         run_id = run.id
+
+    log.info(
+        "scope_runner: reproducibility — input_pdf_hash=%s, model_versions=%s",
+        pdf_hash[:12], list(model_versions.keys()),
+    )
 
     log.info(
         "scope_runner: starting run %s for project %s — %d divisions",

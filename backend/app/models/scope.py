@@ -57,6 +57,15 @@ class ScopeExtractionRun(Base):
     # Reproducibility — snapshot of config at run start
     config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
+    # Reproducibility (per design doc P10) — captures the exact model IDs
+    # used for every stage of this run + a SHA-256 over all project document
+    # SHA-256s. Re-running with the same input PDFs and pinned models is
+    # expected to produce identical output (within model nondeterminism).
+    # Drift detection: if model_versions changes between two runs, the
+    # diff in scope items is attributable to model change, not input change.
+    model_versions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    input_pdf_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
     # Stage 6 — trust score (4-component substitution)
     trust_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     trust_score_components: Mapped[dict | None] = mapped_column(JSON, nullable=True)

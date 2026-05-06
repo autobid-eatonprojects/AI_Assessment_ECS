@@ -261,10 +261,13 @@ async def _score_one_pair(
     )
     async with sem:
         t0 = time.perf_counter()
+        # Cache the tool schema across (scope × bid) pairs in this run.
+        # ~600 pairs per project means cache hit on calls 2..N.
+        cached_tool = {**_COVERAGE_TOOL, "cache_control": {"type": "ephemeral"}}
         msg = await client.messages.create(
             model=settings.classifier_model,  # Haiku 4.5
             max_tokens=512,
-            tools=[_COVERAGE_TOOL],
+            tools=[cached_tool],
             tool_choice={"type": "tool", "name": "judge_coverage"},
             messages=[{"role": "user", "content": prompt}],
         )
