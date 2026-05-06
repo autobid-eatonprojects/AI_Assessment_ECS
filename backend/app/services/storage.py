@@ -32,6 +32,12 @@ class StorageService:
     def absolute_path(self, relative_path: str) -> Path:
         return self.root / relative_path
 
+    def relative_path(self, absolute_path: Path | str) -> str:
+        """Inverse of absolute_path — used when a service produces a derived
+        artifact (e.g. Office → PDF conversion) and we need to store the
+        new path on the Document row."""
+        return str(Path(absolute_path).resolve().relative_to(self.root.resolve()))
+
     def delete(self, relative_path: str) -> None:
         p = self.absolute_path(relative_path)
         if p.exists():

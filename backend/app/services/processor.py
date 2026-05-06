@@ -462,6 +462,56 @@ async def process_document(document_id: str) -> None:
         filename = doc.filename
         upload_source = doc.source  # 'project_document' | 'bid_submission'
 
+    # 0. Office-format conversion (Phase 11.5). PyMuPDF + our renderer can
+    # only read PDFs and images. If a user uploaded a .doc, .docx, .ppt,
+    # .pptx, .odt, .rtf, etc., shell out to LibreOffice headless and
+    # convert to PDF first. The original is preserved on disk; the
+    # Document.storage_path is repointed to the converted PDF so every
+    # downstream stage sees a normal PDF.
+    from .office_converter import (
+        OfficeConverterUnavailable,
+        convert_to_pdf,
+        is_office_format,
+    )
+
+    if is_office_format(source_path):
+        await _set_status(document_id, "converting")
+        try:
+            pdf_path = await convert_to_pdf(
+                source_path, output_dir=source_path.parent / "_converted"
+            )
+            # Repoint the document at the converted PDF for the rest of the
+            # pipeline. Keep filename + size_bytes referencing the upload
+            # for UI honesty (the user uploaded a .doc, not a .pdf).
+            new_rel = storage.relative_path(pdf_path)
+            async with SessionLocal() as db:
+                d = await db.get(Document, document_id)
+                if d is not None:
+                    d.storage_path = new_rel
+                    d.content_type = "application/pdf"
+                    await db.commit()
+            source_path = pdf_path
+            content_type = "application/pdf"
+            log.info(
+                "processor: converted Office %s → PDF for downstream processing",
+                filename,
+            )
+        except OfficeConverterUnavailable as e:
+            log.warning("processor: office conversion unavailable: %s", e)
+            await _set_status(
+                document_id,
+                "failed",
+                error=(
+                    f"office conversion: {e}. Re-upload as PDF or install "
+                    "LibreOffice on the server."
+                ),
+            )
+            return
+        except Exception as e:  # noqa: BLE001
+            log.exception("processor: office conversion failed for %s", filename)
+            await _set_status(document_id, "failed", error=f"office conversion: {e}")
+            return
+
     # 1. Classify (taxonomy depends on which side uploaded it)
     needs_api_key = False
     await _set_status(document_id, "classifying")
