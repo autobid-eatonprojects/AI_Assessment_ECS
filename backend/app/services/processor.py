@@ -102,28 +102,51 @@ async def _persist_classification(document_id: str, c: classifier.Classification
 
 async def _persist_pages(document_id: str, pages: list[renderer.RenderedPage]) -> None:
     async with SessionLocal() as db:
-        # Wipe any prior pages for idempotency
-        result = await db.execute(
-            select(DocumentPage).where(DocumentPage.document_id == document_id)
-        )
-        for old in result.scalars().all():
-            await db.delete(old)
-        await db.flush()
-
-        for p in pages:
-            native = (p.native_text or "").strip()
-            db.add(
-                DocumentPage(
-                    document_id=document_id,
-                    page_number=p.page_number,
-                    width=p.width,
-                    height=p.height,
-                    image_path=str(p.image_path.relative_to(storage.root)),
-                    thumbnail_path=str(p.thumbnail_path.relative_to(storage.root)),
-                    text_content=native or None,
-                    text_source="pymupdf" if native else None,
-                )
+        existing = (
+            await db.execute(
+                select(DocumentPage).where(DocumentPage.document_id == document_id)
             )
+        ).scalars().all()
+
+        # Resume guard: if pages already exist with the same count, the
+        # renderer already ran successfully on this document — don't wipe
+        # OCR text and per-page extractions just to re-insert identical
+        # rows. Previously this wipe was unconditional, which caused
+        # /resume to lose ~30 minutes of OCR work on every retry.
+        # Mismatched count means renderer ran with a different page set
+        # (corrupt PDF / mid-render abort), so we still wipe-and-reinsert
+        # in that case to keep DocumentPage rows aligned with the source.
+        if existing and len(existing) == len(pages):
+            log.info(
+                "processor: %d pages already persisted for doc %s — "
+                "skipping wipe (true resume)",
+                len(existing), document_id,
+            )
+        else:
+            if existing:
+                log.info(
+                    "processor: persisted page count mismatch (had %d, render "
+                    "produced %d) — wiping for re-insert",
+                    len(existing), len(pages),
+                )
+            for old in existing:
+                await db.delete(old)
+            await db.flush()
+
+            for p in pages:
+                native = (p.native_text or "").strip()
+                db.add(
+                    DocumentPage(
+                        document_id=document_id,
+                        page_number=p.page_number,
+                        width=p.width,
+                        height=p.height,
+                        image_path=str(p.image_path.relative_to(storage.root)),
+                        thumbnail_path=str(p.thumbnail_path.relative_to(storage.root)),
+                        text_content=native or None,
+                        text_source="pymupdf" if native else None,
+                    )
+                )
 
         result = await db.execute(select(Document).where(Document.id == document_id))
         doc = result.scalar_one_or_none()
@@ -745,6 +768,48 @@ async def process_document(document_id: str) -> None:
         extraction_error = (
             f"{extraction_error}; indexing: {e}" if extraction_error else f"indexing: {e}"
         )
+
+    # Status='ready' guard: for drawing-set docs only mark ready when
+    # every per-page extraction reached a terminal state (ready or
+    # failed). Without this, the doc shows as ready while the UI
+    # still has 5+ pages spinning in 'extracting' — the symptom you'd
+    # see is "Why is it ready when not all pages are done?".
+    async with SessionLocal() as db:
+        from sqlalchemy import func as sql_func
+
+        n_pe_total = (
+            await db.execute(
+                select(sql_func.count(PageExtraction.id))
+                .where(PageExtraction.document_id == document_id)
+            )
+        ).scalar() or 0
+        n_pe_terminal = (
+            await db.execute(
+                select(sql_func.count(PageExtraction.id))
+                .where(PageExtraction.document_id == document_id)
+                .where(PageExtraction.status.in_(("ready", "failed")))
+            )
+        ).scalar() or 0
+
+    if n_pe_total > 0 and n_pe_total != n_pe_terminal:
+        # Some per-page extractions still in flight (likely stuck because
+        # the asyncio task died mid-flight). Keep the document in
+        # 'extracting' so the UI shows the truth and /resume can finish
+        # them. The per-page batch above will be re-driven on next resume.
+        log.warning(
+            "processor: %s — %d/%d page extractions terminal; staying "
+            "'extracting' rather than marking ready",
+            filename, n_pe_terminal, n_pe_total,
+        )
+        await _set_status(
+            document_id,
+            "extracting",
+            error=(
+                extraction_error
+                or f"only {n_pe_terminal}/{n_pe_total} per-page extractions reached terminal state"
+            ),
+        )
+        return
 
     await _set_status(document_id, "ready", error=extraction_error)
 

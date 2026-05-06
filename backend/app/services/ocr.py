@@ -242,7 +242,29 @@ async def ocr_image(image_path: Path, *, preprocess: bool | None = None) -> OCRR
     `preprocess`: None (default) = auto-detect via scan_preprocessor heuristic
     (low-res or low-contrast pages get cleaned). True = force preprocess.
     False = skip (useful when the caller already passed a clean render).
+
+    Retry-on-empty: if all providers return empty text on the first try,
+    re-run once with forced preprocessing (deskew + Sauvola + despeckle)
+    in case the rendered image had contrast/skew issues that confused
+    OCR. The cost is a second API call per failing page; on a typical
+    spec book this fires for ~5% of pages, not 30% (the previous bug
+    where Gemini's empty result was preferred over Mistral's good text).
     """
+    result = await _ocr_image_inner(image_path, preprocess=preprocess)
+    if result.text.strip() or preprocess is True:
+        return result
+    # Empty result + preprocessing wasn't already forced → retry once
+    # with preprocessing on. Most "blank page" results recover here.
+    log.info(
+        "ocr: %s came back empty; retrying with forced preprocessing",
+        image_path.name,
+    )
+    return await _ocr_image_inner(image_path, preprocess=True)
+
+
+async def _ocr_image_inner(image_path: Path, *, preprocess: bool | None = None) -> OCRResult:
+    """Internal: single OCR pass (one set of provider calls). Wrapped
+    by ocr_image() which adds retry-on-empty."""
     # Optional scan preprocessing — runs deskew + Sauvola binarize + despeckle
     # for pages that look like scanned spec books. Skipped on clean
     # high-res renders (drawings rendered from native PDFs).
@@ -305,8 +327,15 @@ async def ocr_image(image_path: Path, *, preprocess: bool | None = None) -> OCRR
     # 2+ providers succeeded — vote. Pick the longer output as canonical
     # (longer usually = more text recovered, less truncation), and flag
     # the page if the providers disagree significantly.
-    longest_name, longest = max(successes, key=lambda x: len(x[1].text))
-    other_text = next(r.text for n, r in successes if n != longest_name)
+    # Empty-text guard: if one provider returns "" (Gemini occasionally
+    # does on dense spec pages — we've seen ~30% empty rate without this),
+    # prefer ANY non-empty result over the empty one regardless of length.
+    non_empty = [(n, r) for n, r in successes if r.text.strip()]
+    if non_empty:
+        longest_name, longest = max(non_empty, key=lambda x: len(x[1].text))
+    else:
+        longest_name, longest = max(successes, key=lambda x: len(x[1].text))
+    other_text = next((r.text for n, r in successes if n != longest_name), "")
     disagreement = _normalized_edit_distance(longest.text, other_text)
     flagged = disagreement >= _DISAGREEMENT_FLAG_THRESHOLD
 
