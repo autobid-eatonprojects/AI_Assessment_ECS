@@ -38,6 +38,8 @@ _NEW_COLUMNS_BY_TABLE: dict[str, dict[str, str]] = {
     },
     "projects": {
         "lifecycle_state": "VARCHAR(32) NOT NULL DEFAULT 'setup'",
+        # Stage 6 — mirror of latest run's trust score for the project list page
+        "trust_score_latest": "FLOAT",
     },
     "document_pages": {
         # Per-page text content for the chunker — populated by PyMuPDF or OCR
@@ -51,6 +53,33 @@ _NEW_COLUMNS_BY_TABLE: dict[str, dict[str, str]] = {
         # Phase 7 Opus reflection pass
         "verifier_status": "VARCHAR(16)",
         "verifier_review": "JSON",
+        # Stage 2 — bilateral evidence + tier
+        "evidence_tier": "VARCHAR(32)",
+        "bilateral_evidence": "BOOLEAN",
+        "trust_components": "JSON",
+        # Stage 4 — trade bundling
+        "package_id": "VARCHAR(36)",
+    },
+    "scope_citations": {
+        # Stage 1 — evidence type denormalized at write time so bilateral
+        # evidence rollup is a single GROUP BY (no JOIN through chunks).
+        # drawing | spec | bid | other (derived from documents.doc_type)
+        "evidence_type": "VARCHAR(32)",
+        "doc_type_at_capture": "VARCHAR(64)",
+        # Stage 3 — link judge per-citation entailment
+        "is_link_judge_pass": "BOOLEAN",
+        "link_judge_score": "FLOAT",
+    },
+    "scope_extraction_runs": {
+        # Stage 6 — trust score + run-level rollups
+        "trust_score": "FLOAT",
+        "trust_score_components": "JSON",
+        "bilateral_coverage_rate": "FLOAT",
+        "link_judge_pass_rate": "FLOAT",
+        "spec_section_coverage_rate": "FLOAT",
+        "conflict_count": "INTEGER",
+        "gap_count": "INTEGER",
+        "package_count": "INTEGER",
     },
 }
 

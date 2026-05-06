@@ -31,6 +31,7 @@ def _to_out(project: Project) -> ProjectOut:
         document_count=len(project.documents),
         project_document_count=project_doc_count,
         bid_submission_count=bid_count,
+        trust_score_latest=project.trust_score_latest,
     )
 
 

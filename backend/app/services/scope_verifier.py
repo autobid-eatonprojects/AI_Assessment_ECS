@@ -20,9 +20,9 @@ and returns one of three verdicts:
   - rejected  : evidence does NOT support the item; mark for soft-delete
 
 We deliberately don't run Opus on green items — most of the value is in
-catching the validator's misses, and Opus on 600 items would be
-prohibitively expensive ($15-25). For Elks's ~30-50 flagged items the
-cost is ~$1-2.
+catching the validator's misses, and Opus on every item would be
+prohibitively expensive (~$15-25 on a 600-item run). On a typical project
+the flagged subset is ~5-10% of items, so the verifier costs ~$1-2.
 
 Audit: every Opus output (verdict + reasoning + revised values) is
 persisted to ScopeItem.verifier_review JSON; the verdict itself goes to

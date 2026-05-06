@@ -11,7 +11,8 @@ bbox area → SF). Reading the scale bar from a drawing is brittle and
 the failure modes are silent — we'd rather honestly mark items
 `unverified` than fabricate a number.
 
-Cost: 0 (no LLM calls). Latency: <1s for the full Elks set (~600 items).
+Cost: 0 (no LLM calls). Latency: <1s for typical small commercial projects
+(~600 items); scales sub-linearly with item count.
 """
 
 from __future__ import annotations

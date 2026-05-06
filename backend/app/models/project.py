@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, String, Text
+from sqlalchemy import DateTime, Float, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
@@ -34,6 +34,10 @@ class Project(Base):
     lifecycle_state: Mapped[str] = mapped_column(
         String(32), nullable=False, default="setup"
     )
+
+    # Stage 6 — mirror of latest scope run's trust score, for the project list
+    # page. Refreshed by the trust score service after each run.
+    trust_score_latest: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(

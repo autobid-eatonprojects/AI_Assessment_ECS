@@ -17,6 +17,10 @@ class ScopeCitationOut(BaseModel):
     rerank_score: float | None
     extraction_query: str | None
     excerpt: str | None
+    # Stage 1/3 — denormalized source-type + link-judge entailment
+    evidence_type: str | None = None
+    is_link_judge_pass: bool | None = None
+    link_judge_score: float | None = None
 
 
 class ScopeItemOut(BaseModel):
@@ -46,6 +50,14 @@ class ScopeItemOut(BaseModel):
     verifier_status: str | None = None
     verifier_review: dict | None = None
 
+    # Stage 2 — bilateral evidence + tier
+    evidence_tier: str | None = None
+    bilateral_evidence: bool | None = None
+    trust_components: dict | None = None
+
+    # Stage 4 — trade bundling
+    package_id: str | None = None
+
     citations: list[ScopeCitationOut]
 
     created_at: datetime
@@ -73,6 +85,28 @@ class ScopeRunOut(BaseModel):
     total_latency_ms: int
 
     config: dict | None
+
+    # Stage 6 — trust score + run-level rollups
+    trust_score: float | None = None
+    trust_score_components: dict | None = None
+    bilateral_coverage_rate: float | None = None
+    link_judge_pass_rate: float | None = None
+    spec_section_coverage_rate: float | None = None
+    conflict_count: int | None = None
+    gap_count: int | None = None
+    package_count: int | None = None
+
+
+class TrustScoreOut(BaseModel):
+    """Trust score view for the dashboard / scope page header."""
+
+    score: float
+    tier: str
+    components: dict
+    weights: dict
+    tier_thresholds: dict
+    dropped_components: list[str] = []
+    rationale: str = ""
 
 
 class ScopeOverview(BaseModel):

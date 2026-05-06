@@ -33,18 +33,26 @@ from sqlalchemy import select
 
 from ..database import SessionLocal
 from ..models import (
+    Document,
     ProjectProfile,
     ScopeCitation,
     ScopeExtractionRun,
     ScopeItem,
     TradeDivisionRelevance,
 )
+from .bilateral_evidence import classify_run as classify_bilateral
+from .conflict_arbitrator import arbitrate_run as arbitrate_conflicts
+from .conflict_detector import detect_run as detect_conflicts
 from .csi_grounder import ground_code
+from .gap_detector import detect_gaps
+from .link_judge import judge_run as judge_links
 from .project_profiler import get_or_create_profile
 from .quantity_resolver import resolve_quantities
 from .schedule_miner import mine_schedules
 from .scope_deduper import dedupe
 from .scope_verifier import verify_low_confidence
+from .trade_bundler import bundle_run as bundle_packages
+from .trust_score import compute_run as compute_trust_score
 from .scope_extractor import (
     CandidateItem,
     ScopeExtractorUnavailable,
@@ -184,6 +192,21 @@ async def _bump_progress(
         await db.commit()
 
 
+def _evidence_type_for_doc_type(doc_type: str | None) -> str:
+    """Map a Document.doc_type to a ScopeCitation.evidence_type bucket.
+
+    Used so the bilateral-evidence rollup (Stage 2) can be a single GROUP BY
+    on scope_citations rather than a JOIN through chunks → documents.
+    """
+    if doc_type == "drawing-set":
+        return "drawing"
+    if doc_type == "written-spec":
+        return "spec"
+    if doc_type in ("bid-quote", "scope-letter"):
+        return "bid"
+    return "other"
+
+
 async def _persist_results(
     run_id: str,
     project_id: str,
@@ -195,6 +218,23 @@ async def _persist_results(
     validated_total = 0
     deduped_total = 0
     async with SessionLocal() as db:
+        # Pre-load doc_type for every chunk's source document so each
+        # citation insert can stamp evidence_type without an N+1 lookup.
+        chunk_doc_ids: set[str] = set()
+        for d in division_results:
+            for cand in d.accepted:
+                for r in cand.supporting_chunks:
+                    if r.chunk.document_id:
+                        chunk_doc_ids.add(r.chunk.document_id)
+        doc_type_by_id: dict[str, str | None] = {}
+        if chunk_doc_ids:
+            doc_rows = await db.execute(
+                select(Document.id, Document.doc_type).where(
+                    Document.id.in_(chunk_doc_ids)
+                )
+            )
+            doc_type_by_id = {row[0]: row[1] for row in doc_rows.all()}
+
         for d in division_results:
             candidates_total += d.candidates_total
             validated_total += len(d.accepted)
@@ -237,6 +277,7 @@ async def _persist_results(
                 for r in cand.supporting_chunks:
                     chunk = r.chunk
                     extra = chunk.extra or {}
+                    src_doc_type = doc_type_by_id.get(chunk.document_id) if chunk.document_id else None
                     db.add(
                         ScopeCitation(
                             scope_item_id=item.id,
@@ -248,6 +289,8 @@ async def _persist_results(
                             rerank_score=r.rerank_score,
                             extraction_query=cand.found_by_query,
                             excerpt=(chunk.text[:240] if chunk.text else None),
+                            evidence_type=_evidence_type_for_doc_type(src_doc_type),
+                            doc_type_at_capture=src_doc_type,
                         )
                     )
         await db.commit()
@@ -414,9 +457,82 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
         verifier_cost,
     )
 
+    # Stage F2 — Link judge (per-citation entailment via Haiku 4.5).
+    # First pass that operates on the actual cited chunks rather than
+    # retrieved candidates. Catches "good item, wrong citation" cases.
+    judged_count, pass_count, link_judge_cost = await judge_links(run_id)
+    log.info(
+        "scope_runner: link judge — %d/%d citations passed (%.0f%%), $%.3f",
+        pass_count,
+        judged_count,
+        (pass_count / judged_count * 100) if judged_count else 0,
+        link_judge_cost,
+    )
+
+    # Stage F3 — Conflict detection. Pure embedding clustering; no LLM cost.
+    # Surfaces within-CSI qty/unit disagreements + cross-division overlaps.
+    conflict_rollup = await detect_conflicts(run_id)
+    log.info(
+        "scope_runner: conflicts — qty=%d unit=%d cross_div=%d",
+        conflict_rollup.qty_mismatch,
+        conflict_rollup.unit_mismatch,
+        conflict_rollup.cross_division,
+    )
+
+    # Stage F4 — Conflict auto-arbitration (Opus 4.7). Picks winners for
+    # high-confidence clusters; ambiguous cases stay status='open' for HITL.
+    arbitrated, deferred, arbitration_cost = await arbitrate_conflicts(run_id)
+    log.info(
+        "scope_runner: arbitrated %d / deferred %d to HITL, $%.3f",
+        arbitrated,
+        deferred,
+        arbitration_cost,
+    )
+
+    # Stage F5 — Bilateral evidence + tier classification. Now that link
+    # judge has populated is_link_judge_pass, the EXPLICITLY_CITED tier
+    # check is fully effective.
+    tier_counts = await classify_bilateral(run_id)
+    log.info("scope_runner: bilateral evidence — %s", tier_counts)
+
+    # Stage G — Trade bundling. AGC-style rollup of items into bid packages,
+    # driven by app/data/bundling_rules.yaml + per-project overrides. Pure
+    # SQL. Idempotent (re-runnable).
+    bundle_stats = await bundle_packages(run_id)
+    log.info(
+        "scope_runner: bundling — %d packages, %d items, %d unbundled",
+        bundle_stats.packages_created,
+        bundle_stats.items_assigned,
+        bundle_stats.unbundled_items,
+    )
+
+    # Stage H — Gap detection. Surfaces missing divisions/sections,
+    # one-sided items, and unresolved cross-references as Gap rows for
+    # the HITL queue. No LLM calls.
+    gap_stats = await detect_gaps(run_id)
+    log.info(
+        "scope_runner: gaps — missing_div=%d missing_sec=%d "
+        "unilateral=%d cross_ref=%d",
+        gap_stats.missing_division,
+        gap_stats.missing_section,
+        gap_stats.unilateral_evidence,
+        gap_stats.unresolved_cross_reference,
+    )
+
+    # Stage I — Trust score. 4-component weighted score persisted on the
+    # run row + mirrored to Project.trust_score_latest. No LLM calls.
+    trust = await compute_trust_score(run_id)
+    log.info(
+        "scope_runner: trust score = %.3f (%s)", trust.score, trust.tier
+    )
+
     # Compute final cost from llm_calls for this run window
     total_cost = (
-        sum(d.cost_usd for d in division_results) + schedule_cost + verifier_cost
+        sum(d.cost_usd for d in division_results)
+        + schedule_cost
+        + verifier_cost
+        + link_judge_cost
+        + arbitration_cost
     )
 
     async with SessionLocal() as db:

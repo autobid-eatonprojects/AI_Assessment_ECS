@@ -15,7 +15,9 @@ import { DocumentUpload } from "@/components/document-upload";
 import { LifecycleBanner } from "@/components/lifecycle-banner";
 import { ProjectProfileCard } from "@/components/project-profile-card";
 import { ScopeOfWorkCard } from "@/components/scope-of-work-card";
-import { SearchBar } from "@/components/search-bar";
+// SearchBar is now rendered by AppShell on every project route, so it
+// no longer needs to be duplicated here. Keeping the import path noted in
+// case a project-page-specific search ever returns.
 import { TradeRelevanceCard } from "@/components/trade-relevance-card";
 import { Button } from "@/components/ui/button";
 import {
@@ -120,10 +122,6 @@ function ProjectDetail({ projectId }: { projectId: string }) {
           <BidAnalysisCard projectId={projectId} />
         </div>
       )}
-
-      <div className="mb-6">
-        <SearchBar projectId={projectId} />
-      </div>
 
       <Tabs defaultValue={inBids ? "bids" : "project-docs"} className="w-full">
         <TabsList>

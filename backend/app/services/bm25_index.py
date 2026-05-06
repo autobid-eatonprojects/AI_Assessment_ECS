@@ -1,8 +1,10 @@
 """Per-project BM25 sparse index, persisted to JSON.
 
 Catches exact codes / identifiers that dense embeddings can miss
-(e.g. NFPA 13, ASTM E1264, TY3121, S1.1, F6.0). Tokenisation is plain
-lower-case alphanumeric splits — good enough for engineering callouts.
+(e.g. code references like "NFPA 13" / "ASTM E1264", manufacturer model
+numbers, sheet IDs like "S1.1", schedule mark IDs like "F6.0").
+Tokenisation is plain lower-case alphanumeric splits — good enough for
+engineering callouts.
 """
 
 from __future__ import annotations

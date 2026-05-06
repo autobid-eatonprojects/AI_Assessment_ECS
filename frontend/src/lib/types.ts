@@ -11,6 +11,8 @@ export interface Project {
   document_count: number;
   project_document_count: number;
   bid_submission_count: number;
+  // Stage 6 — mirror of latest scope run's trust score
+  trust_score_latest: number | null;
 }
 
 export type DocType =
@@ -226,6 +228,10 @@ export interface ScopeCitation {
   rerank_score: number | null;
   extraction_query: string | null;
   excerpt: string | null;
+  // Stage 1/3 — denormalized source-type + link-judge entailment
+  evidence_type: "drawing" | "spec" | "bid" | "other" | null;
+  is_link_judge_pass: boolean | null;
+  link_judge_score: number | null;
 }
 
 export type QtyConfidence = "high" | "medium" | "conflicting" | "unverified";
@@ -264,6 +270,12 @@ export interface ScopeItem {
   qty_provenance: Record<string, unknown> | null;
   verifier_status: VerifierStatus | null;
   verifier_review: VerifierReview | null;
+  // Stage 2 — bilateral evidence + tier
+  evidence_tier: EvidenceTier | null;
+  bilateral_evidence: boolean | null;
+  trust_components: Record<string, unknown> | null;
+  // Stage 4 — trade bundling
+  package_id: string | null;
   citations: ScopeCitation[];
   created_at: string;
   updated_at: string;
@@ -516,4 +528,156 @@ export interface User {
 
 export interface ApiError {
   detail: string | { msg: string }[];
+}
+
+// ----- Stage 3+ — review queue / packages / trust score / audit -----
+
+export type EvidenceTier =
+  | "EXPLICITLY_CITED"
+  | "INFERRED_HIGH_CONFIDENCE"
+  | "INFERRED_LOW_CONFIDENCE";
+
+export type ConflictType =
+  | "qty_mismatch"
+  | "unit_mismatch"
+  | "spec_contradiction"
+  | "cross_division_overlap";
+
+export type ConflictStatus = "open" | "resolved" | "deferred" | "ignored";
+
+export type GapType =
+  | "missing_division"
+  | "missing_section"
+  | "unilateral_evidence"
+  | "unresolved_cross_reference";
+
+export type GapSeverity = "blocker" | "warn" | "info";
+
+export interface ConflictMember {
+  id: string;
+  scope_item_id: string;
+  role: "primary" | "contradictor";
+  citation_id: string | null;
+  is_winner: boolean | null;
+}
+
+export interface ConflictItemSummary {
+  id: string;
+  csi_code: string;
+  csi_division: string;
+  description: string;
+  quantity: string | null;
+  unit: string | null;
+  confidence: number;
+  evidence_tier: EvidenceTier | null;
+}
+
+export interface Conflict {
+  id: string;
+  project_id: string;
+  run_id: string;
+  conflict_type: ConflictType;
+  csi_division: string | null;
+  status: ConflictStatus;
+  arbitrated_value: Record<string, unknown> | null;
+  arbitration_reasoning: string | null;
+  arbitrator: string | null;
+  created_at: string;
+  resolved_at: string | null;
+  members: ConflictMember[];
+  item_snapshots: ConflictItemSummary[];
+}
+
+export interface Gap {
+  id: string;
+  project_id: string;
+  run_id: string;
+  gap_type: GapType;
+  csi_division: string | null;
+  csi_section: string | null;
+  description: string;
+  severity: GapSeverity;
+  suggested_remediation: string | null;
+  related_item_id: string | null;
+  status: "open" | "acknowledged" | "resolved";
+  created_at: string;
+  acknowledged_at: string | null;
+}
+
+export interface TradePackage {
+  id: string;
+  project_id: string;
+  run_id: string;
+  package_key: string;
+  package_label: string;
+  csi_divisions: string[] | null;
+  bundling_rule_source: "yaml" | "override";
+  item_count: number;
+  bilateral_count: number;
+  avg_confidence: number | null;
+  narrative_md: string | null;
+  created_at: string;
+}
+
+export interface TradePackageDetail extends TradePackage {
+  items_by_section: {
+    csi_section: string;
+    section_title: string | null;
+    items: ScopeItem[];
+  }[];
+}
+
+export interface TrustScore {
+  score: number;
+  tier: "GREEN" | "YELLOW" | "RED";
+  components: {
+    bilateral_coverage?: number;
+    extraction_confidence_avg?: number;
+    link_judge_pass_rate?: number;
+    spec_section_coverage?: number;
+  };
+  weights: Record<string, number>;
+  tier_thresholds: Record<string, number>;
+  dropped_components: string[];
+  rationale: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  project_id: string;
+  run_id: string | null;
+  entity_type: string;
+  entity_id: string | null;
+  action: string;
+  actor: string;
+  payload: Record<string, unknown> | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface AppSettings {
+  classifier_model: string;
+  vision_model: string;
+  vision_provider: string;
+  vision_concurrency: number;
+  embedding_model: string;
+  rerank_model: string;
+  contextualizer_model: string;
+  index_concurrency: number;
+  page_dpi: number;
+  thumbnail_max_dim: number;
+  default_theme: "light" | "dark" | "system";
+  provider_keys_configured: Record<string, boolean>;
+  overrides_in_use: string[];
+}
+
+export interface SystemStatus {
+  backend_version: string;
+  db_path: string;
+  project_count: number;
+  document_count: number;
+  scope_run_count: number;
+  llm_call_count: number;
+  total_cost_usd: number;
+  audit_log_count: number;
 }

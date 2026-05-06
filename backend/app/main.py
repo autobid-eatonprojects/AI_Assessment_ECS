@@ -5,14 +5,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .api import (
+    audit,
     auth,
     bids,
     documents,
     extraction,
+    outputs,
+    packages,
     profile,
     projects,
+    review,
     scope,
     search,
+    settings as settings_api,
     trade_relevance,
     vendors,
 )
@@ -70,3 +75,8 @@ app.include_router(scope.router, prefix="/api")
 app.include_router(bids.router, prefix="/api")
 app.include_router(vendors.router, prefix="/api")
 app.include_router(vendors.bidleveling_router, prefix="/api")
+app.include_router(review.router, prefix="/api")
+app.include_router(packages.router, prefix="/api")
+app.include_router(audit.router, prefix="/api")
+app.include_router(settings_api.router, prefix="/api")
+app.include_router(outputs.router, prefix="/api")

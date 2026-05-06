@@ -28,7 +28,26 @@ from .profile import (
     TradeRelevanceOverrideIn,
 )
 from .project import LifecycleTransition, ProjectCreate, ProjectOut, ProjectUpdate
-from .scope import ScopeCitationOut, ScopeItemOut, ScopeOverview, ScopeRunOut
+from .review import (
+    AuditLogOut,
+    ConflictItemSummary,
+    ConflictMemberOut,
+    ConflictOut,
+    ConflictResolveIn,
+    GapAcknowledgeIn,
+    GapOut,
+    ItemReclassifyIn,
+    PackageItemMoveIn,
+    TradePackageDetailOut,
+    TradePackageOut,
+)
+from .scope import (
+    ScopeCitationOut,
+    ScopeItemOut,
+    ScopeOverview,
+    ScopeRunOut,
+    TrustScoreOut,
+)
 from .search import SearchHit, SearchRequest, SearchResponse
 from .vendor import (
     BidLevelingCell,
@@ -42,6 +61,7 @@ from .vendor import (
 )
 
 __all__ = [
+    "AuditLogOut",
     "BidAnalysisOverview",
     "BidCoverageOut",
     "BidDetailOut",
@@ -51,15 +71,23 @@ __all__ = [
     "BidRunOut",
     "BidSummaryOut",
     "BoundingBox",
+    "ConflictItemSummary",
+    "ConflictMemberOut",
+    "ConflictOut",
+    "ConflictResolveIn",
     "CrossReferenceOut",
     "DocumentExtractionOverview",
     "DocumentOut",
     "DocumentPageOut",
     "DocumentPageTextOut",
     "EntityOut",
+    "GapAcknowledgeIn",
+    "GapOut",
+    "ItemReclassifyIn",
     "LifecycleTransition",
     "LoginRequest",
     "NoteOut",
+    "PackageItemMoveIn",
     "PageExtractionIn",
     "PageExtractionOut",
     "PageExtractionSummary",
@@ -77,8 +105,11 @@ __all__ = [
     "SearchResponse",
     "TokenResponse",
     "TradeDivisionRelevanceOut",
+    "TradePackageDetailOut",
+    "TradePackageOut",
     "TradeRelevanceMatrix",
     "TradeRelevanceOverrideIn",
+    "TrustScoreOut",
     "UserOut",
     "BidLevelingCell",
     "BidLevelingResponse",

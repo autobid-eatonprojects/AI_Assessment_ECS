@@ -12,7 +12,7 @@ deep-link from the UI back to the source page.
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
@@ -56,6 +56,16 @@ class ScopeExtractionRun(Base):
 
     # Reproducibility — snapshot of config at run start
     config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    # Stage 6 — trust score (4-component substitution)
+    trust_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    trust_score_components: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    bilateral_coverage_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    link_judge_pass_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    spec_section_coverage_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    conflict_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    gap_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    package_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class ScopeItem(Base):
@@ -102,6 +112,19 @@ class ScopeItem(Base):
     verifier_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
     verifier_review: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
+    # Stage 2 — bilateral evidence + tier classification
+    #   EXPLICITLY_CITED          — bilateral=True AND high confidence AND link-judge passes
+    #   INFERRED_HIGH_CONFIDENCE  — strong support but missing one side
+    #   INFERRED_LOW_CONFIDENCE   — surfaces in HITL low-confidence queue
+    evidence_tier: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    bilateral_evidence: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    trust_components: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    # Stage 4 — trade bundling. Loose pointer to TradePackage; nullable until
+    # bundling stage runs. No hard FK to keep the model decoupled if we wipe
+    # packages without dropping items.
+    package_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+
     # Audit
     raw_extractions: Mapped[list | None] = mapped_column(JSON, nullable=True)
     validation_votes: Mapped[list | None] = mapped_column(JSON, nullable=True)
@@ -140,6 +163,18 @@ class ScopeCitation(Base):
     rerank_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     extraction_query: Mapped[str | None] = mapped_column(String(64), nullable=True)
     excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Stage 1 — denormalized source-type so bilateral evidence rollup is one
+    # GROUP BY (no JOIN through chunks → documents). Set at write time.
+    #   drawing | spec | bid | other
+    evidence_type: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    # Snapshot of documents.doc_type at the moment we persisted this citation,
+    # so future doc-type renames don't silently invalidate older runs.
+    doc_type_at_capture: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    # Stage 3 — link judge entailment per citation
+    is_link_judge_pass: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    link_judge_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 

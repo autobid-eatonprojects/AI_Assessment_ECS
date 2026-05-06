@@ -22,6 +22,7 @@ dependencies = [
     "rank-bm25>=0.2.2",
     "google-genai>=1.75.0",
     "openpyxl>=3.1.5",
+    "python-docx>=1.2.0",
 ]
 
 [dependency-groups]

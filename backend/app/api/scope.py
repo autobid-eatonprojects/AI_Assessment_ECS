@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from ..models import Project, ScopeExtractionRun, ScopeItem
-from ..schemas import ScopeItemOut, ScopeOverview, ScopeRunOut
+from ..schemas import ScopeItemOut, ScopeOverview, ScopeRunOut, TrustScoreOut
 from ..services.scope_runner import (
     ScopeRunnerUnavailable,
     schedule_scope_run,
@@ -216,3 +216,31 @@ async def get_item(
             status_code=status.HTTP_404_NOT_FOUND, detail="scope item not found"
         )
     return ScopeItemOut.model_validate(item)
+
+
+@router.get("/trust-score", response_model=TrustScoreOut | None)
+async def get_trust_score(
+    project_id: str, db: DB, _: CurrentUser
+) -> TrustScoreOut | None:
+    """Trust score for the latest run. Returns null if no run exists yet."""
+    await _ensure_project(db, project_id)
+    run = (
+        await db.execute(
+            select(ScopeExtractionRun)
+            .where(ScopeExtractionRun.project_id == project_id)
+            .order_by(ScopeExtractionRun.started_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if run is None or run.trust_score is None:
+        return None
+    payload = run.trust_score_components or {}
+    return TrustScoreOut(
+        score=run.trust_score,
+        tier=payload.get("tier") or "RED",
+        components=payload.get("components") or {},
+        weights=payload.get("weights") or {},
+        tier_thresholds=payload.get("tier_thresholds") or {},
+        dropped_components=payload.get("dropped_components") or [],
+        rationale=payload.get("rationale") or "",
+    )

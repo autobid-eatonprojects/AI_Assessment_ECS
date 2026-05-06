@@ -40,3 +40,5 @@ class ProjectOut(BaseModel):
     document_count: int = 0
     project_document_count: int = 0
     bid_submission_count: int = 0
+    # Stage 6 — mirror of latest scope run's trust score
+    trust_score_latest: float | None = None

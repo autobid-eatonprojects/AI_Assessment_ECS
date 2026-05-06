@@ -210,12 +210,14 @@ Set `target_sheet` (e.g. "S2.1"), `detail_id` if present (e.g. "5"), and \
 the `context` snippet from the drawing.
 
 5. **entities** — fine-grained tagged identifiers visible on the page:
-   - material: "4-inch concrete slab", "8\\" CMU", "R-19 batt insulation"
-   - manufacturer: "TYCO TY3121", "VICTAULIC 717", "Wilsonart 1573SL"
-   - code: "NFPA 13 2019", "ASTM E1264", "IBC 2024", "SMACNA"
-   - dimension: any explicit measurement worth tagging ("8'-0\\"", "5,200 SF")
-   - room: room/zone labels visible on plans ("CONFERENCE 201", "STORAGE B-12")
-   - equipment: equipment tags ("RTU-1", "AHU-2", "F6.0")
+   - material: e.g. concrete-slab thicknesses, CMU sizes, insulation R-values
+   - manufacturer: any brand name + model/spec combination (e.g. brand of
+     sprinkler head, fitting, finish laminate). Capture verbatim.
+   - code: any cited standard or code edition (e.g. "NFPA 13 2019",
+     "ASTM E1264", "IBC 2024", "SMACNA")
+   - dimension: any explicit measurement worth tagging
+   - room: room/zone labels visible on plans
+   - equipment: equipment tags (e.g. "RTU-1", "AHU-2", or schedule mark IDs)
    - symbol: legend symbols with their meaning
    - other: anything else worth recording
 

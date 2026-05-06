@@ -27,8 +27,9 @@ Optimizations:
    inclusions are formatted into a single context block once per bid,
    reused across all scope items in the inner loop.
 
-Cost estimate (Elks): ~600 scope items × ~5 priced bids = 3000 pairs;
-after CSI filter, ~600 pairs survive. 600 Haiku calls × $0.0005 ≈ $0.30.
+Cost estimate for a small commercial project (~600 scope items × ~5 priced
+bids = 3000 pairs): after CSI pre-filter ~600 pairs survive; 600 Haiku
+calls × ~$0.0005 ≈ $0.30. Larger projects scale roughly linearly.
 """
 
 from __future__ import annotations

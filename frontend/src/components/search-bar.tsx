@@ -97,7 +97,7 @@ export function SearchBar({ projectId }: Props) {
                 ref={inputRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder='Try "footing reinforcement", "TYCO TY3121", or "kitchen"…'
+                placeholder='Search for materials, sheet numbers, codes (e.g. "NFPA 13"), or rooms…'
                 className="flex-1 border-0 px-0 shadow-none focus-visible:ring-0"
               />
               {search.isPending && <Loader2 className="size-4 animate-spin text-muted-foreground" />}

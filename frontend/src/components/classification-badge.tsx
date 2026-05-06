@@ -51,10 +51,6 @@ export function ClassificationBadge({
   confidence: number | null;
 }) {
   const style = STYLES[docType ?? "unclassified"] ?? STYLES.other;
-  const conf =
-    confidence != null
-      ? ` · ${Math.round(confidence * 100)}%`
-      : "";
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${style.className}`}
@@ -65,7 +61,6 @@ export function ClassificationBadge({
       }
     >
       {style.label}
-      <span className="ml-1 opacity-70">{conf}</span>
     </span>
   );
 }

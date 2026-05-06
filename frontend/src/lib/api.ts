@@ -1,11 +1,15 @@
 import { useAuthStore } from "./auth";
 import type {
+  AppSettings,
+  AuditLogEntry,
   BidAnalysisOverview,
   BidCoverage,
   BidDetail,
   BidLevelingResponse,
   BidRun,
+  Conflict,
   Document,
+  Gap,
   VendorProfile,
   VendorSummary,
   DocumentExtractionOverview,
@@ -18,8 +22,12 @@ import type {
   ScopeOverview,
   ScopeRun,
   SearchResponse,
+  SystemStatus,
   TokenResponse,
+  TradePackage,
+  TradePackageDetail,
   TradeRelevanceMatrix,
+  TrustScore,
   User,
 } from "./types";
 
@@ -247,6 +255,118 @@ export const api = {
       `/api/projects/${projectId}/bid-leveling${qs}`,
     );
   },
+
+  // ----- Stage 6 — Trust score -----
+  getTrustScore: (projectId: string) =>
+    request<TrustScore | null>(`/api/projects/${projectId}/scope/trust-score`),
+
+  // ----- Stage 7 — Review queues -----
+  listConflicts: (projectId: string, status?: string) => {
+    const qs = status === undefined ? "" : `?status=${encodeURIComponent(status)}`;
+    return request<Conflict[]>(`/api/projects/${projectId}/review/conflicts${qs}`);
+  },
+  resolveConflict: (
+    projectId: string,
+    conflictId: string,
+    body: { winner_member_id: string; note?: string },
+  ) =>
+    request<Conflict>(
+      `/api/projects/${projectId}/review/conflicts/${conflictId}/resolve`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  listGaps: (
+    projectId: string,
+    opts?: { status?: string; severity?: string[] },
+  ) => {
+    const params = new URLSearchParams();
+    if (opts?.status !== undefined) params.set("status", opts.status);
+    for (const sev of opts?.severity ?? []) params.append("severity", sev);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    return request<Gap[]>(`/api/projects/${projectId}/review/gaps${qs}`);
+  },
+  acknowledgeGap: (projectId: string, gapId: string, body: { note?: string }) =>
+    request<Gap>(
+      `/api/projects/${projectId}/review/gaps/${gapId}/acknowledge`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  listLowConfidence: (projectId: string) =>
+    request<ScopeItem[]>(`/api/projects/${projectId}/review/low-confidence`),
+  reclassifyItem: (
+    projectId: string,
+    itemId: string,
+    body: { new_csi_code: string; note?: string },
+  ) =>
+    request<ScopeItem>(
+      `/api/projects/${projectId}/review/items/${itemId}/reclassify`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+
+  // ----- Stage 7 — Trade packages -----
+  listPackages: (projectId: string) =>
+    request<TradePackage[]>(`/api/projects/${projectId}/packages`),
+  getPackageDetail: (projectId: string, packageId: string) =>
+    request<TradePackageDetail>(
+      `/api/projects/${projectId}/packages/${packageId}`,
+    ),
+  movePackageItem: (
+    projectId: string,
+    fromPackageId: string,
+    itemId: string,
+    body: { target_package_id: string; note?: string },
+  ) =>
+    request<ScopeItem>(
+      `/api/projects/${projectId}/packages/${fromPackageId}/items/${itemId}/move`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+
+  // ----- Stage 7 — Audit log -----
+  listAuditLog: (
+    projectId: string,
+    opts?: { entity_type?: string; limit?: number },
+  ) => {
+    const params = new URLSearchParams();
+    if (opts?.entity_type) params.set("entity_type", opts.entity_type);
+    if (opts?.limit !== undefined) params.set("limit", String(opts.limit));
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    return request<AuditLogEntry[]>(`/api/projects/${projectId}/audit-log${qs}`);
+  },
+  listLLMCalls: (
+    projectId: string,
+    opts?: { purpose?: string; limit?: number },
+  ) => {
+    const params = new URLSearchParams();
+    if (opts?.purpose) params.set("purpose", opts.purpose);
+    if (opts?.limit !== undefined) params.set("limit", String(opts.limit));
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    return request<
+      Array<{
+        id: string;
+        purpose: string;
+        model: string;
+        provider: string;
+        prompt_tokens: number | null;
+        completion_tokens: number | null;
+        cache_read_tokens: number | null;
+        cost_usd: number | null;
+        latency_ms: number | null;
+        status: string;
+        created_at: string;
+      }>
+    >(`/api/projects/${projectId}/audit-log/llm-calls${qs}`);
+  },
+
+  // ----- Stage 8 — App settings + system status -----
+  getSettings: () => request<AppSettings>(`/api/settings`),
+  patchSettings: (body: Partial<AppSettings>) =>
+    request<AppSettings>(`/api/settings`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  providerHealth: (provider: string) =>
+    request<{ provider: string; ok: boolean; detail: string | null }>(
+      `/api/settings/health/${encodeURIComponent(provider)}`,
+    ),
+  getSystemStatus: () => request<SystemStatus>(`/api/settings/status`),
 };
 
 export { ApiError };

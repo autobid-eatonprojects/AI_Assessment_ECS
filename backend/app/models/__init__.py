@@ -1,3 +1,5 @@
+from .app_setting import AppSetting
+from .audit import AuditLog
 from .bid import (
     BidCoverage,
     BidExclusion,
@@ -19,9 +21,18 @@ from .extraction import (
 )
 from .profile import ProjectProfile, TradeDivisionRelevance
 from .project import Project
+from .review import (
+    Conflict,
+    ConflictMember,
+    Gap,
+    TradePackage,
+    TradePackageItem,
+)
 from .scope import ScopeCitation, ScopeExtractionRun, ScopeItem
 
 __all__ = [
+    "AppSetting",
+    "AuditLog",
     "BidCoverage",
     "BidExclusion",
     "BidExtractionRun",
@@ -29,12 +40,15 @@ __all__ = [
     "BidLineItem",
     "BidSummary",
     "Chunk",
+    "Conflict",
+    "ConflictMember",
     "Document",
     "DocumentPage",
     "ExtractedCrossReference",
     "ExtractedEntity",
     "ExtractedNote",
     "ExtractedSchedule",
+    "Gap",
     "LLMCall",
     "PageExtraction",
     "Project",
@@ -43,4 +57,6 @@ __all__ = [
     "ScopeExtractionRun",
     "ScopeItem",
     "TradeDivisionRelevance",
+    "TradePackage",
+    "TradePackageItem",
 ]

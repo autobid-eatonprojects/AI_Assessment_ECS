@@ -62,7 +62,7 @@ export function NewProjectDialog() {
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Elks Community Enrichment Center"
+              placeholder="e.g. Maple Street Office Renovation"
               required
             />
           </div>
@@ -72,7 +72,7 @@ export function NewProjectDialog() {
               id="desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="6,235 SF community center, Oak Ridge TN"
+              placeholder="Short summary — building type, size, location"
             />
           </div>
           <DialogFooter>
