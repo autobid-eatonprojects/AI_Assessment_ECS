@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass
@@ -43,6 +44,305 @@ log = logging.getLogger(__name__)
 
 
 _MINER_CONCURRENCY = 8
+
+
+# =============================================================================
+# Smart-miner type rules (Layer 1 of the chunker improvement plan).
+#
+# Per-schedule-type rules that constrain Haiku's output and inform
+# post-extraction validation. Goal: cut the wrong-unit + junk-row +
+# definition-vs-quantity errors that the spot-check found in the
+# previous miner runs.
+#
+# Each entry is keyed on the schedule type tag emitted by
+# schedule_extractor_typed (the [typed:X] prefix on schedule.name).
+# =============================================================================
+_TYPE_RULES: dict[str, dict] = {
+    # Door schedule — one EA per door tag, qty from row count
+    "door": {
+        "csi_division_hint": "08",
+        "default_unit": "EA",
+        "unit_overrides": {},          # No per-content overrides — every door is EA
+        "skip_predicates": ["empty_row"],
+        "guidance": (
+            "Door schedule — every row with a door tag is one bid item, unit=EA. "
+            "Skip header rows and rows that have only a tag with no description."
+        ),
+    },
+    # Window schedule — same pattern as doors
+    "window": {
+        "csi_division_hint": "08",
+        "default_unit": "EA",
+        "unit_overrides": {},
+        "skip_predicates": ["empty_row"],
+        "guidance": (
+            "Window schedule — every row with a window tag is one bid item, "
+            "unit=EA. Skip header rows."
+        ),
+    },
+    # Finish schedule — the trickiest. Two sub-types in one schedule:
+    #   (a) MATERIAL CODES (LVT1, FT1, B2, P1, etc.) — these are SPECS, not
+    #       quantity items. The QTY comes from measuring the floor plan, not
+    #       from the schedule. Treat as is_quantifiable=false unless the
+    #       schedule has an actual area/length column.
+    #   (b) ROOM ROWS (Room 101, Room 102) listing what code goes where —
+    #       these reference back to material codes, also not bid items.
+    # In both cases, the schedule itself rarely has biddable quantities.
+    "finish": {
+        "csi_division_hint": "09",
+        "default_unit": None,           # Force model to set unit per row
+        "unit_overrides": {
+            # Order matters — earlier (more-specific) patterns win first.
+            # Linear-foot items first so a "TR2: Schluter Resilient Edge" row
+            # doesn't get caught by the RESILIENT keyword in the SF group.
+            r"\b(TR[0-9]|TN[0-9]|TRANSITION|EDGE PROTECTION|SCHLUTER)\b": "LF",
+            r"\b(B[0-9]|BASE TILE|BASE TRIM|WALL BASE|RUBBER BASE)\b": "LF",
+            # SF items — wall tile / gyp board / ceilings / acoustic panels
+            r"\b(WT\d*|WALL TILE|WP\d*|WALL PANEL)\b": "SF",
+            r"\b(GWB|GB\d*|GYPSUM|DRYWALL|GYP\.|SHEETROCK)\b": "SF",
+            r"\b(ACT|CEILING TILE|ACOUSTICAL CEILING|ACOUSTIC PANEL(?:ING)?|ACOUSTIC SLATS?|ACOUSTIC GRIDS?)\b": "SF",
+            r"\b(WOOD SLATS?|DECK(?:ING)?|COMPOSITE DECK)\b": "SF",
+            # Paint — coded P1/P2 always counts; bare "PAINT" only counts when
+            # it isn't part of a door description ("paint finish/frame/grade").
+            r"\bP\d+\b|\b(?:SHERWIN|BENJAMIN MOORE)\b|\bPAINT\b(?!\s+(?:FINISH|FRAME|GRADE|TYPE|COAT|JOB))": "SF",
+            # Generic flooring keywords last — RESILIENT/VINYL show up in
+            # transition product names too, so we want the specific TR/TN
+            # patterns above to fire first. \d* lets coded SKUs match
+            # (LVT1, VCT2, FT3, CT4 ...).
+            r"\b(LVT|VCT|FT|RF|SC|CT|SEALED CONCRETE|FLOOR TILE|RESILIENT|VINYL|CARPET)\d*\b": "SF",
+        },
+        "skip_predicates": ["empty_row"],
+        "guidance": (
+            "Finish schedule — emit ONE item per material code row "
+            "(LVT1, P1, B2, TR3, WT4, etc.). Set is_quantifiable=true "
+            "and use quantity='1' as a placeholder; the GC computes "
+            "actual square/linear footage by measuring the floor plan. "
+            "Pick the unit by material kind: SF for floor/wall tile, "
+            "carpet, paint, gypsum, ceiling tile, acoustic panels; "
+            "LF for transitions and wall base; EA for cabinets and "
+            "fabricated pieces. Skip empty rows and pure header text."
+        ),
+    },
+    # Plumbing/HVAC fixture schedule — one EA per tag (toilet, lav, urinal,
+    # AHU, RTU, etc.); qty = explicit count from drawings or '1' as
+    # placeholder
+    "fixture": {
+        "csi_division_hint": "22",
+        "default_unit": "EA",
+        "unit_overrides": {},
+        "skip_predicates": ["empty_row"],
+        "guidance": (
+            "Plumbing/HVAC fixture schedule — every fixture tag is one bid "
+            "item, unit=EA. Quantity per the row's count column or '1' as "
+            "placeholder. Skip rows that are just header text."
+        ),
+    },
+    # Equipment schedule — HVAC units, electrical equipment, kitchen, etc.
+    "equipment": {
+        "csi_division_hint": None,      # depends on equipment kind
+        "default_unit": "EA",
+        "unit_overrides": {
+            # Lighting — emergency/exit signs etc. — count by EA
+            r"\b(LED|LIGHTING|FIXTURE|EMERGENCY|EXIT SIGN)\b": "EA",
+            # Bulk piping — refrigerant lines, ductwork mains, etc.
+            r"\b(REFRIGERANT LINE|REFRIGERANT PIPING|DUCTWORK MAIN)\b": "LF",
+        },
+        # circuit_no_load filters SPARE/PROVISIONAL/RESERVED slots — relevant
+        # because typed:equipment also covers electrical panels (PANEL: A1,
+        # Panel Schedule, etc.) where those placeholder rows aren't bid items.
+        "skip_predicates": ["empty_row", "circuit_no_load"],
+        "guidance": (
+            "Equipment schedule — every tagged unit is one bid item, "
+            "unit=EA unless description names a piping system (LF). "
+            "Skip rows with empty description fields, and skip rows whose "
+            "description is a placeholder (SPARE, PROVISIONAL SPACE, "
+            "RESERVED, FUTURE, NO LOAD) — those are not current bid items."
+        ),
+    },
+    # Panel schedule — circuit-by-circuit table. Most rows are NOT bid items;
+    # they're internal wiring assignments. ONLY emit items for rows that
+    # describe a connected load worth bidding (e.g. specific equipment).
+    "panel": {
+        "csi_division_hint": "26",
+        "default_unit": "EA",
+        "unit_overrides": {},
+        "skip_predicates": ["empty_row", "circuit_no_load"],
+        "guidance": (
+            "Panel schedule — IMPORTANT: most rows describe internal circuit "
+            "assignments, NOT biddable scope items. A row like 'Circuit 8 = "
+            "20A breaker, KITCHEN 116' is electrical wiring, not something a "
+            "subcontractor bids separately. ONLY emit items when a row "
+            "describes a SPECIFIC PIECE OF EQUIPMENT receiving power "
+            "(e.g. 'Circuit 22 = RECIRC PUMP'). Mark is_quantifiable=false "
+            "for circuit lookup tables that are pure wiring schematic."
+        ),
+    },
+    # Plant/landscape schedule — count column + species + caliper
+    "plant": {
+        "csi_division_hint": "32",
+        "default_unit": "EA",
+        "unit_overrides": {},
+        "skip_predicates": ["empty_row"],
+        "guidance": (
+            "Plant schedule — each row is one species at one size; quantity "
+            "comes from the row's count/quantity column."
+        ),
+    },
+    # Room schedule — references rooms by name; not a bid item itself
+    "room": {
+        "csi_division_hint": None,
+        "default_unit": None,
+        "unit_overrides": {},
+        "skip_predicates": ["empty_row"],
+        "guidance": (
+            "Room schedule — rooms are reference data, NOT bid items. Set "
+            "is_quantifiable=false."
+        ),
+    },
+}
+
+
+def _detect_schedule_type(schedule_name: str) -> str | None:
+    """Pull the [typed:X] prefix out of the schedule name. None if untyped."""
+    m = re.match(r"^\s*\[typed:([a-z]+)\]", schedule_name or "", re.IGNORECASE)
+    return m.group(1).lower() if m else None
+
+
+def _row_is_empty(row: dict, columns: list[str]) -> bool:
+    """A row is 'empty' when it has only a tag/index column populated."""
+    populated = [c for c in columns if row.get(c) not in (None, "", "<UNKNOWN>")]
+    if not populated:
+        return True
+    # Tag/identifier columns alone don't constitute a real row
+    tag_cols = {"tag", "code", "row_index", "id", "ref"}
+    non_tag = [c for c in populated if c.lower() not in tag_cols]
+    return len(non_tag) == 0
+
+
+def _row_is_color_only(row: dict, columns: list[str]) -> bool:
+    """For finish schedules: a row is 'color only' if the ONLY non-trivial
+    content is a manufacturer/SKU/color callout with no explicit quantity unit.
+
+    The test is positive: row has spec/manufacturer keywords AND no
+    measured-quantity pattern (digit immediately followed by SF/LF/CY/EA).
+    SKU numbers like "SW 7005" don't count as quantity — only a digit
+    paired with a unit token does.
+    """
+    text = " ".join(
+        str(v) for v in (row.get(c, "") for c in columns) if v
+    ).upper()
+    if not text:
+        return True
+    # Explicit measured quantity present? Then it's quantifiable.
+    if re.search(r"\b\d+(?:[\.,]\d+)?\s*(SF|LF|CY|EA|S\.F\.|L\.F\.|C\.Y\.)\b", text):
+        return False
+    # Otherwise, if any spec/manufacturer/SKU keyword is present, treat
+    # the row as a material-callout (not a bid quantity).
+    spec_keywords = (
+        "COLOR", "SKU", "MANUFACTURER", "MFR", "PATTERN", "FINISH",
+        "SHERWIN", "WILSON", "CROSSVILLE", "COBALT", "AKZO", "BENJAMIN",
+    )
+    return any(k in text for k in spec_keywords)
+
+
+_CIRCUIT_NO_LOAD_TERMS = re.compile(
+    r"\b(SPARE|PROVISIONAL\s+SPACE|PROVISIONAL|RESERVED|FUTURE|BLANK|"
+    r"NO\s+LOAD|UNUSED|EMPTY)\b",
+    re.IGNORECASE,
+)
+
+
+def _row_is_circuit_no_load(row: dict, columns: list[str]) -> bool:
+    """Panel schedule row that's just a circuit assignment with no real load.
+
+    Two cases skip:
+      1. No description / load / remarks at all — pure wiring schematic.
+      2. Description is a placeholder (SPARE / PROVISIONAL SPACE / RESERVED /
+         FUTURE / NO LOAD) — circuit position reserved for later, not a
+         current bid item.
+    """
+    desc_cols = [c for c in columns if c.lower() in ("description", "load", "remarks")]
+    desc_text = " ".join(
+        str(row.get(c) or "") for c in desc_cols
+    ).strip()
+    if not desc_text:
+        return True
+    return bool(_CIRCUIT_NO_LOAD_TERMS.search(desc_text))
+
+
+_SKIP_PREDICATES = {
+    "empty_row": _row_is_empty,
+    "color_only_row": _row_is_color_only,
+    "circuit_no_load": _row_is_circuit_no_load,
+}
+
+
+def _apply_unit_override(
+    schedule_type: str | None,
+    description: str,
+    default: str,
+) -> str:
+    """If the description matches a known unit-override pattern, return
+    the overridden unit. Else return default.
+
+    Lookup rules:
+      - typed schedule with non-empty unit_overrides → use those rules only.
+        (Don't fall through to finish-rules; that bled into door/panel rows
+        where "paint finish" / "resilient channel" would mis-fire.)
+      - typed schedule with EMPTY unit_overrides ({}) → trust the schedule's
+        default_unit (door=EA, fixture=EA, panel=EA, etc.).
+      - untyped schedule (schedule_type is None) → use finish-rules as a
+        content fallback. This is the case where transitions or base trim
+        landed in an untyped schedule and would otherwise keep a wrong unit.
+    """
+    upper = description.upper()
+    if schedule_type:
+        rules = _TYPE_RULES.get(schedule_type, {}).get("unit_overrides") or {}
+    else:
+        rules = _TYPE_RULES.get("finish", {}).get("unit_overrides", {})
+
+    for pattern, unit in rules.items():
+        if re.search(pattern, upper, re.IGNORECASE):
+            return unit
+    return default
+
+
+def _description_matches_row(description: str, row: dict, columns: list[str]) -> float:
+    """Hallucination guard: how much of the description's word content
+    actually appears in the source row?
+
+    Returns a Jaccard-like overlap ratio in [0, 1]. We skip very common
+    construction terms ("schedule", "see", "specification", etc.) so the
+    check rewards specificity: a row about EH-1 in a heater schedule needs
+    to share words like 'EH-1' or 'heater' with the description, not just
+    'schedule'.
+    """
+    row_text = " ".join(
+        str(v) for v in (row.get(c, "") for c in columns) if v not in (None, "")
+    ).upper()
+    if not row_text or not description:
+        return 0.0
+
+    common_words = {
+        "THE", "AND", "FOR", "WITH", "OF", "TO", "PER", "AT", "IN", "ON", "BY",
+        "FROM", "AS", "OR", "A", "AN", "IS", "BE", "SHALL", "PROVIDE", "INSTALL",
+        "SCHEDULE", "SEE", "DETAIL", "SHEET", "SPEC", "SPECIFICATION",
+    }
+    # Include short codes like B1/P1/WT/TR — those carry more signal than
+    # generic words. Min length of 2 with at least one alphanumeric.
+    token_re = re.compile(r"\b[A-Z0-9][A-Z0-9-/.]*\b")
+    desc_tokens = {
+        t for t in token_re.findall(description.upper())
+        if len(t) >= 2 and t not in common_words
+    }
+    row_tokens = {
+        t for t in token_re.findall(row_text)
+        if len(t) >= 2 and t not in common_words
+    }
+    if not desc_tokens:
+        return 1.0  # No specific tokens to match — neutral
+    overlap = desc_tokens & row_tokens
+    return len(overlap) / len(desc_tokens)
 
 
 # Tool schema — one Haiku call per schedule. The model decides:
@@ -244,8 +544,28 @@ async def _mine_one_schedule(
         return [], Usage(), 0
 
     prompt_body = _format_schedule_for_prompt(s, ctx.sheet_number)
+
+    # Layer 1: type-aware prompt augmentation
+    schedule_type = _detect_schedule_type(s.name)
+    type_rule = _TYPE_RULES.get(schedule_type or "")
+    type_guidance = ""
+    if type_rule and type_rule.get("guidance"):
+        type_guidance = (
+            f"\n\nSchedule type: {schedule_type}\n"
+            f"Type-specific guidance: {type_rule['guidance']}"
+        )
+        if type_rule.get("csi_division_hint"):
+            type_guidance += (
+                f"\nLikely CSI division: {type_rule['csi_division_hint']}"
+            )
+        if type_rule.get("default_unit"):
+            type_guidance += (
+                f"\nDefault unit for this schedule type: "
+                f"{type_rule['default_unit']}"
+            )
+
     prompt = (
-        f"{prompt_body}\n\n"
+        f"{prompt_body}{type_guidance}\n\n"
         "Decide whether each row is a biddable scope item. If yes, emit one "
         "items[] entry per row. If the schedule is reference data (legend, "
         "abbreviation table, calculation sheet, panel totals, code lookup, "
@@ -290,7 +610,26 @@ async def _mine_one_schedule(
     csi_code = section if section else f"{division[:2]} 00 00"
 
     default_unit = (payload.get("default_unit") or "EA").strip() or "EA"
+    if type_rule and type_rule.get("default_unit"):
+        # Trust the type rule's unit if Haiku didn't pick something specific
+        default_unit = (
+            (it_unit := payload.get("default_unit")) and it_unit.strip()
+        ) or type_rule["default_unit"]
+
+    # Layer 1 row filtering: which skip-predicates apply for this type
+    skip_predicate_names = (
+        type_rule.get("skip_predicates", []) if type_rule else []
+    )
+    active_predicates = [
+        _SKIP_PREDICATES[name]
+        for name in skip_predicate_names
+        if name in _SKIP_PREDICATES
+    ]
+
     candidates: list[CandidateItem] = []
+    skipped_empty = 0
+    skipped_hallucinated = 0
+    overridden_units = 0
 
     for it in payload.get("items", []):
         row_index = int(it.get("row_index", -1))
@@ -299,19 +638,52 @@ async def _mine_one_schedule(
         description = (it.get("description") or "").strip()
         if not description:
             continue
+
+        row = s.rows[row_index]
+
+        # Filter 1 — type-aware row skip predicates
+        if any(pred(row, s.columns) for pred in active_predicates):
+            skipped_empty += 1
+            continue
+
+        # Filter 2 — hallucination guard. The description must overlap with
+        # the source row's content above a low threshold. Without this guard
+        # we saw cases where the AI invented a "T-bar LED ceiling grid"
+        # description for a row that was actually about emergency exit signs.
+        # 0.20 is intentionally lenient — only catches gross mismatches.
+        overlap = _description_matches_row(description, row, s.columns)
+        if overlap < 0.20:
+            skipped_hallucinated += 1
+            log.info(
+                "schedule_miner: skipping hallucinated row %d (overlap=%.2f) "
+                "in %s — desc='%s'",
+                row_index, overlap, s.name, description[:60],
+            )
+            continue
+
         quantity = it.get("quantity") or "1"
-        unit = (it.get("unit") or default_unit).strip() or default_unit
+        haiku_unit = (it.get("unit") or default_unit).strip() or default_unit
+
+        # Filter 3 — type-aware unit override. If the row description
+        # matches a known pattern for this schedule type, force the
+        # right unit (FT1 floor tile → SF, B2 base → LF, etc.).
+        unit = _apply_unit_override(schedule_type, description, haiku_unit)
+        if unit != haiku_unit:
+            overridden_units += 1
+            log.info(
+                "schedule_miner: unit override on row %d: %s → %s (type=%s, desc='%s')",
+                row_index, haiku_unit, unit, schedule_type, description[:50],
+            )
+
         specification = it.get("specification")
 
         synthetic_chunk = _build_synthetic_row_chunk(
             ctx.chunk,
             schedule_name=s.name,
             row_index=row_index,
-            row=s.rows[row_index],
+            row=row,
             columns=s.columns,
         )
-        # Wrap as RetrievedChunk so downstream code (validator, persister)
-        # doesn't need to special-case schedule-miner candidates.
         retrieved = RetrievedChunk(
             chunk=synthetic_chunk,
             dense_score=1.0,
@@ -334,6 +706,14 @@ async def _mine_one_schedule(
             supporting_chunks=[retrieved],
         )
         candidates.append(cand)
+
+    if skipped_empty or skipped_hallucinated or overridden_units:
+        log.info(
+            "schedule_miner: %s (%s) — %d items, %d skipped (empty), "
+            "%d skipped (hallucinated), %d unit overrides",
+            s.name, schedule_type or "untyped", len(candidates),
+            skipped_empty, skipped_hallucinated, overridden_units,
+        )
 
     return candidates, usage_from_anthropic(msg), latency_ms
 
@@ -384,6 +764,38 @@ async def mine_schedules(
         if not schedules:
             log.info("schedule_miner: no extracted schedules for project %s", project_id)
             return {}, 0.0
+
+        # Dedupe — the schedule extractor sometimes runs both an untyped pass
+        # and a typed (`[typed:X]`) pass over the same source page, so the
+        # same logical schedule appears twice with different IDs and slightly
+        # different LLM-picked units. When both exist for the same
+        # (page_extraction_id, normalized_name), prefer the typed version.
+        def _strip_type_prefix(name: str) -> str:
+            return re.sub(r"^\s*\[typed:[^\]]+\]\s*", "", name or "", flags=re.IGNORECASE).strip().lower()
+
+        groups: dict[tuple, list] = defaultdict(list)
+        for row in schedules:
+            s = row[0]
+            key = (s.page_extraction_id, _strip_type_prefix(s.name))
+            groups[key].append(row)
+
+        deduped: list = []
+        dropped = 0
+        for key, group in groups.items():
+            if len(group) == 1:
+                deduped.append(group[0])
+                continue
+            typed = [r for r in group if (r[0].name or "").lstrip().lower().startswith("[typed:")]
+            chosen = typed[0] if typed else group[0]
+            deduped.append(chosen)
+            dropped += len(group) - 1
+        if dropped:
+            log.info(
+                "schedule_miner: deduped %d redundant schedule pass(es) "
+                "(%d → %d schedules)",
+                dropped, len(schedules), len(deduped),
+            )
+        schedules = deduped
 
         # One chunk per schedule (chunk_type='schedule', source_id=schedule.id)
         schedule_ids = [s.id for s, _, _ in schedules]
