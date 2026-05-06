@@ -217,6 +217,29 @@ async def reclassify_document(
     return DocumentOut.model_validate(doc)
 
 
+@router.post("/{document_id}/resume", response_model=DocumentOut)
+async def resume_processing(
+    project_id: str, document_id: str, db: DB, _: CurrentUser
+) -> DocumentOut:
+    """Re-trigger the processing pipeline on a document that's stuck in
+    a non-terminal status (`pending`, `extracting`, `ocr`, etc.) — typically
+    because the backend was restarted while processing was in flight and
+    the asyncio task was lost.
+
+    Reuses any already-completed work (rendered pages, OCR text,
+    extractions); only the missing downstream stages re-run."""
+    doc = await _ensure_document(db, project_id, document_id)
+    if doc.processing_status in ("ready", "failed"):
+        # No-op; user can use /reclassify to restart from scratch
+        return DocumentOut.model_validate(doc)
+    # Don't reset upstream state — let processor pick up where it left off
+    doc.processing_error = None
+    await db.commit()
+    await db.refresh(doc)
+    processor.schedule(doc.id)
+    return DocumentOut.model_validate(doc)
+
+
 @router.get("/{document_id}/pages", response_model=list[DocumentPageOut])
 async def list_pages(
     project_id: str, document_id: str, db: DB, _: CurrentUser
