@@ -105,6 +105,12 @@ async def classify_run(run_id: str) -> dict[str, int]:
 
     Persists ``bilateral_evidence``, ``evidence_tier``, and
     ``trust_components`` on each ScopeItem.
+
+    Project-aware: if the project has no written-spec doc uploaded at
+    all, "bilateral" is redefined as having a citation to every
+    evidence_type that DOES exist in the project (typically just
+    'drawing'). Otherwise drawing-only projects always score 0 in the
+    top tier through no fault of the extraction.
     """
     counts: dict[str, int] = defaultdict(int)
 
@@ -117,6 +123,43 @@ async def classify_run(run_id: str) -> dict[str, int]:
         if not items:
             log.info("bilateral_evidence: no items for run %s", run_id)
             return {}
+
+        # Determine which evidence_types are reachable on this project.
+        # A project that only uploaded drawings can never produce
+        # spec-side citations — penalising every item for that is wrong.
+        from ..models import Document
+
+        project_id = items[0].project_id
+        project_doc_types = set(
+            (
+                await db.execute(
+                    select(Document.doc_type).where(
+                        Document.project_id == project_id
+                    )
+                )
+            ).scalars().all()
+        )
+        # Map Document.doc_type → ScopeCitation.evidence_type buckets
+        # (mirrors scope_runner._evidence_type_for_doc_type).
+        ev_present: set[str] = set()
+        if "drawing-set" in project_doc_types:
+            ev_present.add("drawing")
+        if "written-spec" in project_doc_types:
+            ev_present.add("spec")
+        if {"bid-quote", "scope-letter"} & project_doc_types:
+            ev_present.add("bid")
+        # Bilateral semantically requires drawing+spec; if both don't
+        # exist on the project, fall back to "all available sides".
+        bilateral_required = (
+            {"drawing", "spec"}
+            if {"drawing", "spec"}.issubset(ev_present)
+            else ev_present
+        )
+        log.info(
+            "bilateral_evidence: project %s has doc_types=%s, "
+            "bilateral requires evidence_types=%s",
+            project_id, sorted(project_doc_types), sorted(bilateral_required),
+        )
 
         item_ids = [i.id for i in items]
         cit_rows = (
@@ -141,7 +184,12 @@ async def classify_run(run_id: str) -> dict[str, int]:
 
         for item in items:
             ev_types = ev_types_by_item.get(item.id, set())
-            bilateral = "drawing" in ev_types and "spec" in ev_types
+            # Project-aware: bilateral when the item cites every
+            # evidence_type that exists on this project.
+            bilateral = bool(
+                bilateral_required
+                and bilateral_required.issubset(ev_types)
+            )
 
             # link_judge_pass: True iff at least one citation passed and
             # none failed; False if any citation failed; None if not yet run.

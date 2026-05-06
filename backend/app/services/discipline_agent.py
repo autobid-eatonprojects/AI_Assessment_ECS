@@ -553,10 +553,31 @@ async def run_discipline_agent(
         + f"\n\n=== TYPED SCHEDULE ROWS ({len(corpus.typed_schedule_rows)} total) ===\n"
         + _format_typed_schedule_block(corpus.typed_schedule_rows[:200])
         + f"\n\n=== SPEC CHUNKS ({len(corpus.spec_chunks)} for divisions {','.join(discipline.csi_divisions)}) ===\n"
-        + _format_chunk_block(corpus.spec_chunks[:60], "SPEC")
+        + (
+            _format_chunk_block(corpus.spec_chunks[:60], "SPEC")
+            if corpus.spec_chunks
+            else (
+                "(no written-spec corpus uploaded — emit ONLY drawing-side "
+                "items as `unilateral_items` with evidence_side='drawing_only'. "
+                "Do NOT fabricate spec_chunk_ids or emit `scope_items` that "
+                "claim spec citations from drawing chunks; the bilateral "
+                "evidence requirement cannot be satisfied without a spec.)"
+            )
+        )
         + f"\n\n=== DRAWING CHUNKS ({len(corpus.drawing_chunks)} from {discipline.label} sheets) ===\n"
         + _format_chunk_block(corpus.drawing_chunks[:80], "DRAWING")
         + "\n\n=== TASK ===\nRun the 4-step protocol now and call emit_discipline_scope."
+        + (
+            "\n\nIMPORTANT: This project has NO written-spec corpus. Therefore:\n"
+            "  - `mandates` MUST be empty (no spec to read).\n"
+            "  - `scope_items` MUST be empty (bilateral evidence requires both sides).\n"
+            "  - Every drawing-side finding goes in `unilateral_items` with "
+            "evidence_side='drawing_only'.\n"
+            "  - `drawing_without_spec` should also list these so the gap "
+            "report flags the missing spec coverage."
+            if not corpus.spec_chunks
+            else ""
+        )
     )
 
     # Sonnet 4.6 supports up to 64K output tokens. A discipline with
