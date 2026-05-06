@@ -236,27 +236,45 @@ def crop_region_sync(
 
     Used by per-schedule-type extractors (P2) to give the model maximum
     grid-line resolution on the table without paying for the full page.
+
+    DPI is clamped down so neither dimension exceeds the 8000-px vision
+    API ceiling. For a half-page crop on an arch-D sheet the requested
+    600 DPI fits; for a near-full-page bbox we drop to ~300 DPI.
     """
     x0, y0, x1, y1 = bbox
-    out_dir = _pages_dir(document_id)
-    crop_path = out_dir / (
-        f"p{page_number:04d}_{dpi}dpi_"
-        f"crop_{int(x0*1000)}_{int(y0*1000)}_{int(x1*1000)}_{int(y1*1000)}.png"
-    )
-    if crop_path.exists():
-        return crop_path
     if not _is_pdf(source):
         raise ValueError("crop_region only supported on PDF sources")
     with fitz.open(source) as pdf:
         page = pdf[page_number - 1]
         rect = page.rect
+        crop_w_in = (x1 - x0) * rect.width / 72.0
+        crop_h_in = (y1 - y0) * rect.height / 72.0
+        if crop_w_in <= 0 or crop_h_in <= 0:
+            raise ValueError(f"degenerate bbox {bbox}")
+        # Clamp to keep both crop dimensions ≤ 8000 px
+        max_dpi_w = int(_MAX_VISION_DIM_PX // crop_w_in)
+        max_dpi_h = int(_MAX_VISION_DIM_PX // crop_h_in)
+        eff_dpi = max(72, min(dpi, max_dpi_w, max_dpi_h))
+
+        out_dir = _pages_dir(document_id)
+        crop_path = out_dir / (
+            f"p{page_number:04d}_{eff_dpi}dpi_"
+            f"crop_{int(x0*1000)}_{int(y0*1000)}_{int(x1*1000)}_{int(y1*1000)}.png"
+        )
+        if crop_path.exists():
+            return crop_path
+        if eff_dpi != dpi:
+            log.info(
+                "crop_region: clamping page %d DPI %d → %d (crop %.1fx%.1f in)",
+                page_number, dpi, eff_dpi, crop_w_in, crop_h_in,
+            )
         clip = fitz.Rect(
             rect.x0 + x0 * rect.width,
             rect.y0 + y0 * rect.height,
             rect.x0 + x1 * rect.width,
             rect.y0 + y1 * rect.height,
         )
-        zoom = dpi / 72.0
+        zoom = eff_dpi / 72.0
         matrix = fitz.Matrix(zoom, zoom)
         pix = page.get_pixmap(matrix=matrix, clip=clip, alpha=False)
         crop_path.write_bytes(pix.tobytes("png"))
@@ -274,3 +292,40 @@ async def crop_region(
         return await asyncio.to_thread(
             crop_region_sync, source, document_id, page_number, bbox, dpi
         )
+
+
+# -----------------------------------------------------------------------------
+# Helper for vision API consumers: read an image file and return bytes that
+# fit Anthropic's 5MB vision payload limit. Downsamples to JPEG quality 85
+# if the source PNG is too large. Caps dim at 4000 px as extra safety.
+# -----------------------------------------------------------------------------
+
+
+def read_image_for_vision(
+    image_path: Path, *, max_bytes: int = 5 * 1024 * 1024, max_dim: int = 4000
+) -> tuple[bytes, str]:
+    """Returns (bytes, mime_type) ready to send to a vision API."""
+    raw = image_path.read_bytes()
+    if len(raw) <= max_bytes:
+        media = (
+            "image/png"
+            if image_path.suffix.lower() == ".png"
+            else "image/jpeg"
+        )
+        return raw, media
+    from io import BytesIO
+    from PIL import Image as PILImage
+
+    img = PILImage.open(image_path)
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    if max(img.size) > max_dim:
+        img.thumbnail((max_dim, max_dim), PILImage.LANCZOS)
+    buf = BytesIO()
+    img.save(buf, format="JPEG", quality=85, optimize=True)
+    out = buf.getvalue()
+    log.info(
+        "vision: downsized %s %dKB → %dKB JPEG (Anthropic 5MB cap)",
+        image_path.name, len(raw) // 1024, len(out) // 1024,
+    )
+    return out, "image/jpeg"

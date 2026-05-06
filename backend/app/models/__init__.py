@@ -30,6 +30,7 @@ from .review import (
 )
 from .scope import ScopeCitation, ScopeExtractionRun, ScopeItem
 from .sheet_index import SheetIndex
+from .sheet_revision import SheetRevision
 
 __all__ = [
     "AppSetting",
@@ -58,6 +59,7 @@ __all__ = [
     "ScopeExtractionRun",
     "ScopeItem",
     "SheetIndex",
+    "SheetRevision",
     "TradeDivisionRelevance",
     "TradePackage",
     "TradePackageItem",
