@@ -1,4 +1,4 @@
-"""Stage 6 — project trust score (4-component substitution).
+"""Stage 6 — project trust score (7-component, design-doc spec).
 
 The reference design (`Elks_AI_Pipeline_Plan.pdf`) defines a 7-component
 trust score:
@@ -35,11 +35,16 @@ from sqlalchemy import select
 from ..database import SessionLocal
 from ..models import (
     Conflict,
+    Document,
+    DocumentPage,
+    ExtractedSchedule,
     Gap,
+    PageExtraction,
     Project,
     ScopeCitation,
     ScopeExtractionRun,
     ScopeItem,
+    SheetRevision,
     TradeDivisionRelevance,
     TradePackage,
 )
@@ -49,11 +54,17 @@ log = logging.getLogger(__name__)
 
 
 # Weights — sum to 1.0. Persisted into trust_score_components for audit.
+# Six wired components per the design doc; symbol_detection_confidence
+# is the seventh and stays dropped until a fine-tuned YOLO11 model is
+# installed (the stub returns empty so its score would be uninformative).
 _WEIGHTS = {
-    "bilateral_coverage": 0.40,
-    "extraction_confidence_avg": 0.20,
-    "link_judge_pass_rate": 0.20,
-    "spec_section_coverage": 0.20,
+    "bilateral_coverage": 0.30,
+    "extraction_confidence_avg": 0.15,
+    "link_judge_pass_rate": 0.15,
+    "spec_section_coverage": 0.15,
+    "ocr_text_coverage": 0.10,
+    "schedule_extraction_validity": 0.05,
+    "document_version_consistency": 0.10,
 }
 
 # Tier thresholds
@@ -165,12 +176,105 @@ async def compute_run(run_id: str) -> TrustScoreResult:
             # data we can't measure).
             spec_section_coverage = 1.0
 
+        # ---- Component 5: OCR text coverage ----
+        # % of pages on text-bearing docs (written-spec / bid-quote /
+        # scope-letter) that successfully landed text via OCR or native
+        # extraction. Empty => neutral 1.0 (don't penalize a project
+        # that uploaded only drawings — those go through vision, not OCR).
+        from sqlalchemy import func as sql_func
+
+        ocr_pages_total = (
+            await db.execute(
+                select(sql_func.count(DocumentPage.id))
+                .join(Document, DocumentPage.document_id == Document.id)
+                .where(Document.project_id == project_id)
+                .where(Document.doc_type.in_(("written-spec", "bid-quote", "scope-letter")))
+            )
+        ).scalar() or 0
+        ocr_pages_with_text = (
+            await db.execute(
+                select(sql_func.count(DocumentPage.id))
+                .join(Document, DocumentPage.document_id == Document.id)
+                .where(Document.project_id == project_id)
+                .where(Document.doc_type.in_(("written-spec", "bid-quote", "scope-letter")))
+                .where(DocumentPage.text_content.isnot(None))
+            )
+        ).scalar() or 0
+        ocr_text_coverage = (
+            ocr_pages_with_text / ocr_pages_total
+            if ocr_pages_total
+            else 1.0
+        )
+
+        # ---- Component 6: schedule extraction validity ----
+        # % of typed schedules (extracted via schedule_extractor_typed) that
+        # produced > 0 rows. Empty schedules indicate vision misread or an
+        # OCR boundary failure on the schedule grid.
+        sched_rows = (
+            await db.execute(
+                select(ExtractedSchedule)
+                .join(PageExtraction, ExtractedSchedule.page_extraction_id == PageExtraction.id)
+                .join(Document, PageExtraction.document_id == Document.id)
+                .where(Document.project_id == project_id)
+                .where(ExtractedSchedule.name.like("[typed:%"))
+            )
+        ).scalars().all()
+        if sched_rows:
+            valid = sum(1 for s in sched_rows if (s.rows or []))
+            schedule_extraction_validity = valid / len(sched_rows)
+        else:
+            schedule_extraction_validity = 1.0  # No typed schedules → neutral
+
+        # ---- Component 7: document version consistency ----
+        # When multiple drawing-set docs share a sheet_id, do they agree
+        # on the latest revision? A divergence (e.g. doc A says Rev 2 of
+        # A1.1, doc B says Rev 1) is a strong signal that the GC has
+        # mismatched bid-set documents — should be reconciled before bid.
+        rev_rows = (
+            await db.execute(
+                select(SheetRevision)
+                .where(SheetRevision.project_id == project_id)
+            )
+        ).scalars().all()
+        if rev_rows:
+            # Group max revision per (sheet_id, document_id), then check
+            # if all documents agree on the same max for each sheet_id.
+            from collections import defaultdict
+
+            by_sheet_doc: dict[tuple[str, str], str] = {}
+            for r in rev_rows:
+                key = (r.sheet_id, r.document_id)
+                # rev_number is a string; max-by-string sort is good enough
+                # for the typical 0/1/2/3/A/B sequence
+                prev = by_sheet_doc.get(key)
+                if prev is None or (r.rev_number or "") > prev:
+                    by_sheet_doc[key] = r.rev_number or ""
+            # Group by sheet_id
+            by_sheet: dict[str, set[str]] = defaultdict(set)
+            for (sheet_id, _doc_id), rev in by_sheet_doc.items():
+                by_sheet[sheet_id].add(rev)
+            multi_doc_sheets = [
+                revs for revs in by_sheet.values() if len(revs) > 0
+            ]
+            if multi_doc_sheets:
+                consistent = sum(1 for revs in multi_doc_sheets if len(revs) == 1)
+                document_version_consistency = consistent / len(multi_doc_sheets)
+            else:
+                document_version_consistency = 1.0
+        else:
+            # No revision data parsed → neutral (don't penalise; revision
+            # parser may have been disabled or no docs uploaded yet).
+            document_version_consistency = 1.0
+
         # ---- Final weighted score ----
         components = {
             "bilateral_coverage": round(bilateral_rate, 4),
             "extraction_confidence_avg": round(confidence_avg, 4),
             "link_judge_pass_rate": round(link_judge_pass_rate, 4),
             "spec_section_coverage": round(spec_section_coverage, 4),
+            "ocr_text_coverage": round(ocr_text_coverage, 4),
+            "schedule_extraction_validity": round(schedule_extraction_validity, 4),
+            "document_version_consistency": round(document_version_consistency, 4),
         }
         score = sum(components[k] * _WEIGHTS[k] for k in _WEIGHTS)
         score = round(score, 4)
@@ -201,15 +305,13 @@ async def compute_run(run_id: str) -> TrustScoreResult:
             "tier": tier,
             "tier_thresholds": {"GREEN": GREEN_MIN, "YELLOW": YELLOW_MIN},
             "dropped_components": [
-                "ocr_confidence",
-                "schedule_extraction_validity",
                 "symbol_detection_confidence",
-                "document_version_consistency",
             ],
             "rationale": (
-                "4-component substitution; W1/W3/W6/W18 components dropped "
-                "due to absence of triple-OCR / YOLO / per-schedule-type "
-                "schemas / revision parser infrastructure."
+                "6-of-7 design-doc components wired. "
+                "symbol_detection_confidence dropped until a fine-tuned "
+                "YOLO11 MEP model is installed (current stub returns no "
+                "detections, so its score would be uninformative)."
             ),
         }
         run.bilateral_coverage_rate = components["bilateral_coverage"]
