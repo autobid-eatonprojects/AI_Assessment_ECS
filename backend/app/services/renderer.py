@@ -153,17 +153,39 @@ def _hi_res_path(document_id: str, page_number: int, dpi: int) -> Path:
     return _pages_dir(document_id) / f"p{page_number:04d}_{dpi}dpi.png"
 
 
+# Anthropic's vision API rejects images >8000 px in either dimension.
+# We clamp our high-DPI renders so a large arch-D sheet at 300 DPI doesn't
+# blow past the limit. Vision providers (Gemini, OpenAI) have similar
+# upper bounds; 8000 is the strictest so it's the universal cap.
+_MAX_VISION_DIM_PX = 8000
+
+
+def _effective_dpi(page, requested_dpi: int) -> int:
+    """Clamp the requested DPI down so neither dimension exceeds the
+    vision API ceiling. Returns the highest DPI that fits.
+    """
+    rect = page.rect  # in PDF points (1/72")
+    page_w_in = rect.width / 72.0
+    page_h_in = rect.height / 72.0
+    if page_w_in <= 0 or page_h_in <= 0:
+        return requested_dpi
+    max_dpi_w = int(_MAX_VISION_DIM_PX // page_w_in)
+    max_dpi_h = int(_MAX_VISION_DIM_PX // page_h_in)
+    return min(requested_dpi, max_dpi_w, max_dpi_h)
+
+
 def render_page_at_dpi_sync(
     source: Path, document_id: str, page_number: int, dpi: int
 ) -> Path:
     """Render one PDF page at the requested DPI. Returns the on-disk PNG path.
 
+    The actual render DPI is clamped so neither dimension exceeds 8000 px
+    (vision API ceiling). The output filename records the *effective* DPI,
+    so subsequent calls with the same `dpi` argument cache-hit correctly.
+
     Idempotent: if the file already exists, returns the path without
     re-rendering (the doc + page + dpi tuple is the cache key).
     """
-    out_path = _hi_res_path(document_id, page_number, dpi)
-    if out_path.exists():
-        return out_path
     if not _is_pdf(source):
         # For single-image docs, the original render is the only render
         return _pages_dir(document_id) / f"p{page_number:04d}.png"
@@ -174,7 +196,16 @@ def render_page_at_dpi_sync(
                 f"page {page_number} out of range (doc has {len(pdf)} pages)"
             )
         page = pdf[page_number - 1]
-        zoom = dpi / 72.0
+        eff_dpi = _effective_dpi(page, dpi)
+        out_path = _hi_res_path(document_id, page_number, eff_dpi)
+        if out_path.exists():
+            return out_path
+        if eff_dpi != dpi:
+            log.info(
+                "render: clamping page %d DPI %d → %d (vision dim cap)",
+                page_number, dpi, eff_dpi,
+            )
+        zoom = eff_dpi / 72.0
         matrix = fitz.Matrix(zoom, zoom)
         pix = page.get_pixmap(matrix=matrix, alpha=False)
         out_path.write_bytes(pix.tobytes("png"))
