@@ -275,7 +275,15 @@ async def judge_run(run_id: str) -> tuple[int, int, float]:
                 continue
             verdicts, cost = outcome
             total_cost += cost
-            verdict_by_cid = {v.get("citation_id"): v for v in verdicts}
+            # Defensive: the schema requires list[dict] but the model
+            # has been observed returning list[str] under load. Skip
+            # any non-dict entries rather than blowing up the whole
+            # post-processing chain.
+            verdict_by_cid = {
+                v.get("citation_id"): v
+                for v in verdicts
+                if isinstance(v, dict) and v.get("citation_id")
+            }
             for cit in ctx.citations:
                 v = verdict_by_cid.get(cit.id)
                 if v is None:

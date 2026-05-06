@@ -549,8 +549,13 @@ async def run_discipline_agent(
     # consume 30K+ tokens of structured tool output. Anything less and
     # the model truncates after mandates+work_items, dropping the
     # scope_items emission step entirely. Ceiling at the model's max.
+    #
+    # Streaming is required by the SDK for any request whose estimated
+    # wall-clock exceeds 10 minutes — at 64K max_tokens that's always
+    # the case. We collect the full message via stream.get_final_message()
+    # so downstream parsing matches the non-streaming path exactly.
     t0 = time.perf_counter()
-    msg = await client.messages.create(
+    async with client.messages.stream(
         model=settings.vision_model,  # Sonnet 4.6
         max_tokens=64000,
         system=[
@@ -563,7 +568,8 @@ async def run_discipline_agent(
         tools=[_AGENT_TOOL],
         tool_choice={"type": "tool", "name": "emit_discipline_scope"},
         messages=[{"role": "user", "content": prompt}],
-    )
+    ) as stream:
+        msg = await stream.get_final_message()
     latency_ms = int((time.perf_counter() - t0) * 1000)
 
     payload: dict = {}
