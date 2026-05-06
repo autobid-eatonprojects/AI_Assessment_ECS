@@ -123,11 +123,23 @@ async def detect_gaps(run_id: str) -> GapStats:
             stats.missing_division += 1
 
         # ---- 2. missing_section ----
-        # Skip "00 00" division-root codes — they're bookkeeping, not biddable.
+        # Only enumerate sections in divisions that ALREADY have at least
+        # one scope item. Divisions with zero items are caught by
+        # missing_division (#1 above); enumerating every section in those
+        # is noise (1000+ false positives on a typical project, since the
+        # CSI catalog has ~5000 sections and most projects only touch a
+        # few hundred).
+        # Within a covered division, an unmatched section IS a real gap —
+        # the division is in-scope, but the spec doesn't reference this
+        # particular section and the drawings don't depict it.
+        # Skip "00 00" division-root codes — they're bookkeeping.
         taxonomy = await get_taxonomy_for_project(project_id)
         if taxonomy is not None:
             sections_with_items = {i.csi_code for i in items}
+            covered_divisions = {i.csi_division for i in items}
             for div_code in relevant_divisions:
+                if div_code not in covered_divisions:
+                    continue
                 div = taxonomy.get_division(div_code)
                 if div is None:
                     continue
@@ -145,10 +157,10 @@ async def detect_gaps(run_id: str) -> GapStats:
                             csi_section=section.code,
                             description=(
                                 f"Section {section.code} ({section.title}) is in "
-                                f"a relevant division but has no scope items in "
-                                f"this run."
+                                f"a covered division ({div_code}) but has no "
+                                f"scope items in this run."
                             ),
-                            severity="warn",
+                            severity="info",  # was 'warn' — most are legit non-coverage
                             suggested_remediation=(
                                 "Verify whether this section applies to the "
                                 "project; if so, surface manually."
