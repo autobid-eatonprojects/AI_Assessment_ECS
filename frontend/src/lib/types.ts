@@ -263,6 +263,8 @@ export interface ScopeItem {
   specification: string | null;
   quantity: string | null;
   unit: string | null;
+  qty_value: number | null;
+  qty_uom: string | null;
   location: string | null;
   confidence: number;
   extraction_method: string | null;
@@ -635,6 +637,9 @@ export interface TrustScore {
     extraction_confidence_avg?: number;
     link_judge_pass_rate?: number;
     spec_section_coverage?: number;
+    ocr_text_coverage?: number;
+    schedule_extraction_validity?: number;
+    document_version_consistency?: number;
   };
   weights: Record<string, number>;
   tier_thresholds: Record<string, number>;
@@ -680,4 +685,17 @@ export interface SystemStatus {
   llm_call_count: number;
   total_cost_usd: number;
   audit_log_count: number;
+}
+
+// P9 — Opus-drafted RFI items for the design team.
+export interface RfiItem {
+  rfi_number: string;
+  subject: string;
+  discipline: string;
+  csi_section: string | null;
+  sheet_refs: string[] | null;
+  issue: string;
+  ask: string;
+  impact: string | null;
+  priority: "critical" | "high" | "medium" | "low";
 }

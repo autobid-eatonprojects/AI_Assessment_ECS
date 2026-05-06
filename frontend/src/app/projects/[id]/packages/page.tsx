@@ -11,6 +11,8 @@ import {
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/auth-guard";
 import { EvidenceTierBadge } from "@/components/evidence-tier-badge";
+import { ExtractionMethodBadge } from "@/components/extraction-method-badge";
+import { NarrativeMarkdown } from "@/components/narrative-markdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -157,6 +159,33 @@ function PackageDetail({
         </div>
       </div>
 
+      {detail.narrative_md && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+              Bid invitation cover letter
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
+                Haiku-drafted
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-auto"
+                onClick={() => {
+                  void navigator.clipboard.writeText(detail.narrative_md ?? "");
+                  toast.success("Narrative copied to clipboard");
+                }}
+              >
+                Copy
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <NarrativeMarkdown source={detail.narrative_md} />
+          </CardContent>
+        </Card>
+      )}
+
       {detail.items_by_section.map((section) => (
         <Card key={section.csi_section}>
           <CardHeader className="pb-2">
@@ -178,19 +207,44 @@ function PackageDetail({
                 className="flex items-start justify-between gap-3 border-b py-2 last:border-b-0 last:pb-0"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
                     <EvidenceTierBadge tier={it.evidence_tier} />
+                    <ExtractionMethodBadge method={it.extraction_method} />
                     <span className="font-mono text-muted-foreground">
                       {it.csi_code}
                     </span>
                     <span className="text-muted-foreground">
                       conf {(it.confidence * 100).toFixed(0)}%
                     </span>
+                    {it.bilateral_evidence === true && (
+                      <span
+                        title="Both spec AND drawing evidence cited"
+                        className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
+                      >
+                        Bilateral ✓
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 text-sm">{it.description}</p>
-                  {(it.quantity || it.unit) && (
+                  {(it.qty_value != null || it.quantity || it.unit) && (
                     <p className="text-xs text-muted-foreground">
-                      {it.quantity ?? "—"} {it.unit ?? ""}
+                      {it.qty_value != null ? (
+                        <>
+                          <span className="font-mono tabular-nums text-foreground">
+                            {it.qty_value.toLocaleString()}
+                          </span>{" "}
+                          <span className="font-mono">{it.qty_uom ?? ""}</span>
+                          {it.quantity && it.quantity !== String(it.qty_value) && (
+                            <span className="ml-2 italic">
+                              (source: {it.quantity} {it.unit ?? ""})
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {it.quantity ?? "—"} {it.unit ?? ""}
+                        </>
+                      )}
                     </p>
                   )}
                 </div>

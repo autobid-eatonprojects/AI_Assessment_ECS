@@ -322,6 +322,24 @@ function Dashboard({ projectId }: { projectId: string }) {
             >
               Generated outputs (SOWs, gap reports)
             </Link>
+            <Link
+              href={`/projects/${projectId}/rfi`}
+              className="block rounded-md border p-2.5 hover:bg-muted/50"
+            >
+              RFI list (design-team punch list)
+            </Link>
+            <a
+              href={api.linkJudgeDatasetUrl(projectId)}
+              className="block rounded-md border p-2.5 hover:bg-muted/50"
+              download
+            >
+              <span className="flex items-center gap-2">
+                Download fine-tuning dataset (.jsonl)
+                <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
+                  P8
+                </span>
+              </span>
+            </a>
           </CardContent>
         </Card>
       </div>

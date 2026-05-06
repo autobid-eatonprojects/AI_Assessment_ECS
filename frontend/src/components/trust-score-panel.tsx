@@ -14,6 +14,9 @@ const COMPONENT_LABELS: Record<string, string> = {
   extraction_confidence_avg: "Extraction confidence",
   link_judge_pass_rate: "Citation entailment",
   spec_section_coverage: "Spec section coverage",
+  ocr_text_coverage: "OCR text coverage",
+  schedule_extraction_validity: "Schedule extraction",
+  document_version_consistency: "Doc version consistency",
 };
 
 function tierColor(tier?: string) {
@@ -137,8 +140,10 @@ export function TrustScorePanel({ trust, loading, compact }: Props) {
           </div>
           <h3 className="mt-2 text-base font-semibold">Project trust score</h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            Weighted blend of bilateral evidence, extraction confidence, citation
-            entailment, and spec section coverage.
+            6-component weighted score: bilateral evidence, extraction
+            confidence, citation entailment, spec coverage, OCR text
+            coverage, schedule extraction validity, and document version
+            consistency.
           </p>
         </div>
       </div>

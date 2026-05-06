@@ -18,6 +18,7 @@ import type {
   PageExtraction,
   Project,
   ProjectProfile,
+  RfiItem,
   ScopeItem,
   ScopeOverview,
   ScopeRun,
@@ -367,6 +368,34 @@ export const api = {
       `/api/settings/health/${encodeURIComponent(provider)}`,
     ),
   getSystemStatus: () => request<SystemStatus>(`/api/settings/status`),
+
+  // ----- P9 — RFI list -----
+  generateRfis: (projectId: string, runId?: string) => {
+    const qs = runId ? `?run_id=${encodeURIComponent(runId)}` : "";
+    return request<{
+      project_id: string;
+      project_name: string;
+      run_id: string;
+      rfi_count: number;
+      cost_usd: number;
+      rfi_list: RfiItem[];
+    }>(`/api/projects/${projectId}/rfi/generate${qs}`, { method: "POST" });
+  },
+  getRfis: (projectId: string, runId?: string) => {
+    const qs = runId ? `?run_id=${encodeURIComponent(runId)}` : "";
+    return request<{
+      project_id: string;
+      project_name: string;
+      run_id: string;
+      rfi_count: number;
+      cost_usd: number;
+      rfi_list: RfiItem[];
+    }>(`/api/projects/${projectId}/rfi${qs}`);
+  },
+
+  // ----- P8 — Fine-tuning dataset URL -----
+  linkJudgeDatasetUrl: (projectId: string) =>
+    `/api/projects/${projectId}/exports/link-judge-dataset`,
 };
 
 export { ApiError };
