@@ -61,6 +61,8 @@ from .retriever import RetrievedChunk
 from .schedule_miner import mine_schedules
 from .scope_deduper import dedupe
 from .scope_verifier import verify_low_confidence
+from .package_narrative import write_narratives_for_run
+from .quantity_sanity import check_run as check_quantity_sanity
 from .trade_bundler import bundle_run as bundle_packages
 from .trust_score import compute_run as compute_trust_score
 from .scope_extractor import (
@@ -942,6 +944,24 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
     qty_updated = await resolve_quantities(run_id)
     log.info("scope_runner: quantity resolver updated %d items", qty_updated)
 
+    # Stage E2 — Quantity sanity heuristics (P7, W7 mitigation).
+    # Pure rules over qty_value + qty_uom + csi_division. Flags items
+    # whose number is implausible for the unit/division pair (decimal
+    # shifts, unit-category mismatches). Persists as Gap rows of type
+    # 'qty_implausible'. No LLM cost.
+    try:
+        sanity_stats = await check_quantity_sanity(run_id)
+        log.info(
+            "scope_runner: quantity sanity — %d findings (%d blocker, %d warn) "
+            "across %d items",
+            sanity_stats.get("findings", 0),
+            sanity_stats.get("blockers", 0),
+            sanity_stats.get("warnings", 0),
+            sanity_stats.get("checked", 0),
+        )
+    except Exception as e:  # noqa: BLE001
+        log.exception("scope_runner: quantity sanity check failed: %s", e)
+
     # Stage F — Opus 4.7 reflection pass on flagged items only (red
     # validator confidence + qty conflicts). Catches misses where the
     # primary 3-vote validator wasn't decisive. ~$1-2 on a typical run.
@@ -1003,6 +1023,20 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
         bundle_stats.unbundled_items,
     )
 
+    # Stage G2 — Per-package narrative writer (P6). One Haiku call per
+    # TradePackage drafts a Markdown bid-invitation cover letter that the
+    # GC can copy into an email to subs. Persists to TradePackage.narrative_md.
+    # Idempotent: re-running rewrites every package's narrative.
+    try:
+        n_narratives, narrative_cost = await write_narratives_for_run(run_id)
+        log.info(
+            "scope_runner: package narratives — %d drafted ($%.4f)",
+            n_narratives, narrative_cost,
+        )
+    except Exception as e:  # noqa: BLE001
+        log.exception("scope_runner: package narrative writer failed: %s", e)
+        narrative_cost = 0.0
+
     # Stage H — Gap detection. Surfaces missing divisions/sections,
     # one-sided items, and unresolved cross-references as Gap rows for
     # the HITL queue. No LLM calls.
@@ -1031,6 +1065,7 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
         + verifier_cost
         + link_judge_cost
         + arbitration_cost
+        + narrative_cost
     )
 
     async with SessionLocal() as db:
