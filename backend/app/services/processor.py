@@ -603,6 +603,67 @@ async def process_document(document_id: str) -> None:
             extraction_error = (
                 f"{failed} of {ready + failed} pages failed extraction; re-extract from UI"
             )
+
+        # P2 — additive structural extractors that augment the per-page
+        # generic vision_extractor with sheet-level metadata, typed
+        # schedule grids, and revision history. Run after vision_extractor
+        # because the typed schedule extractor needs the PageExtraction
+        # rows it created. All four are individually fault-tolerant —
+        # one failing doesn't fail the document.
+        try:
+            from . import (
+                revision_block_parser,
+                schedule_extractor_typed,
+                schedule_router,
+                sheet_index_extractor,
+            )
+        except Exception:  # noqa: BLE001 — defensive: never break the pipeline
+            log.exception("processor: P2 imports failed; skipping P2 stages")
+        else:
+            try:
+                si = await sheet_index_extractor.extract_for_document(document_id)
+                log.info(
+                    "processor: P2 sheet_index — %d sheets ($%.4f) for %s",
+                    si[0], si[1], filename,
+                )
+            except Exception as e:  # noqa: BLE001
+                log.exception("processor: P2 sheet_index failed: %s", e)
+
+            try:
+                route_result = await schedule_router.route_for_document(document_id)
+                log.info(
+                    "processor: P2 schedule_router — %d schedules in %d pages "
+                    "($%.4f) for %s",
+                    route_result.schedules_found,
+                    route_result.pages_classified,
+                    route_result.cost_usd,
+                    filename,
+                )
+                if route_result.schedules:
+                    typed = await schedule_extractor_typed.extract_for_routed_schedules(
+                        route_result.schedules
+                    )
+                    log.info(
+                        "processor: P2 schedule_extractor_typed — "
+                        "%d/%d extracted, %d rows ($%.4f) for %s",
+                        typed["extracted"],
+                        typed["requests"],
+                        typed["rows"],
+                        typed["cost_usd"],
+                        filename,
+                    )
+            except Exception as e:  # noqa: BLE001
+                log.exception("processor: P2 schedule pipeline failed: %s", e)
+
+            try:
+                rev = await revision_block_parser.parse_for_document(document_id)
+                log.info(
+                    "processor: P2 revision_block_parser — %d revisions in "
+                    "%d pages ($%.4f) for %s",
+                    rev["revisions"], rev["pages"], rev["cost_usd"], filename,
+                )
+            except Exception as e:  # noqa: BLE001
+                log.exception("processor: P2 revision_block_parser failed: %s", e)
     elif doc_type in ("written-spec", "bid-quote", "scope-letter") and pages:
         # Text-bearing docs: OCR any page that lacks native text so the
         # downstream chunker has content to index.
@@ -612,6 +673,33 @@ async def process_document(document_id: str) -> None:
             log.info("processor: OCR'd %d pages for %s", n_ocr, filename)
         except Exception as e:  # noqa: BLE001
             log.exception("processor: OCR failed for %s", filename)
+
+        # P2 — Spec TOC reconstruction → project-specific CSI subset.
+        # Only fires for written-spec docs; reads the project's spec
+        # text + the canonical CSI vocab and produces the subset that
+        # downstream P3 discipline agents will use to scope their
+        # context. Cheap (~$0.05) and idempotent — re-runs as new spec
+        # docs are uploaded. Runs after OCR so detected sections are
+        # complete.
+        if upload_source == "project_document" and doc_type == "written-spec":
+            try:
+                from .spec_toc_extractor import reconstruct_for_project
+
+                async with SessionLocal() as db:
+                    doc_row = await db.get(Document, document_id)
+                    project_id_for_toc = doc_row.project_id if doc_row else None
+                if project_id_for_toc:
+                    toc_result = await reconstruct_for_project(project_id_for_toc)
+                    log.info(
+                        "processor: P2 spec_toc — %d detected, "
+                        "%d confirmed sections ($%.4f) for %s",
+                        toc_result["detected_count"],
+                        len(toc_result["confirmed"]),
+                        toc_result["cost_usd"],
+                        filename,
+                    )
+            except Exception as e:  # noqa: BLE001
+                log.exception("processor: P2 spec_toc failed: %s", e)
             extraction_error = f"ocr: {e}"
 
     # 4. Phase 3 — index for search.
