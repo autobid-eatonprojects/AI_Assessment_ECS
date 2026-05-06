@@ -194,6 +194,34 @@ async def acknowledge_gap(
     return GapOut.model_validate(gap)
 
 
+@router.post("/gaps/{gap_id}/promote-to-rfi")
+async def promote_gap_to_rfi(
+    project_id: str,
+    gap_id: str,
+    db: DB,
+    user: CurrentUser,
+):
+    """Draft a single RFI from one gap. Returns the draft so the operator
+    can copy it into their RFI tool, or click Save to add it to the
+    project's cached RFI list."""
+    from sqlalchemy import select as _sel
+
+    from ..models import Gap as _Gap
+    from ..services import gap_to_rfi
+
+    await _ensure_project(db, project_id)
+    gap = (
+        await db.execute(_sel(_Gap).where(_Gap.id == gap_id).where(_Gap.project_id == project_id))
+    ).scalar_one_or_none()
+    if gap is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="gap not found"
+        )
+
+    draft = await gap_to_rfi.promote(project_id, gap, actor=f"user:{user}")
+    return draft
+
+
 # -----------------------------------------------------------------------------
 # Low-confidence items
 # -----------------------------------------------------------------------------

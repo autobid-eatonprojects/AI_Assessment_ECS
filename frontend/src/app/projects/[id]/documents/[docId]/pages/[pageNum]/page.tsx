@@ -34,6 +34,7 @@ interface Highlight {
   bbox: BoundingBox;
   color?: string;
   label?: string;
+  text?: string;
 }
 
 
@@ -339,7 +340,16 @@ function PageView({
                     <div
                       key={s.id}
                       onMouseEnter={() =>
-                        s.bbox && setHover({ bbox: s.bbox, label: s.name })
+                        s.bbox &&
+                        setHover({
+                          bbox: s.bbox,
+                          label: s.name,
+                          text:
+                            `Schedule: ${s.name}\n` +
+                            (s.rows && s.rows.length
+                              ? `${s.rows.length} row${s.rows.length === 1 ? "" : "s"} extracted`
+                              : "no rows"),
+                        })
                       }
                       onMouseLeave={() => setHover(null)}
                     >
@@ -358,7 +368,13 @@ function PageView({
                       key={n.id}
                       className="rounded-md border bg-background p-3 text-sm hover:border-blue-400"
                       onMouseEnter={() =>
-                        n.bbox && setHover({ bbox: n.bbox, color: "#2563eb", label: "Note" })
+                        n.bbox &&
+                        setHover({
+                          bbox: n.bbox,
+                          color: "#2563eb",
+                          label: "Note",
+                          text: n.text,
+                        })
                       }
                       onMouseLeave={() => setHover(null)}
                     >
@@ -378,7 +394,15 @@ function PageView({
                       className="rounded-md border bg-background p-3 text-sm hover:border-amber-400"
                       onMouseEnter={() =>
                         cr.bbox &&
-                        setHover({ bbox: cr.bbox, color: "#d97706", label: cr.target_sheet })
+                        setHover({
+                          bbox: cr.bbox,
+                          color: "#d97706",
+                          label: cr.target_sheet,
+                          text:
+                            `→ ${cr.target_sheet}` +
+                            (cr.detail_id ? ` / ${cr.detail_id}` : "") +
+                            (cr.context ? `\n\n${cr.context}` : ""),
+                        })
                       }
                       onMouseLeave={() => setHover(null)}
                     >
@@ -408,6 +432,7 @@ function PageView({
                           bbox: e.bbox,
                           color: ENTITY_COLORS[e.entity_type] ?? "#2563eb",
                           label: e.value.slice(0, 40),
+                          text: `${e.entity_type}: ${e.value}`,
                         })
                       }
                       onMouseLeave={() => setHover(null)}

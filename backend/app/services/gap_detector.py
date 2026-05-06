@@ -123,20 +123,41 @@ async def detect_gaps(run_id: str) -> GapStats:
             stats.missing_division += 1
 
         # ---- 2. missing_section ----
-        # Only enumerate sections in divisions that ALREADY have at least
-        # one scope item. Divisions with zero items are caught by
-        # missing_division (#1 above); enumerating every section in those
-        # is noise (1000+ false positives on a typical project, since the
-        # CSI catalog has ~5000 sections and most projects only touch a
-        # few hundred).
-        # Within a covered division, an unmatched section IS a real gap —
-        # the division is in-scope, but the spec doesn't reference this
-        # particular section and the drawings don't depict it.
+        # Only flag sections that:
+        #   (a) live in a covered division (has ≥1 item already), AND
+        #   (b) are EXPLICITLY MENTIONED in the project's spec book —
+        #       i.e. some spec chunk's text contains the canonical
+        #       "NN NN NN" code or its compact "NN NN NN" form.
+        # Reason: the CSI catalog has ~5,000 sections; only ~50-200 are
+        # in scope on any given project. The catalog itself is not a
+        # signal — the spec author's TOC is. If the spec doesn't mention
+        # a section, it's not in scope, and flagging it as missing is
+        # noise.
         # Skip "00 00" division-root codes — they're bookkeeping.
         taxonomy = await get_taxonomy_for_project(project_id)
         if taxonomy is not None:
             sections_with_items = {i.csi_code for i in items}
             covered_divisions = {i.csi_division for i in items}
+
+            # Pre-fetch all spec chunk texts for the project so we can
+            # check section mentions without per-section query.
+            from sqlalchemy import select as _select
+
+            from ..models import Chunk, Document as _Doc
+
+            spec_text_blob = ""
+            spec_chunks_q = (
+                _select(Chunk.text)
+                .join(_Doc, Chunk.document_id == _Doc.id)
+                .where(Chunk.project_id == project_id)
+                .where(_Doc.doc_type == "written-spec")
+            )
+            spec_texts = (await db.execute(spec_chunks_q)).scalars().all()
+            if spec_texts:
+                # Concatenated (deduped on first chunk only would miss
+                # late-spec sections — keep all).
+                spec_text_blob = "\n".join(t for t in spec_texts if t)
+
             for div_code in relevant_divisions:
                 if div_code not in covered_divisions:
                     continue
@@ -148,6 +169,15 @@ async def detect_gaps(run_id: str) -> GapStats:
                         continue
                     if section.code in sections_with_items:
                         continue
+                    # Spec-mention filter: only flag when the spec
+                    # explicitly mentions this section.
+                    if not spec_text_blob:
+                        # No spec uploaded → skip this signal entirely.
+                        # Otherwise a drawings-only project would generate
+                        # noise on every catalog section.
+                        continue
+                    if section.code not in spec_text_blob:
+                        continue
                     db.add(
                         Gap(
                             project_id=project_id,
@@ -156,41 +186,70 @@ async def detect_gaps(run_id: str) -> GapStats:
                             csi_division=div_code,
                             csi_section=section.code,
                             description=(
-                                f"Section {section.code} ({section.title}) is in "
-                                f"a covered division ({div_code}) but has no "
-                                f"scope items in this run."
+                                f"Section {section.code} ({section.title}) is "
+                                f"referenced in the spec book but no scope "
+                                f"items were extracted for it."
                             ),
-                            severity="info",  # was 'warn' — most are legit non-coverage
+                            severity="warn",
                             suggested_remediation=(
-                                "Verify whether this section applies to the "
-                                "project; if so, surface manually."
+                                "Open the spec section in the document viewer "
+                                "and confirm whether items should be added; "
+                                "this is a likely coverage miss since the spec "
+                                "explicitly calls out the section."
                             ),
                         )
                     )
                     stats.missing_section += 1
 
         # ---- 3. unilateral_evidence ----
+        # Group items by (csi_division, csi_section). When a single
+        # section has many one-sided items (typical: 30-80 fixture
+        # schedule rows lacking spec coverage), surface ONE grouped
+        # gap with the count rather than 80 individual rows. Operators
+        # action on the section, not per-row.
+        from collections import defaultdict
+
         unilateral_items = [
             i for i in items if i.evidence_tier == "INFERRED_LOW_CONFIDENCE"
         ]
+        by_section: dict[tuple[str, str], list] = defaultdict(list)
         for item in unilateral_items:
+            by_section[(item.csi_division, item.csi_code)].append(item)
+
+        for (div_code, section_code), group in by_section.items():
+            if len(group) == 1:
+                # Single — keep the verbose per-item description
+                item = group[0]
+                description = (
+                    f"Item lacks bilateral evidence (drawing AND spec). "
+                    f"Description: {item.description[:140]}"
+                )
+                related_id = item.id
+            else:
+                # Many — group into one rolled-up gap
+                description = (
+                    f"{len(group)} items in section {section_code} lack "
+                    f"bilateral evidence (one-sided citations only). "
+                    f"Sample: {group[0].description[:120]}"
+                )
+                related_id = None  # No single related item
+
             db.add(
                 Gap(
                     project_id=project_id,
                     run_id=run_id,
                     gap_type="unilateral_evidence",
-                    csi_division=item.csi_division,
-                    csi_section=item.csi_code,
-                    description=(
-                        f"Item lacks bilateral evidence (drawing AND spec). "
-                        f"Description: {item.description[:140]}"
-                    ),
+                    csi_division=div_code,
+                    csi_section=section_code,
+                    description=description,
                     severity="info",
                     suggested_remediation=(
-                        "Operator should verify item in HITL low-confidence "
-                        "queue; either accept, reject, or escalate via RFI."
+                        f"{len(group)} item(s) — verify each in the "
+                        f"low-confidence queue; either accept (mark as "
+                        f"covered), reject, or promote to RFI for the "
+                        f"design team."
                     ),
-                    related_item_id=item.id,
+                    related_item_id=related_id,
                 )
             )
             stats.unilateral_evidence += 1

@@ -85,6 +85,15 @@ class GapAcknowledgeIn(BaseModel):
     note: str | None = None
 
 
+class GapPromoteToRfiOut(BaseModel):
+    rfi_subject: str
+    rfi_body: str
+    discipline: str
+    csi_section: str | None
+    priority: str
+    sheet_refs: list[str]
+
+
 # -----------------------------------------------------------------------------
 # Trade packages
 # -----------------------------------------------------------------------------

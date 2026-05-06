@@ -290,6 +290,18 @@ export const api = {
       `/api/projects/${projectId}/review/gaps/${gapId}/acknowledge`,
       { method: "POST", body: JSON.stringify(body) },
     ),
+  promoteGapToRfi: (projectId: string, gapId: string) =>
+    request<{
+      rfi_subject: string;
+      rfi_body: string;
+      discipline: string;
+      csi_section: string | null;
+      priority: "critical" | "high" | "medium" | "low";
+      sheet_refs: string[];
+    }>(
+      `/api/projects/${projectId}/review/gaps/${gapId}/promote-to-rfi`,
+      { method: "POST" },
+    ),
   listLowConfidence: (projectId: string) =>
     request<ScopeItem[]>(`/api/projects/${projectId}/review/low-confidence`),
   reclassifyItem: (

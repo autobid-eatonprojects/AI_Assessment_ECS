@@ -190,6 +190,24 @@ function GapCard({ gap, projectId }: { gap: Gap; projectId: string }) {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+  const promote = useMutation({
+    mutationFn: () => api.promoteGapToRfi(projectId, gap.id),
+    onSuccess: (draft) => {
+      const md =
+        `# RFI: ${draft.rfi_subject}\n\n` +
+        `**Discipline**: ${draft.discipline}\n` +
+        (draft.csi_section ? `**CSI Section**: ${draft.csi_section}\n` : "") +
+        `**Priority**: ${draft.priority.toUpperCase()}\n` +
+        (draft.sheet_refs.length
+          ? `**Sheets**: ${draft.sheet_refs.join(", ")}\n`
+          : "") +
+        `\n${draft.rfi_body}`;
+      void navigator.clipboard.writeText(md);
+      toast.success(`RFI drafted + copied: "${draft.rfi_subject}"`);
+      qc.invalidateQueries({ queryKey: ["audit-log", projectId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <Card>
@@ -220,14 +238,24 @@ function GapCard({ gap, projectId }: { gap: Gap; projectId: string }) {
               </p>
             )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => ack.mutate()}
-            disabled={ack.isPending}
-          >
-            {ack.isPending ? "…" : "Acknowledge"}
-          </Button>
+          <div className="flex shrink-0 flex-col gap-1.5">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => promote.mutate()}
+              disabled={promote.isPending}
+            >
+              {promote.isPending ? "Drafting…" : "Send to RFI"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => ack.mutate()}
+              disabled={ack.isPending}
+            >
+              {ack.isPending ? "…" : "Acknowledge"}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
