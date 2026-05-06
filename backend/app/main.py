@@ -9,12 +9,14 @@ from .api import (
     auth,
     bids,
     documents,
+    exports,
     extraction,
     outputs,
     packages,
     profile,
     projects,
     review,
+    rfi,
     scope,
     search,
     settings as settings_api,
@@ -80,3 +82,5 @@ app.include_router(packages.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
 app.include_router(settings_api.router, prefix="/api")
 app.include_router(outputs.router, prefix="/api")
+app.include_router(rfi.router, prefix="/api")
+app.include_router(exports.router, prefix="/api")
