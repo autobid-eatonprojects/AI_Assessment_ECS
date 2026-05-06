@@ -99,8 +99,16 @@ class ScopeItem(Base):
     # The deliverable
     description: Mapped[str] = mapped_column(Text, nullable=False)
     specification: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Freeform display strings — preserve verbatim wording from spec
+    # / drawings so reviewers see "approximately 4500" not "4500.0".
     quantity: Mapped[str | None] = mapped_column(String(64), nullable=True)
     unit: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # Structured quantity for downstream pricing + bid coverage math
+    # (P5). Set by quantity_resolver after parsing the freeform form.
+    # qty_uom uses the canonical short token from quantity_resolver._UNIT_ALIASES
+    # (e.g. "EA" / "SF" / "LF" / "CY" — not "ea." / "sq.ft.").
+    qty_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    qty_uom: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
     location: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Quality signals

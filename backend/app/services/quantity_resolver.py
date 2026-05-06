@@ -122,8 +122,13 @@ class _QtyEvidence:
 def _resolve_for_item(
     item: ScopeItem,
     citations: list[ScopeCitation],
-) -> tuple[str | None, str | None, str, dict]:
-    """Return (final_qty_str, final_unit, confidence_band, provenance_dict)."""
+) -> tuple[str | None, str | None, float | None, str | None, str, dict]:
+    """Return (final_qty_str, final_unit, qty_value, qty_uom, confidence_band, provenance_dict).
+
+    qty_value + qty_uom are the STRUCTURED form (P5) for downstream
+    pricing math; qty_str + unit remain the human-readable display
+    pair preserved verbatim from the source where possible.
+    """
     evidence: list[_QtyEvidence] = []
 
     # 1. Stated quantity on the ScopeItem itself (Sonnet EVE or
@@ -151,7 +156,7 @@ def _resolve_for_item(
             )
 
     if not evidence:
-        return item.quantity, item.unit, "unverified", {
+        return item.quantity, item.unit, None, None, "unverified", {
             "reason": "no quantity signal in any source",
         }
 
@@ -184,6 +189,8 @@ def _resolve_for_item(
             return (
                 str(chosen.value).rstrip("0").rstrip("."),
                 chosen_unit,
+                chosen.value,
+                chosen_unit,
                 "conflicting",
                 {
                     "chosen": {
@@ -215,6 +222,8 @@ def _resolve_for_item(
     )
     return (
         qty_str,
+        chosen_unit,
+        chosen.value,
         chosen_unit,
         band,
         {
@@ -260,7 +269,7 @@ async def resolve_quantities(run_id: str) -> int:
 
         updated = 0
         for item in items:
-            qty, unit, band, prov = _resolve_for_item(
+            qty, unit, qty_val, qty_uom, band, prov = _resolve_for_item(
                 item,
                 by_item.get(item.id, []),
             )
@@ -268,9 +277,13 @@ async def resolve_quantities(run_id: str) -> int:
                 item.qty_confidence != band
                 or item.quantity != qty
                 or item.unit != unit
+                or item.qty_value != qty_val
+                or item.qty_uom != qty_uom
             )
             item.quantity = qty
             item.unit = unit
+            item.qty_value = qty_val
+            item.qty_uom = qty_uom
             item.qty_confidence = band
             item.qty_provenance = prov
             if changed:
