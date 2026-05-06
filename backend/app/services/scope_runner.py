@@ -24,14 +24,14 @@ Resumability:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass
 
 from sqlalchemy import select
-
-import hashlib
 
 from ..config import settings as app_settings
 from ..database import SessionLocal
@@ -47,10 +47,17 @@ from .bilateral_evidence import classify_run as classify_bilateral
 from .conflict_arbitrator import arbitrate_run as arbitrate_conflicts
 from .conflict_detector import detect_run as detect_conflicts
 from .csi_grounder import ground_code
+from .discipline_agent import (
+    DisciplineAgentResult,
+    gather_corpus_for_discipline,
+    run_discipline_agent,
+)
+from .discipline_config import disciplines_for_project
 from .gap_detector import detect_gaps
 from .link_judge import judge_run as judge_links
 from .project_profiler import get_or_create_profile
 from .quantity_resolver import resolve_quantities
+from .retriever import RetrievedChunk
 from .schedule_miner import mine_schedules
 from .scope_deduper import dedupe
 from .scope_verifier import verify_low_confidence
@@ -88,6 +95,343 @@ class ScopeRunnerUnavailable(Exception):
 # in roughly 10-15 minutes.
 _DIVISION_CONCURRENCY = 4
 _VALIDATE_CONCURRENCY = 10
+# Per-discipline mode: each discipline_agent call loads ~80K tokens of
+# corpus, so 3 concurrent calls keep peak input around 240K tokens —
+# safely under per-minute token rate limits.
+_DISCIPLINE_CONCURRENCY = 3
+
+
+async def _hydrate_chunks_by_id(chunk_ids: list[str]) -> dict:
+    """Bulk-fetch Chunk rows + their Document rows for citation lookups.
+
+    Returns {chunk_id: (chunk, doc_type)}. Missing chunk_ids are simply
+    absent from the dict; callers should treat that as "skip this
+    citation" rather than failing the whole emission. The agent
+    sometimes fabricates chunk_ids by mis-quoting the in-context
+    label; we treat those as "spec_id_X mentioned but not actually a
+    valid chunk" rather than poisoning the whole item.
+    """
+    if not chunk_ids:
+        return {}
+    from sqlalchemy import select as _select
+
+    from ..models import Chunk
+
+    async with SessionLocal() as db:
+        rows = (
+            await db.execute(
+                _select(Chunk, Document.doc_type)
+                .join(Document, Chunk.document_id == Document.id)
+                .where(Chunk.id.in_(chunk_ids))
+            )
+        ).all()
+    return {row[0].id: (row[0], row[1]) for row in rows}
+
+
+def _candidate_from_discipline_scope_item(
+    item: dict,
+    chunk_lookup: dict,
+) -> CandidateItem | None:
+    """Convert a discipline_agent emitted scope_item into a CandidateItem.
+
+    The discipline agent's bilateral-evidence requirement (minItems=1
+    on both spec_chunk_ids and drawing_chunk_ids) is enforced at the
+    Anthropic tool input_schema layer, so by the time we see the item
+    here both sides are guaranteed non-empty IF the model obeyed its
+    schema. We still defensively skip items that hydrate to zero
+    real chunks (rare but possible if the model fabricated ids).
+    """
+    csi_code = (item.get("csi_code") or "").strip()
+    description = (item.get("description") or "").strip()
+    if not csi_code or not description:
+        return None
+
+    spec_ids = [str(x) for x in (item.get("spec_chunk_ids") or [])]
+    drawing_ids = [str(x) for x in (item.get("drawing_chunk_ids") or [])]
+    all_ids = spec_ids + drawing_ids
+
+    supporting: list[RetrievedChunk] = []
+    for cid in all_ids:
+        hit = chunk_lookup.get(cid)
+        if hit is None:
+            continue
+        chunk, _doc_type = hit
+        supporting.append(
+            RetrievedChunk(
+                chunk=chunk,
+                dense_score=0.0,
+                sparse_score=0.0,
+                rrf_score=0.0,
+                rerank_score=None,
+                snippet=(chunk.text[:240] if chunk.text else None),
+            )
+        )
+    if not supporting:
+        return None
+
+    # Defensive truncation: ScopeItem column widths cap quantity at 64,
+    # unit at 16, location at 255. The agent occasionally writes long
+    # phrases here ("approximately 4500 SF of pavement marking on
+    # parking lot"). Don't lose the row over a string overflow — keep
+    # the truncated form and let the quantity_resolver normalize later.
+    def _trunc(s, n):
+        if not s:
+            return None
+        s = str(s).strip()
+        return s[: n - 1] + "…" if len(s) > n else s
+
+    cand = CandidateItem(
+        csi_code=csi_code,
+        description=description,
+        specification=item.get("specification") or None,
+        quantity=_trunc(item.get("quantity"), 64),
+        unit=_trunc(item.get("unit"), 16),
+        location=_trunc(item.get("location"), 255),
+        extraction_method="discipline_agent_v1",
+        source_chunk_ids=all_ids,
+        found_by_query=_trunc(
+            f"discipline_agent[{item.get('csi_code', '?')}]", 64
+        ),
+        supporting_chunks=supporting,
+    )
+    confidence = item.get("confidence")
+    if isinstance(confidence, (int, float)):
+        setattr(cand, "_confidence", float(confidence))
+    else:
+        setattr(cand, "_confidence", 0.85)
+    setattr(cand, "_votes", [])
+    setattr(cand, "_ground_method", "agent_emitted")
+    setattr(cand, "_ground_note", None)
+    return cand
+
+
+_CSI_CODE_RE = re.compile(r"^\d{2} \d{2} \d{2}$")
+_CSI_DIV_RE = re.compile(r"^\d{2}$")
+
+
+def _canonical_csi_section(value: str | None) -> str | None:
+    """Return the input only if it's a real 6-char 'NN NN NN' CSI section.
+
+    The discipline agent sometimes returns freeform titles in the
+    csi_section slot ('C500/C501 Site Details'). Those don't fit the
+    Gap table's VARCHAR(16) and would be misleading anyway since they
+    aren't grounded against the project's CSI taxonomy. Drop them
+    rather than storing — the agent's full text already lives in the
+    Gap.description, so no information is lost.
+    """
+    if not value:
+        return None
+    s = str(value).strip()
+    if _CSI_CODE_RE.match(s):
+        return s
+    return None
+
+
+def _canonical_csi_division(value: str | None) -> str | None:
+    """Return the input only if it's a 2-digit CSI division code."""
+    if not value:
+        return None
+    s = str(value).strip()
+    if _CSI_DIV_RE.match(s):
+        return s
+    return None
+
+
+async def _persist_discipline_gaps(
+    run_id: str,
+    project_id: str,
+    discipline_results: list[DisciplineAgentResult],
+) -> int:
+    """Persist spec_without_drawing / drawing_without_spec / unilateral.
+
+    These are the discipline_agent's own gap signals — separate from the
+    cross-document gaps the gap_detector finds afterwards. Stamping
+    them as Gap rows means HITL UI sees them in one queue.
+    """
+    from ..models import Gap
+
+    n_inserted = 0
+    async with SessionLocal() as db:
+        for res in discipline_results:
+            for entry in res.spec_without_drawing or []:
+                desc = (entry.get("summary") or entry.get("description") or "").strip()
+                if not desc:
+                    continue
+                raw_section = entry.get("csi_section")
+                section = _canonical_csi_section(raw_section)
+                # If the model returned a non-canonical csi_section
+                # (e.g. a sheet title), preserve that text in the
+                # description so reviewers can still see it.
+                section_hint = (
+                    f" (ref: {raw_section})"
+                    if raw_section and not section
+                    else ""
+                )
+                db.add(
+                    Gap(
+                        project_id=project_id,
+                        run_id=run_id,
+                        gap_type="unilateral_evidence",
+                        csi_section=section,
+                        description=(
+                            f"[{res.discipline}] SPEC mandate without drawing "
+                            f"evidence: {desc}{section_hint}"
+                        ),
+                        severity="warn",
+                        suggested_remediation=(
+                            "Locate the drawing detail or schedule that "
+                            "implements this mandate, or note the omission "
+                            "as a Design RFI."
+                        ),
+                    )
+                )
+                n_inserted += 1
+            for entry in res.drawing_without_spec or []:
+                desc = (entry.get("description") or "").strip()
+                if not desc:
+                    continue
+                db.add(
+                    Gap(
+                        project_id=project_id,
+                        run_id=run_id,
+                        gap_type="unilateral_evidence",
+                        description=(
+                            f"[{res.discipline}] DRAWING shows item without "
+                            f"spec mandate: {desc}"
+                        ),
+                        severity="warn",
+                        suggested_remediation=(
+                            "Confirm the spec division covers this item, or "
+                            "raise as a Design RFI for the spec author."
+                        ),
+                    )
+                )
+                n_inserted += 1
+            for entry in (res.raw or {}).get("unilateral_items") or []:
+                desc = (entry.get("description") or "").strip()
+                if not desc:
+                    continue
+                side = entry.get("evidence_side") or "?"
+                csi_code = (entry.get("csi_code") or "").strip()
+                db.add(
+                    Gap(
+                        project_id=project_id,
+                        run_id=run_id,
+                        gap_type="unilateral_evidence",
+                        csi_division=_canonical_csi_division(csi_code[:2] if csi_code else None),
+                        csi_section=_canonical_csi_section(csi_code),
+                        description=(
+                            f"[{res.discipline}/{side}] {desc} — "
+                            f"reason: {entry.get('reason') or '(none given)'}"
+                        ),
+                        severity="warn",
+                    )
+                )
+                n_inserted += 1
+        await db.commit()
+    return n_inserted
+
+
+async def _run_per_discipline(
+    project_id: str,
+    profile: ProjectProfile,
+    taxonomy: CSITaxonomy,
+    run_id: str,
+    active_division_codes: set[str],
+) -> tuple[list[_DivisionResult], list[DisciplineAgentResult], float]:
+    """P3 orchestration: run one discipline_agent per active discipline.
+
+    Returns:
+      - division_results: scope_items bucketed by csi_code[:2] so the
+        existing _persist_results function can write them
+      - discipline_results: raw agent outputs (used for gap persistence)
+      - total_cost_usd
+    """
+    disciplines = disciplines_for_project(active_division_codes)
+    if not disciplines:
+        log.warning(
+            "scope_runner[per-discipline]: no disciplines mapped from "
+            "active divisions %s — nothing to run",
+            sorted(active_division_codes),
+        )
+        return [], [], 0.0
+
+    log.info(
+        "scope_runner[per-discipline]: running %d disciplines: %s",
+        len(disciplines), [d.key for d in disciplines],
+    )
+
+    sem = asyncio.Semaphore(_DISCIPLINE_CONCURRENCY)
+
+    async def with_sem(d):
+        async with sem:
+            try:
+                return await run_discipline_agent(project_id, d)
+            except Exception:  # noqa: BLE001
+                log.exception(
+                    "scope_runner[per-discipline]: agent for %s failed",
+                    d.key,
+                )
+                await _bump_progress(run_id, failed_inc=1)
+                return None
+
+    raw_results = await asyncio.gather(*(with_sem(d) for d in disciplines))
+    discipline_results: list[DisciplineAgentResult] = [
+        r for r in raw_results if r is not None
+    ]
+    for _ in discipline_results:
+        await _bump_progress(run_id, completed_inc=1)
+
+    # Hydrate every cited chunk_id in one go so we don't N+1 the DB
+    all_chunk_ids: set[str] = set()
+    for r in discipline_results:
+        for item in r.scope_items:
+            for cid in (item.get("spec_chunk_ids") or []):
+                all_chunk_ids.add(str(cid))
+            for cid in (item.get("drawing_chunk_ids") or []):
+                all_chunk_ids.add(str(cid))
+    chunk_lookup = await _hydrate_chunks_by_id(list(all_chunk_ids))
+
+    # Convert + bucket by division, then dedupe within bucket
+    by_division: dict[str, list[CandidateItem]] = {}
+    total_emitted = 0
+    for r in discipline_results:
+        for item in r.scope_items:
+            cand = _candidate_from_discipline_scope_item(item, chunk_lookup)
+            if cand is None:
+                continue
+            # Ground the CSI code against the project's taxonomy now,
+            # so persisted rows have a canonicalised code.
+            ground = ground_code(cand.csi_code, taxonomy)
+            cand.csi_code = ground.code
+            setattr(cand, "_ground_method", ground.method)
+            setattr(cand, "_ground_note", ground.note)
+            div = cand.csi_code[:2]
+            by_division.setdefault(div, []).append(cand)
+            total_emitted += 1
+
+    division_results: list[_DivisionResult] = []
+    for div_code, cands in by_division.items():
+        deduped = await dedupe(cands)
+        division_results.append(
+            _DivisionResult(
+                division_code=div_code,
+                accepted=deduped,
+                candidates_total=len(cands),
+                cost_usd=0.0,  # cost rolled up at the discipline level
+            )
+        )
+
+    total_cost = sum(r.cost_usd for r in discipline_results)
+    log.info(
+        "scope_runner[per-discipline]: %d disciplines → %d items across "
+        "%d divisions ($%.4f)",
+        len(discipline_results),
+        total_emitted,
+        len(by_division),
+        total_cost,
+    )
+    return division_results, discipline_results, total_cost
 
 
 async def _process_division(
@@ -394,13 +738,33 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
     pdf_hash = await _compute_input_pdf_hash(project_id)
     model_versions = _capture_model_versions()
 
+    # Per-discipline mode counts disciplines (~10) instead of divisions
+    # for sections_total so progress UI shows accurate denominator.
+    mode = (app_settings.scope_orchestration_mode or "per-discipline").strip()
+    if mode not in ("per-discipline", "per-division"):
+        log.warning(
+            "scope_runner: unknown scope_orchestration_mode=%r, "
+            "falling back to per-discipline",
+            mode,
+        )
+        mode = "per-discipline"
+
+    active_division_codes = {d.code for d in divisions_to_process}
+    if mode == "per-discipline":
+        sections_total = (
+            len(disciplines_for_project(active_division_codes)) or 1
+        )
+    else:
+        sections_total = len(divisions_to_process)
+
     # Create the run row
     async with SessionLocal() as db:
         run = ScopeExtractionRun(
             project_id=project_id,
             status="running",
-            sections_total=len(divisions_to_process),
+            sections_total=sections_total,
             config={
+                "mode": mode,
                 "divisions": [d.code for d in divisions_to_process],
                 "extractor_model": "claude-sonnet-4-6",
                 "validator_model": "claude-haiku-4-5",
@@ -422,15 +786,17 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
     )
 
     log.info(
-        "scope_runner: starting run %s for project %s — %d divisions",
-        run_id,
-        project_id,
-        len(divisions_to_process),
+        "scope_runner: starting run %s for project %s — mode=%s, "
+        "%d divisions in scope",
+        run_id, project_id, mode, len(divisions_to_process),
     )
 
     # Stage 0 — Schedule miner pre-pass. Walks every Phase-2 ExtractedSchedule
     # and converts quantifiable rows into structured CandidateItems. Catches
-    # the per-row enumerations that Sonnet's EVE tends to summarize.
+    # the per-row enumerations that Sonnet's EVE tends to summarize. Runs in
+    # both modes — the discipline_agent is exhaustive on schedules in
+    # principle, but the deterministic miner is a safety net for any rows
+    # the LLM dropped.
     t0 = time.perf_counter()
     schedule_candidates_by_division, schedule_cost = await mine_schedules(
         project_id, taxonomy
@@ -441,67 +807,133 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
         schedule_cost,
     )
 
-    sem_div = asyncio.Semaphore(_DIVISION_CONCURRENCY)
-    sem_validate = asyncio.Semaphore(_VALIDATE_CONCURRENCY)
-
-    async def process_with_sem(division: CSIDivision):
-        async with sem_div:
-            try:
-                return await _process_division(
-                    project_id,
-                    division,
-                    profile,
-                    taxonomy,
-                    run_id,
-                    sem_validate,
-                    schedule_candidates_by_division.get(division.code, []),
-                )
-            except Exception as e:  # noqa: BLE001
-                log.exception("scope_runner: division %s failed", division.code)
-                await _bump_progress(run_id, failed_inc=1)
-                return _DivisionResult(division.code, [], 0, 0.0)
-
-    division_results = await asyncio.gather(
-        *(process_with_sem(d) for d in divisions_to_process)
-    )
-
-    # Surface schedule-miner items whose division wasn't in the relevance set
-    # (e.g. miner classified a schedule into Div 12 but trade filter skipped it).
-    # Don't drop them silently — they're valuable line items.
-    relevant_codes = {d.code for d in divisions_to_process}
-    orphan_divisions = set(schedule_candidates_by_division) - relevant_codes
-    for div_code in orphan_divisions:
-        orphan_cands = schedule_candidates_by_division[div_code]
-        if not orphan_cands:
-            continue
-        log.info(
-            "scope_runner: surfacing %d schedule-miner items in non-relevant div %s",
-            len(orphan_cands),
-            div_code,
-        )
-        # Run them through CSI grounding + dedupe directly (no validation needed)
-        for c in orphan_cands:
-            ground = ground_code(c.csi_code, taxonomy)
-            c.csi_code = ground.code
-            setattr(c, "_votes", [])
-            setattr(c, "_confidence", 1.0)
-            setattr(c, "_ground_method", ground.method)
-            setattr(c, "_ground_note", ground.note)
-        deduped_orphans = await dedupe(orphan_cands)
-        division_results.append(
-            _DivisionResult(
-                division_code=div_code,
-                accepted=deduped_orphans,
-                candidates_total=len(orphan_cands),
-                cost_usd=0.0,  # schedule_cost is already counted
+    discipline_results: list[DisciplineAgentResult] = []
+    if mode == "per-discipline":
+        division_results, discipline_results, discipline_cost = (
+            await _run_per_discipline(
+                project_id,
+                profile,
+                taxonomy,
+                run_id,
+                active_division_codes,
             )
         )
+        # Bolt on schedule-miner items whose division wasn't covered by
+        # any discipline_agent's emitted items — keeps the deterministic
+        # row enumeration as a backstop against the agent dropping a
+        # schedule entirely.
+        emitted_divisions = {dr.division_code for dr in division_results}
+        for div_code, miner_cands in schedule_candidates_by_division.items():
+            if not miner_cands:
+                continue
+            if div_code in emitted_divisions:
+                # Append to the existing bucket (they'll dedupe in
+                # post-process if they overlap with the agent emissions)
+                bucket = next(
+                    (dr for dr in division_results if dr.division_code == div_code),
+                    None,
+                )
+                if bucket is not None:
+                    for c in miner_cands:
+                        ground = ground_code(c.csi_code, taxonomy)
+                        c.csi_code = ground.code
+                        setattr(c, "_votes", [])
+                        setattr(c, "_confidence", 1.0)
+                        setattr(c, "_ground_method", ground.method)
+                        setattr(c, "_ground_note", ground.note)
+                    bucket.accepted.extend(miner_cands)
+                    bucket.candidates_total += len(miner_cands)
+                continue
+            # Fresh bucket: discipline_agent didn't emit for this division
+            for c in miner_cands:
+                ground = ground_code(c.csi_code, taxonomy)
+                c.csi_code = ground.code
+                setattr(c, "_votes", [])
+                setattr(c, "_confidence", 1.0)
+                setattr(c, "_ground_method", ground.method)
+                setattr(c, "_ground_note", ground.note)
+            deduped = await dedupe(miner_cands)
+            division_results.append(
+                _DivisionResult(
+                    division_code=div_code,
+                    accepted=deduped,
+                    candidates_total=len(miner_cands),
+                    cost_usd=0.0,
+                )
+            )
+    else:
+        sem_div = asyncio.Semaphore(_DIVISION_CONCURRENCY)
+        sem_validate = asyncio.Semaphore(_VALIDATE_CONCURRENCY)
+
+        async def process_with_sem(division: CSIDivision):
+            async with sem_div:
+                try:
+                    return await _process_division(
+                        project_id,
+                        division,
+                        profile,
+                        taxonomy,
+                        run_id,
+                        sem_validate,
+                        schedule_candidates_by_division.get(division.code, []),
+                    )
+                except Exception:  # noqa: BLE001
+                    log.exception("scope_runner: division %s failed", division.code)
+                    await _bump_progress(run_id, failed_inc=1)
+                    return _DivisionResult(division.code, [], 0, 0.0)
+
+        division_results = await asyncio.gather(
+            *(process_with_sem(d) for d in divisions_to_process)
+        )
+        discipline_cost = 0.0
+
+        # Surface schedule-miner items whose division wasn't in the
+        # relevance set (e.g. miner classified a schedule into Div 12
+        # but trade filter skipped it). Don't drop them silently —
+        # they're valuable line items.
+        relevant_codes = {d.code for d in divisions_to_process}
+        orphan_divisions = set(schedule_candidates_by_division) - relevant_codes
+        for div_code in orphan_divisions:
+            orphan_cands = schedule_candidates_by_division[div_code]
+            if not orphan_cands:
+                continue
+            log.info(
+                "scope_runner: surfacing %d schedule-miner items in non-relevant div %s",
+                len(orphan_cands),
+                div_code,
+            )
+            for c in orphan_cands:
+                ground = ground_code(c.csi_code, taxonomy)
+                c.csi_code = ground.code
+                setattr(c, "_votes", [])
+                setattr(c, "_confidence", 1.0)
+                setattr(c, "_ground_method", ground.method)
+                setattr(c, "_ground_note", ground.note)
+            deduped_orphans = await dedupe(orphan_cands)
+            division_results.append(
+                _DivisionResult(
+                    division_code=div_code,
+                    accepted=deduped_orphans,
+                    candidates_total=len(orphan_cands),
+                    cost_usd=0.0,
+                )
+            )
 
     total_latency_ms = int((time.perf_counter() - t0) * 1000)
 
     candidates, validated, deduped = await _persist_results(
         run_id, project_id, division_results, taxonomy
     )
+
+    # Per-discipline mode also persists the agent's spec-without-drawing /
+    # drawing-without-spec / unilateral_items as Gap rows so HITL sees them.
+    if mode == "per-discipline" and discipline_results:
+        n_agent_gaps = await _persist_discipline_gaps(
+            run_id, project_id, discipline_results
+        )
+        log.info(
+            "scope_runner: per-discipline gaps persisted = %d", n_agent_gaps,
+        )
 
     # Stage E — Quantity Resolver. Deterministic post-pass: aggregate every
     # quantity signal (Sonnet-stated, schedule-miner cluster sizes, regex-
@@ -594,6 +1026,7 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
     # Compute final cost from llm_calls for this run window
     total_cost = (
         sum(d.cost_usd for d in division_results)
+        + discipline_cost
         + schedule_cost
         + verifier_cost
         + link_judge_cost

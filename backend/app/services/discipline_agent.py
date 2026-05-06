@@ -544,10 +544,15 @@ async def run_discipline_agent(
         + "\n\n=== TASK ===\nRun the 4-step protocol now and call emit_discipline_scope."
     )
 
+    # Sonnet 4.6 supports up to 64K output tokens. A discipline with
+    # 30+ mandates × 50+ work_items × per-row scope_items can easily
+    # consume 30K+ tokens of structured tool output. Anything less and
+    # the model truncates after mandates+work_items, dropping the
+    # scope_items emission step entirely. Ceiling at the model's max.
     t0 = time.perf_counter()
     msg = await client.messages.create(
         model=settings.vision_model,  # Sonnet 4.6
-        max_tokens=8192,
+        max_tokens=64000,
         system=[
             {
                 "type": "text",

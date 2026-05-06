@@ -60,6 +60,19 @@ class Settings(BaseSettings):
     # detections. When unset, those agents fall back to vision-only.
     yolo_mep_model_path: str | None = None
 
+    # Scope orchestration mode (P3/P4 of design doc).
+    #   "per-discipline" — NEW. Runs one discipline_agent per
+    #     architectural / structural / mechanical / etc. bucket. Each
+    #     agent reads its own ~80K token corpus once (cached) and emits
+    #     bilateral-evidence scope_items in a single Sonnet call.
+    #     Cheaper, more coherent (mandates ↔ work_items cross-checked
+    #     in-context), and cuts call count from ~30 divisions × 3
+    #     queries × 3 votes ≈ 270 calls down to ~10 disciplines.
+    #   "per-division" — LEGACY. Existing per-CSI-division Stage A/B/C/D
+    #     pipeline. Kept for fallback + diff comparison so we can A/B
+    #     output quality before deprecating.
+    scope_orchestration_mode: str = "per-discipline"
+
     # Phase 3 — Indexing + Retrieval
     # Embeddings: voyage-3-large (1024d) per the design doc — best published
     # AEC retrieval scores. Cohere Rerank 3 still does cross-encoder rerank.
