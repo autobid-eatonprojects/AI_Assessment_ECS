@@ -27,6 +27,8 @@ dependencies = [
     "pgvector>=0.4.2",
     "alembic>=1.18.4",
     "voyageai>=0.3.7",
+    "opencv-python-headless>=4.13.0.92",
+    "rapidfuzz>=3.14.5",
 ]
 
 [dependency-groups]

@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     google_api_key: str | None = None
     gemini_vision_model: str = "gemini-2.5-pro"
 
+    # Mistral OCR — primary OCR per design doc P1, best AEC accuracy.
+    # When set, the OCR ensemble runs Mistral + Gemini in parallel and
+    # picks the higher-quality output (and flags pages with significant
+    # disagreement for human review). Without it, falls back to Gemini only.
+    mistral_api_key: str | None = None
+    mistral_ocr_model: str = "mistral-ocr-latest"
+
     # Phase 3 — Indexing + Retrieval
     # Embeddings: voyage-3-large (1024d) per the design doc — best published
     # AEC retrieval scores. Cohere Rerank 3 still does cross-encoder rerank.

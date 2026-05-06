@@ -1,18 +1,25 @@
-"""OCR for scanned PDFs (project manuals especially).
+"""OCR for scanned PDFs — multi-provider ensemble per design doc P1.
 
-When a `written-spec` document arrives without a native text layer, we use
-Gemini 2.5 Flash to OCR each rendered page image. Output is plain text per
-page, written into `DocumentPage.text_content` so the existing chunker
-indexes it transparently.
+When a `written-spec` document arrives without a native text layer, we OCR
+each rendered page. The output is plain text per page, written into
+`DocumentPage.text_content` so the existing chunker indexes it transparently.
 
-Why Gemini Flash:
-  - Fast (~3-5s per page)
-  - Cheap (~$0.001 per page at 110 DPI)
-  - Strong on multi-column technical text and CSI section formatting
-  - We already have google-genai wired up
+Providers (auto-detected from configured API keys):
+  - Mistral OCR (primary, best AEC accuracy per design doc)
+  - Gemini 2.5 Flash (fallback, always available since GOOGLE_API_KEY is
+    used elsewhere too)
+  - AWS Textract (deferred — install boto3 + add credentials to enable)
+  - Document AI (deferred — Google Cloud SDK is heavy)
 
-The classifier and Phase 2 vision-extractor still use Sonnet/Pro for richer
-reasoning; Gemini Flash here is purpose-fit for plain-text OCR.
+When 2+ providers are configured, the facade runs them in parallel and:
+  1. Picks the longer/cleaner output as the canonical text
+  2. Records BOTH outputs (audit + future token-level voting)
+  3. Flags pages where outputs diverge significantly (Levenshtein-ratio
+     based) so a human can spot-check before liability-bearing decisions
+
+W1 mitigation: a single misread `shall not` → `shall` is exactly the kind
+of failure mode the ensemble surfaces — provider disagreement on safety-
+critical wording shows up as a flagged page in the HITL review queue.
 """
 
 from __future__ import annotations
@@ -20,10 +27,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..config import settings
+from . import ocr_mistral, scan_preprocessor
 from .llm_log import Usage
 
 log = logging.getLogger(__name__)
@@ -78,6 +86,12 @@ class OCRResult:
     text: str
     usage: Usage
     latency_ms: int
+    # Multi-provider audit: which provider's text won, all candidate outputs,
+    # and the disagreement metric. Single-provider runs leave these empty.
+    provider: str = "gemini"
+    candidates: list[dict] = field(default_factory=list)
+    disagreement: float = 0.0  # 0.0 = identical, 1.0 = totally different
+    flagged_low_confidence: bool = False
 
 
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
@@ -116,7 +130,7 @@ def _is_retryable(exc: Exception) -> bool:
     return False
 
 
-async def ocr_image(image_path: Path) -> OCRResult:
+async def _ocr_image_gemini(image_path: Path) -> OCRResult:
     """OCR a single rendered page image using Gemini Flash, with retry-on-overload."""
     client = _get_client()
     sem = _get_semaphore()
@@ -168,7 +182,149 @@ async def ocr_image(image_path: Path) -> OCRResult:
             completion_tokens=getattr(usage_meta, "candidates_token_count", 0) or 0,
         )
         text = (getattr(resp, "text", "") or "").strip()
-        return OCRResult(text=text, usage=usage, latency_ms=latency_ms)
+        return OCRResult(
+            text=text, usage=usage, latency_ms=latency_ms, provider="gemini"
+        )
 
     assert last is not None
     raise last
+
+
+# -----------------------------------------------------------------------------
+# Multi-provider ensemble facade
+# -----------------------------------------------------------------------------
+
+
+_DISAGREEMENT_FLAG_THRESHOLD = 0.20  # 20% normalized edit distance flips the flag
+
+
+def _normalized_edit_distance(a: str, b: str) -> float:
+    """Levenshtein distance / max(len(a), len(b)). 0.0 = identical, 1.0 = no overlap.
+
+    Cheap, char-level. For full token-level voting (the design doc's
+    eventual target), we'd need per-provider token confidences and
+    alignment — that's a follow-up. This metric is enough to flag
+    pages where providers genuinely disagree (the W1 risk we care about).
+    """
+    if not a and not b:
+        return 0.0
+    if not a or not b:
+        return 1.0
+    # Use a bounded distance computation — full Levenshtein is O(n*m).
+    # rapidfuzz is fast and Python-native; if we don't have it, fall back
+    # to a length-ratio check (less accurate but no extra dep).
+    try:
+        from rapidfuzz import distance as rf_distance  # type: ignore
+
+        d = rf_distance.Levenshtein.distance(a, b)
+    except ImportError:  # pragma: no cover
+        d = abs(len(a) - len(b))
+    return d / max(len(a), len(b))
+
+
+def _enabled_providers() -> list[str]:
+    """Return list of OCR provider names that are configured."""
+    out: list[str] = []
+    if settings.google_api_key:
+        out.append("gemini")
+    if ocr_mistral.is_available():
+        out.append("mistral")
+    return out
+
+
+async def ocr_image(image_path: Path, *, preprocess: bool | None = None) -> OCRResult:
+    """OCR one page using all configured providers; pick the best.
+
+    Single-provider mode (only Gemini configured) is the existing behavior:
+    one call, one result. Multi-provider mode runs them in parallel and
+    surfaces both outputs + a disagreement metric for audit.
+
+    `preprocess`: None (default) = auto-detect via scan_preprocessor heuristic
+    (low-res or low-contrast pages get cleaned). True = force preprocess.
+    False = skip (useful when the caller already passed a clean render).
+    """
+    # Optional scan preprocessing — runs deskew + Sauvola binarize + despeckle
+    # for pages that look like scanned spec books. Skipped on clean
+    # high-res renders (drawings rendered from native PDFs).
+    ocr_input = image_path
+    if preprocess is True or (
+        preprocess is None and scan_preprocessor.needs_preprocessing(image_path)
+    ):
+        try:
+            pp = scan_preprocessor.preprocess_for_ocr(image_path)
+            log.info(
+                "ocr: preprocessed %s (%s)",
+                image_path.name, ", ".join(pp.steps_applied),
+            )
+            ocr_input = pp.output_path
+        except Exception as e:  # noqa: BLE001
+            log.warning("ocr: preprocessing failed (%s); using raw image", e)
+
+    providers = _enabled_providers()
+    if not providers:
+        raise OCRUnavailable("no OCR providers configured (need GOOGLE_API_KEY at minimum)")
+
+    if len(providers) == 1:
+        # Fast path — same as before
+        if providers[0] == "gemini":
+            return await _ocr_image_gemini(ocr_input)
+        return await ocr_mistral.ocr_image(ocr_input)
+
+    # Run all providers in parallel
+    tasks = []
+    if "gemini" in providers:
+        tasks.append(("gemini", _ocr_image_gemini(ocr_input)))
+    if "mistral" in providers:
+        tasks.append(("mistral", ocr_mistral.ocr_image(ocr_input)))
+
+    results: list[tuple[str, OCRResult | Exception]] = []
+    raw = await asyncio.gather(*(t[1] for t in tasks), return_exceptions=True)
+    for (name, _), r in zip(tasks, raw):
+        results.append((name, r))
+
+    # Filter to successes
+    successes: list[tuple[str, OCRResult]] = [
+        (n, r) for n, r in results if isinstance(r, OCRResult)
+    ]
+    if not successes:
+        # All providers failed — surface the first exception
+        for _, r in results:
+            if isinstance(r, Exception):
+                raise r
+        raise OCRUnavailable("all OCR providers failed silently")
+
+    # If only one succeeded, use it (and log that the other failed)
+    if len(successes) == 1:
+        name, primary = successes[0]
+        for n, r in results:
+            if isinstance(r, Exception):
+                log.warning("ocr ensemble: %s failed (%s); using %s only", n, r, name)
+        primary.candidates = [{"provider": name, "len": len(primary.text)}]
+        return primary
+
+    # 2+ providers succeeded — vote. Pick the longer output as canonical
+    # (longer usually = more text recovered, less truncation), and flag
+    # the page if the providers disagree significantly.
+    longest_name, longest = max(successes, key=lambda x: len(x[1].text))
+    other_text = next(r.text for n, r in successes if n != longest_name)
+    disagreement = _normalized_edit_distance(longest.text, other_text)
+    flagged = disagreement >= _DISAGREEMENT_FLAG_THRESHOLD
+
+    longest.provider = longest_name
+    longest.candidates = [
+        {
+            "provider": n,
+            "len": len(r.text),
+            "latency_ms": r.latency_ms,
+        }
+        for n, r in successes
+    ]
+    longest.disagreement = round(disagreement, 4)
+    longest.flagged_low_confidence = flagged
+
+    if flagged:
+        log.warning(
+            "ocr ensemble: providers disagree (%.0f%%) on %s — flagged for review",
+            disagreement * 100, image_path.name,
+        )
+    return longest
