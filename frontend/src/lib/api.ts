@@ -406,7 +406,20 @@ export const api = {
 
   // ----- Stage 8 — App settings + system status -----
   getSettings: () => request<AppSettings>(`/api/settings`),
-  patchSettings: (body: Partial<AppSettings>) =>
+  patchSettings: (
+    body:
+      | Partial<AppSettings>
+      | Partial<{
+          // API key fields aren't on AppSettings (the GET response masks
+          // them) but the PATCH payload accepts them. Empty string clears
+          // the DB override and falls back to the .env value.
+          anthropic_api_key: string;
+          voyage_api_key: string;
+          cohere_api_key: string;
+          mistral_api_key: string;
+          google_api_key: string;
+        }>,
+  ) =>
     request<AppSettings>(`/api/settings`, {
       method: "PATCH",
       body: JSON.stringify(body),

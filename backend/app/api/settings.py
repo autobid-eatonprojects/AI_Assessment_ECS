@@ -10,15 +10,55 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from ..config import settings as env_settings
-from ..models import AuditLog, Document, LLMCall, Project, ScopeExtractionRun
+from ..models import Document, LLMCall, Project, ScopeExtractionRun
 from ..services import app_settings as app_settings_svc
 from ..services.app_settings import (
     ALLOWED_SETTING_KEYS,
+    API_KEY_SETTING_NAMES,
     SettingValidationError,
+    mask_api_key,
 )
 from .deps import DB, CurrentUser
 
 router = APIRouter(prefix="/settings", tags=["settings"])
+
+
+# Where the user goes to actually create / find each provider's key.
+# Surfaced in the GET response so the UI can render a "Get key" link
+# next to each row instead of hard-coding URLs in the frontend.
+PROVIDER_KEY_LINKS: dict[str, str] = {
+    "anthropic": "https://console.anthropic.com/settings/keys",
+    "voyage": "https://dash.voyageai.com/api-keys",
+    "cohere": "https://dashboard.cohere.com/api-keys",
+    "mistral": "https://console.mistral.ai/api-keys/",
+    "google": "https://aistudio.google.com/apikey",
+}
+
+
+# Map env-settings field names to provider names used in the UI.
+PROVIDER_TO_KEY_FIELD = {
+    "anthropic": "anthropic_api_key",
+    "voyage": "voyage_api_key",
+    "cohere": "cohere_api_key",
+    "mistral": "mistral_api_key",
+    "google": "google_api_key",
+}
+
+
+class ProviderKeyInfo(BaseModel):
+    """Per-provider info surfaced to the Settings UI.
+
+    `masked` is the first 5 + last 4 chars of the configured key (or None
+    if not set), so the UI can show "anthr…c4d2" without exposing the
+    secret. `source` is "db" when the user set it from the UI (DB override
+    in AppSetting) and "env" when it's still coming from backend/.env;
+    "none" means no key is configured.
+    """
+
+    configured: bool
+    masked: str | None = None
+    source: str  # "db" | "env" | "none"
+    signup_url: str
 
 
 class SettingsOut(BaseModel):
@@ -37,7 +77,12 @@ class SettingsOut(BaseModel):
     default_theme: str
     # Boolean health: whether each provider key is configured (never the key itself)
     provider_keys_configured: dict[str, bool]
+    # Per-provider detail (masked value + source + signup link)
+    provider_keys: dict[str, ProviderKeyInfo]
     overrides_in_use: list[str]
+    # API-key edits via the UI take effect on backend restart since the
+    # provider clients are singletonized at process start.
+    needs_restart_for: list[str]
 
 
 class SettingsPatchIn(BaseModel):
@@ -54,6 +99,13 @@ class SettingsPatchIn(BaseModel):
     default_theme: str | None = None
     bundling_rules_override_yaml: str | None = None
     trust_score_weights: dict | None = None
+    # Provider API keys — empty string clears the DB override (falls back
+    # to backend/.env value); a real value upserts the override.
+    anthropic_api_key: str | None = None
+    voyage_api_key: str | None = None
+    cohere_api_key: str | None = None
+    mistral_api_key: str | None = None
+    google_api_key: str | None = None
 
 
 class HealthOut(BaseModel):
@@ -73,6 +125,43 @@ class SystemStatusOut(BaseModel):
     audit_log_count: int
 
 
+def _env_key_for(provider: str) -> str | None:
+    """Look up the env-settings value for a provider's API key."""
+    field = PROVIDER_TO_KEY_FIELD.get(provider)
+    if not field:
+        return None
+    return getattr(env_settings, field, None)
+
+
+def _build_provider_keys(overrides: dict[str, Any]) -> dict[str, ProviderKeyInfo]:
+    """For each provider, decide whether the effective key comes from a DB
+    override, the env, or nowhere — and produce a masked display value.
+    """
+    out: dict[str, ProviderKeyInfo] = {}
+    for provider, signup_url in PROVIDER_KEY_LINKS.items():
+        field = PROVIDER_TO_KEY_FIELD.get(provider)
+        if not field:
+            continue
+        db_value = overrides.get(field) if isinstance(overrides.get(field), str) else None
+        env_value = _env_key_for(provider)
+        if db_value:
+            source = "db"
+            effective = db_value
+        elif env_value:
+            source = "env"
+            effective = env_value
+        else:
+            source = "none"
+            effective = None
+        out[provider] = ProviderKeyInfo(
+            configured=effective is not None,
+            masked=mask_api_key(effective),
+            source=source,
+            signup_url=signup_url,
+        )
+    return out
+
+
 @router.get("", response_model=SettingsOut)
 async def get_settings(db: DB, _: CurrentUser) -> SettingsOut:
     """Effective settings (env defaults overlaid with any DB overrides)."""
@@ -80,6 +169,15 @@ async def get_settings(db: DB, _: CurrentUser) -> SettingsOut:
 
     def eff(key: str, default: Any) -> Any:
         return overrides.get(key, default)
+
+    provider_keys = _build_provider_keys(overrides)
+    # Any provider whose key was just changed in the DB needs a backend
+    # restart to take effect (clients are singletonized at process start).
+    needs_restart = [
+        provider
+        for provider, info in provider_keys.items()
+        if info.source == "db"
+    ]
 
     return SettingsOut(
         classifier_model=eff("classifier_model", env_settings.classifier_model),
@@ -96,12 +194,16 @@ async def get_settings(db: DB, _: CurrentUser) -> SettingsOut:
         thumbnail_max_dim=eff("thumbnail_max_dim", env_settings.thumbnail_max_dim),
         default_theme=eff("default_theme", "system"),
         provider_keys_configured={
-            "anthropic": bool(env_settings.anthropic_api_key),
-            "cohere": bool(env_settings.cohere_api_key),
-            "google": bool(env_settings.google_api_key),
-            "openai": bool(env_settings.openai_api_key),
+            p: info.configured for p, info in provider_keys.items()
         },
-        overrides_in_use=sorted(overrides.keys()),
+        provider_keys=provider_keys,
+        # Sort overrides for stable output, but redact API key names so
+        # the UI doesn't surface that the key exists in DB through this
+        # field (the masked-value path is the canonical view).
+        overrides_in_use=sorted(
+            k for k in overrides.keys() if k not in API_KEY_SETTING_NAMES
+        ),
+        needs_restart_for=sorted(needs_restart),
     )
 
 
@@ -116,6 +218,10 @@ async def patch_settings(
         if k in ALLOWED_SETTING_KEYS
     }
     for key, value in changes.items():
+        # API keys: empty string clears the DB override (revert to env).
+        if key in API_KEY_SETTING_NAMES and isinstance(value, str) and value == "":
+            await app_settings_svc.clear_setting(db, key)
+            continue
         try:
             await app_settings_svc.set_setting(db, key, value)
         except SettingValidationError as e:
@@ -123,19 +229,11 @@ async def patch_settings(
                 status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
             ) from e
 
-    # Audit each change so the activity feed shows it
-    if changes:
-        for key, value in changes.items():
-            db.add(
-                AuditLog(
-                    project_id="00000000-0000-0000-0000-000000000000",
-                    entity_type="app_setting",
-                    entity_id=key,
-                    action="update",
-                    actor=f"user:{user}",
-                    payload={"new_value": value},
-                )
-            )
+    # AuditLog is project-scoped (project_id is non-nullable + FK to
+    # projects.id). App-level settings have no project context so we
+    # don't write audit rows for them — the AppSetting row itself is
+    # the source of truth + the patched value goes through the normal
+    # response flow. (API keys are masked in the response, never echoed.)
     await db.commit()
     return await get_settings(db, user)
 

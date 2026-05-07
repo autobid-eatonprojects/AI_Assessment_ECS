@@ -39,7 +39,41 @@ ALLOWED_SETTING_KEYS = {
     "bundling_rules_override_yaml",
     # UI preferences
     "default_theme",
+    # Provider API keys — DB overrides for the values normally read from
+    # backend/.env. Kept as JSON ({"value": "..."}) like every other setting
+    # so the storage shape is uniform; never serialized verbatim in the GET
+    # response (always masked).
+    "anthropic_api_key",
+    "voyage_api_key",
+    "cohere_api_key",
+    "mistral_api_key",
+    "google_api_key",
 }
+
+
+# Provider API keys are sensitive — never returned verbatim in API
+# responses; UI shows the masked form instead.
+API_KEY_SETTING_NAMES = {
+    "anthropic_api_key",
+    "voyage_api_key",
+    "cohere_api_key",
+    "mistral_api_key",
+    "google_api_key",
+}
+
+
+def mask_api_key(value: str | None) -> str | None:
+    """Mask an API key for display: first 5 chars + ellipsis + last 4 chars.
+
+    Short keys (< 12 chars) are masked entirely so we don't leak the bulk
+    of the secret. Returns None when value is empty/None so the caller
+    can render a "not set" state.
+    """
+    if not value:
+        return None
+    if len(value) < 12:
+        return "•" * len(value)
+    return f"{value[:5]}…{value[-4:]}"
 
 
 class SettingValidationError(ValueError):
@@ -70,6 +104,22 @@ async def set_setting(db: AsyncSession, key: str, value: Any) -> AppSetting:
         row.value_json = payload
     await db.flush()
     return row
+
+
+async def clear_setting(db: AsyncSession, key: str) -> None:
+    """Delete a DB override (revert to env / default value).
+
+    No-op if the row doesn't exist. Used when the Settings UI clears an
+    API key field so the value falls back to backend/.env.
+    """
+    if key not in ALLOWED_SETTING_KEYS:
+        raise SettingValidationError(
+            f"setting key {key!r} not in ALLOWED_SETTING_KEYS"
+        )
+    row = await db.get(AppSetting, key)
+    if row is not None:
+        await db.delete(row)
+        await db.flush()
 
 
 async def list_all(db: AsyncSession) -> dict[str, Any]:

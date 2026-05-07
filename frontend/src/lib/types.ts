@@ -731,6 +731,13 @@ export interface AuditLogEntry {
   created_at: string;
 }
 
+export interface ProviderKeyInfo {
+  configured: boolean;
+  masked: string | null;
+  source: "db" | "env" | "none";
+  signup_url: string;
+}
+
 export interface AppSettings {
   classifier_model: string;
   vision_model: string;
@@ -744,7 +751,9 @@ export interface AppSettings {
   thumbnail_max_dim: number;
   default_theme: "light" | "dark" | "system";
   provider_keys_configured: Record<string, boolean>;
+  provider_keys: Record<string, ProviderKeyInfo>;
   overrides_in_use: string[];
+  needs_restart_for: string[];
 }
 
 export interface SystemStatus {
