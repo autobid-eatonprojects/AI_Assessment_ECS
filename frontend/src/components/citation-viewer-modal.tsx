@@ -12,6 +12,86 @@ import {
 } from "@/components/ui/dialog";
 import type { ScopeCitation, ScopeItem } from "@/lib/types";
 
+// ----- Pass B: per-citation badges -----------------------------------------
+// Renders evidence_type (drawing/spec/bid/other) + link_judge entailment
+// status. Both export from this file so the inline citation list in
+// scope/page.tsx can also use them.
+
+const EVIDENCE_TYPE_META: Record<
+  string,
+  { label: string; classes: string; tooltip: string }
+> = {
+  drawing: {
+    label: "Drawing",
+    classes:
+      "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30",
+    tooltip: "Citation comes from a drawing-set document",
+  },
+  spec: {
+    label: "Spec",
+    classes:
+      "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30",
+    tooltip: "Citation comes from a written-spec document",
+  },
+  bid: {
+    label: "Bid",
+    classes:
+      "bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/30",
+    tooltip: "Citation comes from a bid submission",
+  },
+  other: {
+    label: "Other",
+    classes:
+      "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-500/30",
+    tooltip: "Citation source not categorized",
+  },
+};
+
+export function EvidenceTypeBadge({ type }: { type: string | null | undefined }) {
+  if (!type) return null;
+  const meta = EVIDENCE_TYPE_META[type] ?? EVIDENCE_TYPE_META.other;
+  return (
+    <span
+      title={meta.tooltip}
+      className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${meta.classes}`}
+    >
+      {meta.label}
+    </span>
+  );
+}
+
+/** Link-judge entailment badge. Renders only when link_judge has run. */
+export function LinkJudgeBadge({
+  pass,
+  score,
+}: {
+  pass: boolean | null | undefined;
+  score?: number | null;
+}) {
+  if (pass === null || pass === undefined) return null;
+  const conf = score != null ? ` (${Math.round(score * 100)}%)` : "";
+  if (pass) {
+    return (
+      <span
+        title={`Link judge: cited chunk supports the item${conf}`}
+        className="inline-flex items-center gap-1 rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
+      >
+        ✓ Entailed{conf}
+      </span>
+    );
+  }
+  return (
+    <span
+      title={`Link judge: cited chunk did not support the item${conf}`}
+      className="inline-flex items-center gap-1 rounded border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 dark:text-rose-300"
+    >
+      ✗ Failed{conf}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -41,7 +121,7 @@ export function CitationViewerModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] max-w-[min(1400px,96vw)] overflow-hidden p-0">
+      <DialogContent className="max-h-[92vh] max-w-[min(1400px,96vw)] overflow-hidden p-0 sm:max-w-[min(1400px,96vw)]">
         <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr]">
           {/* Left: PDF page with bbox overlay */}
           <div className="relative min-h-[60vh] max-h-[92vh] overflow-auto bg-zinc-950 p-3">
@@ -112,6 +192,14 @@ export function CitationViewerModal({
                 <h4 className="text-xs uppercase tracking-wide text-muted-foreground">
                   Source location
                 </h4>
+                {/* Pass B: link_judge + evidence_type badges */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <EvidenceTypeBadge type={citation.evidence_type} />
+                  <LinkJudgeBadge
+                    pass={citation.is_link_judge_pass}
+                    score={citation.link_judge_score}
+                  />
+                </div>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
                   {citation.sheet_number && (
                     <>

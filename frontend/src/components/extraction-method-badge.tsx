@@ -50,6 +50,44 @@ const META: Record<
       "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-500/30",
     tooltip: "Sonnet inferred from context without a single concrete source",
   },
+  // section_extractor variants — items emitted from per-CSI-section Sonnet
+  // extraction. Sub-type encoded after the slash (material/equipment/admin/qc/demo)
+  // tells the evidence_pattern rollup whether to expect bilateral evidence.
+  "section_extractor/material": {
+    label: "Material",
+    classes:
+      "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+    tooltip:
+      "Material spec from a CSI section (concrete, drywall, paint, etc.). Expects bilateral evidence — drawing-side count comes from drawing_grounder.",
+  },
+  "section_extractor/equipment": {
+    label: "Equipment",
+    classes:
+      "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/30",
+    tooltip:
+      "Tagged equipment item (AHU, panel, fixture). Expects bilateral — spec defines product, drawing locates it.",
+  },
+  "section_extractor/admin": {
+    label: "Admin",
+    classes:
+      "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
+    tooltip:
+      "Administrative scope (submittals, mockups, warranties, closeout). Spec-only by nature — never drawn.",
+  },
+  "section_extractor/qc": {
+    label: "QC",
+    classes:
+      "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30",
+    tooltip:
+      "Quality control / testing requirement. Typically spec-only.",
+  },
+  "section_extractor/demo": {
+    label: "Demo",
+    classes:
+      "bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/30",
+    tooltip:
+      "Demolition extent. Typically drawing-only — shown on demo plan.",
+  },
 };
 
 export function ExtractionMethodBadge({

@@ -3,10 +3,11 @@
 import { use, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowRightLeft,
   ChevronLeft,
   Layers,
+  Loader2,
   Search,
-  ArrowRightLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/auth-guard";
@@ -35,9 +36,8 @@ function PackageCard({
   pkg: TradePackage;
   onClick: () => void;
 }) {
-  const bilateralPct =
-    pkg.item_count > 0 ? (pkg.bilateral_count / pkg.item_count) * 100 : 0;
-  const conf = pkg.avg_confidence ?? 0;
+  const lowConf = pkg.low_confidence_count ?? 0;
+  const issues = pkg.open_issue_count ?? 0;
   return (
     <button
       type="button"
@@ -66,28 +66,36 @@ function PackageCard({
         </span>
       </div>
 
-      <div className="space-y-1 text-xs text-muted-foreground">
-        <div className="flex items-center justify-between">
-          <span>Bilateral coverage</span>
-          <span className="tabular-nums">{Math.round(bilateralPct)}%</span>
-        </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-          <div
-            className={cn(
-              "h-full rounded-full",
-              bilateralPct >= 50
-                ? "bg-emerald-500"
-                : bilateralPct >= 25
-                  ? "bg-amber-500"
-                  : "bg-rose-500",
-            )}
-            style={{ width: `${bilateralPct}%` }}
-          />
-        </div>
-        <div className="flex items-center justify-between pt-1">
-          <span>Avg confidence</span>
-          <span className="tabular-nums">{Math.round(conf * 100)}%</span>
-        </div>
+      {/* Actionable counts — what should the GC look at next? */}
+      <div className="flex items-center gap-2 text-xs">
+        <span
+          title="Items in this package that need review (INFERRED_LOW_CONFIDENCE tier — the extractor or link judge wasn't sure)"
+          className={cn(
+            "inline-flex items-center gap-1 rounded-md border px-2 py-1 font-medium",
+            lowConf > 0
+              ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+              : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+          )}
+        >
+          <span className="tabular-nums">{lowConf}</span>
+          <span className="font-normal opacity-80">
+            need{lowConf === 1 ? "s" : ""} review
+          </span>
+        </span>
+        <span
+          title="Open RFIs and gaps related to items in this package"
+          className={cn(
+            "inline-flex items-center gap-1 rounded-md border px-2 py-1 font-medium",
+            issues > 0
+              ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+              : "border-muted-foreground/20 bg-muted/40 text-muted-foreground",
+          )}
+        >
+          <span className="tabular-nums">{issues}</span>
+          <span className="font-normal opacity-80">
+            open issue{issues === 1 ? "" : "s"}
+          </span>
+        </span>
       </div>
     </button>
   );
@@ -252,8 +260,13 @@ function PackageDetail({
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={
-                        <Button variant="ghost" size="sm">
-                          <ArrowRightLeft className="mr-1 size-3.5" /> Move
+                        <Button variant="ghost" size="sm" disabled={move.isPending}>
+                          {move.isPending ? (
+                            <Loader2 className="mr-1 size-3.5 animate-spin" />
+                          ) : (
+                            <ArrowRightLeft className="mr-1 size-3.5" />
+                          )}
+                          {move.isPending ? "Moving…" : "Move"}
                         </Button>
                       }
                     />
@@ -263,6 +276,7 @@ function PackageDetail({
                         {otherPackages.map((p) => (
                           <DropdownMenuItem
                             key={p.id}
+                            disabled={move.isPending}
                             onClick={() =>
                               move.mutate({
                                 itemId: it.id,

@@ -45,6 +45,7 @@ from ..models import (
     ScopeItem,
     TradeDivisionRelevance,
 )
+from .discipline_config import is_valid_sheet_id
 from .trade_list_parser import get_taxonomy_for_project
 
 log = logging.getLogger(__name__)
@@ -201,68 +202,23 @@ async def detect_gaps(run_id: str) -> GapStats:
                     )
                     stats.missing_section += 1
 
-        # ---- 3. evidence-pattern shortfall ----
-        # Items in INFERRED_LOW_CONFIDENCE didn't meet their expected
-        # evidence pattern (a Division 1 item lacking spec, or a material
-        # item lacking the bilateral pair, etc.). The evidence_pattern
-        # module handles WHY an item lands in LOW — this just surfaces
-        # them. Group by (division, section) so a section with 80 weak
-        # items raises ONE gap, not 80.
-        from collections import defaultdict
-
-        unilateral_items = [
-            i for i in items if i.evidence_tier == "INFERRED_LOW_CONFIDENCE"
-        ]
-        by_section: dict[tuple[str, str], list] = defaultdict(list)
-        for item in unilateral_items:
-            by_section[(item.csi_division, item.csi_code)].append(item)
-
-        def _expected_label(item) -> str:
-            tc = item.trust_components or {}
-            return tc.get("expected_pattern", "bilateral")
-
-        for (div_code, section_code), group in by_section.items():
-            if len(group) == 1:
-                item = group[0]
-                description = (
-                    f"Item did not meet its expected evidence pattern "
-                    f"({_expected_label(item)}). "
-                    f"Description: {item.description[:140]}"
-                )
-                related_id = item.id
-            else:
-                # Group: report the dominant expected pattern for context
-                from collections import Counter as _Counter
-                top_expected = _Counter(
-                    _expected_label(i) for i in group
-                ).most_common(1)[0][0]
-                description = (
-                    f"{len(group)} items in section {section_code} did not "
-                    f"meet their expected evidence pattern "
-                    f"(mostly {top_expected}). "
-                    f"Sample: {group[0].description[:120]}"
-                )
-                related_id = None  # No single related item
-
-            db.add(
-                Gap(
-                    project_id=project_id,
-                    run_id=run_id,
-                    gap_type="unilateral_evidence",
-                    csi_division=div_code,
-                    csi_section=section_code,
-                    description=description,
-                    severity="info",
-                    suggested_remediation=(
-                        f"{len(group)} item(s) — verify each in the "
-                        f"low-confidence queue; either accept (mark as "
-                        f"covered), reject, or promote to RFI for the "
-                        f"design team."
-                    ),
-                    related_item_id=related_id,
-                )
-            )
-            stats.unilateral_evidence += 1
+        # ---- 3. evidence-pattern shortfall — DEPRECATED ----
+        # Previously emitted one Gap row per (division, section) bucket of
+        # INFERRED_LOW_CONFIDENCE items. Removed because:
+        #   1. The evidence_tier=INFERRED_LOW_CONFIDENCE badge already
+        #      surfaces these items directly on the scope page, with full
+        #      drill-down on WHY each item didn't meet its expected pattern
+        #      (bilateral_evidence + evidence_pattern columns).
+        #   2. Many flagged items are CORRECTLY one-sided per their
+        #      expected_pattern — admin items expect spec_only, demo items
+        #      expect drawing_only, and MEP items in a project where the
+        #      spec book has no MEP sections legitimately expect
+        #      drawing_only. Re-surfacing them as gaps creates noise that
+        #      conflates "system uncertainty" with "real coverage problem."
+        # Reviewers who want a low-confidence review queue can filter the
+        # scope view by evidence_tier directly — no duplicate gap row needed.
+        # stats.unilateral_evidence stays at 0; downstream consumers
+        # treating its absence as "no shortfall" still work correctly.
 
         # ---- 4. unresolved_cross_reference ----
         # Pull all cross-refs for this project's documents. Compare against
@@ -291,9 +247,16 @@ async def detect_gaps(run_id: str) -> GapStats:
                 .where(Document.project_id == project_id)
             )
         ).scalars().all()
-        # De-dupe by (target_sheet, detail_id) so each broken link is one gap
+        # De-dupe by (target_sheet, detail_id) so each broken link is one gap.
+        # Also drop cross-refs whose target isn't a real sheet ID — the vision
+        # extractor sometimes captures discipline names verbatim (e.g.
+        # "STRUCTURAL", "Architectural drawings") when a note reads "see
+        # structural" without naming a sheet. These aren't broken links;
+        # they're just narrative pointers.
         seen: set[tuple[str, str | None]] = set()
         for xref in xref_rows:
+            if not is_valid_sheet_id(xref.target_sheet):
+                continue
             key = (xref.target_sheet, xref.detail_id)
             if key in seen:
                 continue

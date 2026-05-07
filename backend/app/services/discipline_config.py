@@ -19,6 +19,7 @@ discipline owns CSI Div 03" reads from here.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -26,6 +27,75 @@ from pathlib import Path
 import yaml
 
 log = logging.getLogger(__name__)
+
+
+# Discipline names AND drawing-jargon abbreviations that the vision extractor
+# sometimes captures verbatim as `target_sheet` when a drawing note reads
+# "see Architectural drawings", "REFER TO SITE", or "SEE ARCHITECT'S RCP".
+# They look like sheet IDs (uppercase, no spaces after stripping suffixes)
+# but they reference a discipline, drawing TYPE, or piece of equipment —
+# not an actual sheet number. Treated as not-a-sheet so they don't generate
+# unresolved_cross_reference gaps.
+_DISCIPLINE_KEYWORDS: frozenset[str] = frozenset({
+    # Discipline names
+    "STRUCTURAL", "STRUCT", "ARCHITECTURAL", "ARCH", "CIVIL",
+    "MECHANICAL", "ELECTRICAL", "ELEC", "PLUMBING", "PLUMB",
+    "INTERIOR", "LANDSCAPE", "FIRE PROTECTION", "FIRE", "MEP",
+    "GENERAL", "HVAC", "SITE",
+    # Drawing-type abbreviations (refer to a kind of drawing, not a sheet)
+    "RCP", "FFP", "FP", "ELEV", "ELEVATIONS", "PLAN", "PLANS",
+    "DETAIL", "DETAILS", "SECTION", "SECTIONS", "SCHEDULE", "SCHEDULES",
+    # Equipment/abbreviation false positives ("see FACP" = the device,
+    # not a sheet labeled FACP)
+    "FACP", "FAAP", "AHU", "VAV", "RTU",
+    # Generic markers
+    "TYP", "TYPICAL", "SIM", "SIMILAR", "NIC", "NTS", "OPP", "OPPOSITE",
+    "ABOVE", "BELOW", "THIS", "OTHER", "OTHERS",
+})
+
+# Real AEC sheet IDs: 1-3 alpha discipline prefix, optional dash/space, then
+# digit-based identifier with optional dotted/dashed sub-sheet. Examples that
+# match: A1.1, A0.0, AS1.1, S0.1, FP0.1, C001, C100, M0.1, ES0.1, T-101.
+# Examples that don't: STRUCTURAL, ARCHITECTURAL, MECHANICAL DRAWINGS.
+_SHEET_ID_RE = re.compile(r"^[A-Z]{1,3}\-?\d{1,4}([.\-]\d{1,3})?[A-Z]?$")
+
+# Short letters-only sheets — covers cover sheets (CVR), title (TS, T1 if
+# the digit form fails), index (INX). Capped at 4 chars so it doesn't admit
+# discipline-name false positives like ARCH, ELEC, MEP.
+_SHORT_ALPHA_RE = re.compile(r"^[A-Z]{1,4}$")
+
+# Narrative phrase suffixes that show up after discipline names in drawing
+# notes — strip before classifying so "STRUCTURAL DRAWINGS" → "STRUCTURAL".
+_PHRASE_SUFFIXES: tuple[str, ...] = (
+    " DRAWINGS", " DRAWING", " DWG", " DWGS", " PLAN", " PLANS",
+    " SHEET", " SHEETS", " SET",
+)
+
+
+def is_valid_sheet_id(value: str | None) -> bool:
+    """Return True iff `value` looks like a real AEC sheet identifier.
+
+    Filters discipline-name false positives (STRUCTURAL, ARCHITECTURAL, etc.)
+    that the vision extractor captures when a drawing note reads "see
+    Structural drawings" instead of "see S2.1". These were inflating the
+    unresolved_cross_reference gap count without representing real broken
+    links.
+    """
+    if not value:
+        return False
+    s = re.sub(r"\s+", " ", value).strip().upper()
+    for suf in _PHRASE_SUFFIXES:
+        if s.endswith(suf):
+            s = s[: -len(suf)].rstrip()
+    if not s or s in _DISCIPLINE_KEYWORDS:
+        return False
+    if _SHEET_ID_RE.match(s):
+        return True
+    if _SHORT_ALPHA_RE.match(s):
+        # Short letters-only string that survived the discipline-keyword
+        # filter — likely CVR / TS / similar cover-style sheet code.
+        return True
+    return False
 
 _MAPPING_PATH = (
     Path(__file__).resolve().parent.parent / "data" / "discipline_mapping.yaml"

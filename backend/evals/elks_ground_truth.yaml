@@ -1,0 +1,192 @@
+# Ground-truth fixtures for the Elks Community Enrichment Center bid.
+#
+# Manually curated from the project's spec book (Section TOC + section
+# bodies) by an estimator review. Each fixture is one CSI section the
+# spec defines, with the items an estimator confirms SHOULD be in the
+# extracted scope. Used by `app.services.ragas_eval.evaluate_run` to
+# compute RAGAS metrics (context_precision, context_recall,
+# answer_faithfulness, answer_relevancy) per section + an aggregate
+# benchmark.
+#
+# To extend: add a new fixture under `fixtures:` with the section's
+# code, title, the items you expect to be extracted (one per line),
+# and optionally the drawing sheets the section's items should cite.
+
+fixtures:
+  # === Architectural + finishes ===
+  - csi_section: "03 30 00"
+    section_title: "Cast-in-Place Concrete"
+    expected_items:
+      - "Cast-in-place concrete walls 4000 psi minimum 28-day strength"
+      - "Cast-in-place concrete slab on grade 4000 psi"
+      - "Cast-in-place concrete spread footings 3000 psi"
+      - "Welded wire fabric (WWF) ASTM A185 in slab on grade"
+      - "Reinforcing steel ASTM A615 Grade 60 deformed bars"
+      - "Vapor barrier below slab on grade"
+    must_cite_sheets:
+      - "S0.1"
+      - "S1.1"
+
+  - csi_section: "04 22 00"
+    section_title: "Concrete Unit Masonry"
+    expected_items:
+      - "Concrete masonry unit (CMU) walls 8 inch regular weight"
+      - "Mortar for masonry per ASTM C270"
+      - "Hot-dip galvanized wire ties and anchors for masonry"
+
+  - csi_section: "06 22 00"
+    section_title: "Millwork"
+    expected_items:
+      - "Plastic laminate countertops Custom Grade HPL"
+      - "Solid surface countertops Wilson Art Frosty White"
+      - "Countertop cutouts for hardware and plumbing"
+
+  - csi_section: "07 92 00"
+    section_title: "Joint Sealants"
+    expected_items:
+      - "Elastomeric joint sealant for exterior joints"
+      - "Non-elastomeric interior joint sealant"
+      - "Acoustical joint sealant for partition perimeters"
+
+  - csi_section: "08 71 00"
+    section_title: "Door Hardware"
+    expected_items:
+      - "Mortise locksets for primary doors"
+      - "Cylindrical locksets for secondary doors"
+      - "Heavy-duty hinges for entrance doors"
+      - "Closers for fire-rated doors"
+      - "Weatherstripping at exterior doors"
+      - "Thresholds at exterior doors"
+      - "Keying schedule submittal"
+
+  - csi_section: "08 83 00"
+    section_title: "Mirrors"
+    expected_items:
+      - "Bobrick channel-frame mirror 16 W x 36 H"
+      - "Mirror manufacturer special warranty 10-year"
+
+  - csi_section: "09 29 00"
+    section_title: "Gypsum Board"
+    expected_items:
+      - "5/8 inch Type X gypsum board on metal stud framing"
+      - "Joint compound — setting-type taping and sandable topping"
+      - "Joint tape for gypsum board"
+      - "Steel drill screws for fastening gypsum board ASTM C1002"
+
+  - csi_section: "09 91 23"
+    section_title: "Interior Painting"
+    expected_items:
+      - "P1 paint Sherwin Williams Pure White on gypsum board"
+      - "Door paint on hollow metal and wood doors"
+      - "Primer coat on new gypsum board"
+
+  - csi_section: "10 28 00"
+    section_title: "Toilet, Bath, and Laundry Accessories"
+    expected_items:
+      - "Toilet paper holders"
+      - "Soap dispensers"
+      - "Paper towel dispensers"
+      - "Grab bars at accessible stalls"
+
+  - csi_section: "01 33 00"
+    section_title: "Submittal Procedures"
+    expected_items:
+      - "Provide submittals for product data on each product type"
+      - "Provide shop drawings where required"
+      - "Provide samples for color/finish selection"
+      - "Provide submittal log maintenance"
+
+  # === Structural + envelope ===
+  - csi_section: "05 50 00"
+    section_title: "Metal Fabrications"
+    expected_items:
+      - "Steel pipe and tube railings"
+      - "Loose steel lintels at masonry openings"
+      - "Anchor bolts and embedded plates"
+
+  - csi_section: "06 10 00"
+    section_title: "Rough Carpentry"
+    expected_items:
+      - "Wood blocking and nailers at roof and wall penetrations"
+      - "Pressure-treated lumber at exterior wood in contact with masonry or concrete"
+      - "Plywood or OSB sheathing"
+
+  - csi_section: "07 21 00"
+    section_title: "Thermal Insulation"
+    expected_items:
+      - "Batt insulation in stud walls"
+      - "Rigid board insulation at exterior walls or roof"
+      - "Vapor retarder at warm side of insulation"
+
+  - csi_section: "07 54 23"
+    section_title: "Thermoplastic-Polyolefin (TPO) Roofing"
+    expected_items:
+      - "Single-ply TPO membrane mechanically attached"
+      - "Roof insulation board (polyiso) with cover board"
+      - "Edge metal flashing and termination bars"
+
+  - csi_section: "07 62 00"
+    section_title: "Sheet Metal Flashing and Trim"
+    expected_items:
+      - "Sheet metal flashing at parapet and roof edge"
+      - "Drip edge and gravel stop"
+      - "Coping at parapet wall"
+
+  - csi_section: "07 84 13"
+    section_title: "Penetration Firestopping"
+    expected_items:
+      - "Firestopping at fire-rated wall penetrations"
+      - "Firestopping at fire-rated floor penetrations"
+      - "UL-listed firestop systems matching assembly rating"
+
+  # === Doors, windows, and glass ===
+  - csi_section: "08 11 13"
+    section_title: "Hollow Metal Doors and Frames"
+    expected_items:
+      - "Hollow metal doors at rated and exterior openings"
+      - "Hollow metal frames with welded corners"
+      - "Door silencers and gasketing"
+
+  - csi_section: "08 14 16"
+    section_title: "Flush Wood Doors"
+    expected_items:
+      - "Solid-core flush wood doors at interior offices"
+      - "Wood veneer face matching architectural finish"
+      - "Factory finishing or field staining per schedule"
+
+  - csi_section: "08 41 13"
+    section_title: "Aluminum-Framed Entrances and Storefronts"
+    expected_items:
+      - "Aluminum storefront framing at exterior entries"
+      - "Tempered insulating glass infill"
+      - "Storefront entrance doors with associated hardware"
+
+  - csi_section: "08 80 00"
+    section_title: "Glazing"
+    expected_items:
+      - "Insulating glass units at exterior fenestration"
+      - "Tempered safety glass at hazardous locations"
+      - "Glazing accessories — setting blocks, sealants, gaskets"
+
+  # === Finishes ===
+  - csi_section: "09 30 13"
+    section_title: "Ceramic Tiling"
+    expected_items:
+      - "Ceramic floor tile in toilet rooms and wet areas"
+      - "Ceramic wall tile at toilet room wainscot"
+      - "Tile setting materials — mortar and grout per ANSI A108"
+
+  - csi_section: "09 51 23"
+    section_title: "Acoustical Panel Ceilings"
+    expected_items:
+      - "Suspended acoustical ceiling panels"
+      - "Steel suspension grid and hangers"
+      - "Edge moldings and seismic clips per code"
+
+  # === Site improvements ===
+  - csi_section: "32 12 16"
+    section_title: "Asphalt Paving"
+    expected_items:
+      - "Hot-mix asphalt paving at parking and drive areas"
+      - "Aggregate base course beneath asphalt"
+      - "Pavement markings — striping for parking stalls and accessibility"

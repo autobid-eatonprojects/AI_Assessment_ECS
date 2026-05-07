@@ -566,7 +566,7 @@ function VendorsView({ projectId }: { projectId: string }) {
           <Users className="size-6 text-violet-600" /> Vendors &amp; Bid Leveling
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Auto-grouped from {vendors.data?.length ?? 0} bidders. Click any
+          Auto-grouped from {vendors.isLoading ? "…" : (vendors.data?.length ?? 0)} bidders. Click any
           card to see what they do, what they don&rsquo;t, and their
           qualifications. Switch tabs for side-by-side bid leveling.
         </p>
@@ -577,7 +577,7 @@ function VendorsView({ projectId }: { projectId: string }) {
           <TabsTrigger value="profiles">
             <Users className="size-4" />
             <span className="ml-1.5">
-              Profiles ({vendors.data?.length ?? 0})
+              Profiles ({vendors.isLoading ? "…" : (vendors.data?.length ?? 0)})
             </span>
           </TabsTrigger>
           <TabsTrigger value="leveling">

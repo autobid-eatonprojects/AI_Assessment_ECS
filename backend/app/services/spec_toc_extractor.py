@@ -30,15 +30,13 @@ from __future__ import annotations
 
 import logging
 import re
-import time
 from dataclasses import dataclass
 
 from sqlalchemy import select
 
-from ..config import settings
 from ..database import SessionLocal
 from ..models import Chunk, Document
-from .llm_log import record_call, usage_from_anthropic
+from .anthropic_tool_call import _get_client, call_with_tool
 from .trade_list_parser import get_taxonomy_for_project
 
 log = logging.getLogger(__name__)
@@ -132,21 +130,6 @@ not a section header), put them in rejected_misreads with a brief reason.
 
 Use confirm_csi_subset now.
 """
-
-
-_client = None
-
-
-def _get_client():
-    global _client
-    if _client is not None:
-        return _client
-    if not settings.anthropic_api_key:
-        return None
-    from anthropic import AsyncAnthropic
-
-    _client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-    return _client
 
 
 async def _detect_in_text(project_id: str) -> list[_DetectedSection]:
@@ -253,55 +236,27 @@ async def reconstruct_for_project(project_id: str) -> dict:
         + "\n\nReconcile and return confirm_csi_subset."
     )
 
-    t0 = time.perf_counter()
-    msg = await client.messages.create(
+    result = await call_with_tool(
         model="claude-sonnet-4-6",
+        tool_def=_CONFIRM_TOOL,
+        system=_SYSTEM_PROMPT,
         max_tokens=8192,
-        system=[
-            {
-                "type": "text",
-                "text": _SYSTEM_PROMPT,
-                "cache_control": {"type": "ephemeral"},
-            }
-        ],
-        tools=[_CONFIRM_TOOL],
-        tool_choice={"type": "tool", "name": "confirm_csi_subset"},
-        messages=[{"role": "user", "content": prompt}],
+        purpose="spec-toc",
+        project_id=project_id,
+        user_content=prompt,
     )
-    latency_ms = int((time.perf_counter() - t0) * 1000)
-
-    payload: dict = {}
-    for block in msg.content:
-        if (
-            getattr(block, "type", None) == "tool_use"
-            and block.name == "confirm_csi_subset"
-        ):
-            payload = block.input
-            break
-
-    cost = 0.0
-    async with SessionLocal() as db:
-        c, _ = await record_call(
-            db,
-            purpose="spec-toc",
-            model="claude-sonnet-4-6",
-            usage=usage_from_anthropic(msg),
-            latency_ms=latency_ms,
-            project_id=project_id,
-        )
-        cost = c or 0.0
-        await db.commit()
+    payload = result.parsed_input
 
     log.info(
         "spec_toc: project %s — %d detected, %d confirmed, $%.4f",
         project_id,
         len(detected),
         len(payload.get("confirmed_sections") or []),
-        cost,
+        result.cost_usd,
     )
     return {
         "detected_count": len(detected),
         "confirmed": payload.get("confirmed_sections") or [],
         "rejected": payload.get("rejected_misreads") or [],
-        "cost_usd": cost,
+        "cost_usd": result.cost_usd,
     }

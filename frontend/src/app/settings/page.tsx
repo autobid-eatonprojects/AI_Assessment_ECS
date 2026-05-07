@@ -25,7 +25,11 @@ const CLAUDE_MODELS = [
   "claude-opus-4-7",
 ];
 const VISION_PROVIDERS = ["anthropic", "google"];
-const COHERE_EMBED_MODELS = ["embed-v4.0", "embed-english-v3.0"];
+const VOYAGE_EMBED_MODELS = [
+  "voyage-3-large",
+  "voyage-3",
+  "voyage-3-lite",
+];
 const COHERE_RERANK_MODELS = ["rerank-v3.5", "rerank-english-v3.0"];
 
 function ProviderRow({
@@ -252,10 +256,10 @@ function SettingsView() {
                 onChange={(v) => patch.mutate({ contextualizer_model: v })}
               />
             </SettingRow>
-            <SettingRow label="Embedding model (Cohere)">
+            <SettingRow label="Embedding model (Voyage)">
               <ModelDropdown
                 value={settings.embedding_model}
-                options={COHERE_EMBED_MODELS}
+                options={VOYAGE_EMBED_MODELS}
                 onChange={(v) => patch.mutate({ embedding_model: v })}
               />
             </SettingRow>

@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, KeyRound, Loader2 } from "lucide-react";
-import type { ProcessingStatus } from "@/lib/types";
+import type { ProcessingProgress, ProcessingStatus } from "@/lib/types";
 
 const STATUS: Record<
   ProcessingStatus,
@@ -23,9 +23,11 @@ const STATUS: Record<
 export function ProcessingStatusIndicator({
   status,
   error,
+  progress,
 }: {
   status: ProcessingStatus;
   error?: string | null;
+  progress?: ProcessingProgress | null;
 }) {
   const cfg = STATUS[status];
   const Icon = cfg.icon;
@@ -36,6 +38,15 @@ export function ProcessingStatusIndicator({
     status === "extracting" ||
     status === "ocr" ||
     status === "indexing";
+  // When the backend supplies stage-aware progress, append the count to
+  // the chip so the user can see "OCR (Gemini Flash) 168/370 (45%)" at a
+  // glance. Falls back gracefully to bare label when progress is null
+  // (terminal states or backends that haven't restarted post-fix yet).
+  let suffix = "";
+  if (progress && progress.total > 0 && progress.stage === status) {
+    const pct = Math.round((progress.completed / progress.total) * 100);
+    suffix = ` ${progress.completed}/${progress.total} (${pct}%)`;
+  }
   return (
     <span
       className={`inline-flex items-center gap-1 text-xs font-medium ${cfg.className}`}
@@ -43,6 +54,7 @@ export function ProcessingStatusIndicator({
     >
       <Icon className={`size-3.5 ${spin ? "animate-spin" : ""}`} />
       {cfg.label}
+      {suffix && <span className="font-normal opacity-80">{suffix}</span>}
     </span>
   );
 }

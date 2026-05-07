@@ -37,6 +37,12 @@ export type ProcessingStatus =
   | "failed"
   | "needs-api-key";
 
+export interface ProcessingProgress {
+  stage: string;       // current stage name (matches ProcessingStatus values)
+  completed: number;   // pages/items completed at this stage
+  total: number;       // pages/items expected at this stage
+}
+
 export interface Document {
   id: string;
   project_id: string;
@@ -53,6 +59,10 @@ export interface Document {
   processing_status: ProcessingStatus;
   processing_error: string | null;
   processed_at: string | null;
+  // Set by GET /documents/{id} only (not in list endpoints). Tells the
+  // UI granular per-stage progress like "OCR 168/370" instead of just
+  // showing the bare status. Null in terminal states.
+  processing_progress?: ProcessingProgress | null;
   created_at: string;
 }
 
@@ -251,6 +261,31 @@ export interface VerifierReview {
   cost_usd?: number | null;
 }
 
+/**
+ * Trust components — populated by bilateral_evidence._classify on every
+ * scope_item. Drives the EvidenceTierBadge AND the trust-breakdown
+ * drill-down panel. Field meanings:
+ *   - expected_pattern: what evidence shape the item should have based on
+ *     CSI division + admin keywords (spec_only for Div 1, drawing_only for
+ *     demo, bilateral for material/equipment).
+ *   - pattern_match: did the item's actual evidence meet that expectation?
+ *     This is the new metric replacing raw bilateral_evidence in the
+ *     coverage rollup.
+ *   - bilateral: legacy raw flag — has BOTH spec + drawing citations.
+ *   - confidence: extraction confidence average for this item's votes.
+ *   - link_judge: aggregate Haiku entailment verdict across the item's
+ *     citations. "n/a" until link_judge runs.
+ *   - tier_reason: one-line explanation of why the item landed in its tier.
+ */
+export interface TrustComponents {
+  expected_pattern?: "bilateral" | "spec_only" | "drawing_only";
+  pattern_match?: boolean;
+  bilateral?: boolean;
+  confidence?: number;
+  link_judge?: "pass" | "fail" | "n/a";
+  tier_reason?: string;
+}
+
 export interface ScopeItem {
   id: string;
   project_id: string;
@@ -275,7 +310,7 @@ export interface ScopeItem {
   // Stage 2 — bilateral evidence + tier
   evidence_tier: EvidenceTier | null;
   bilateral_evidence: boolean | null;
-  trust_components: Record<string, unknown> | null;
+  trust_components: TrustComponents | null;
   // Stage 4 — trade bundling
   package_id: string | null;
   citations: ScopeCitation[];
@@ -617,6 +652,9 @@ export interface TradePackage {
   item_count: number;
   bilateral_count: number;
   avg_confidence: number | null;
+  // Pass D follow-up — actionable counts for the trade-packages list view.
+  low_confidence_count?: number;   // items in INFERRED_LOW_CONFIDENCE tier
+  open_issue_count?: number;       // open Gap rows linked to this package
   narrative_md: string | null;
   created_at: string;
 }
@@ -645,6 +683,39 @@ export interface TrustScore {
   tier_thresholds: Record<string, number>;
   dropped_components: string[];
   rationale: string;
+}
+
+export interface RagasFixture {
+  csi_section: string;
+  section_title: string;
+  n_extracted_items: number;
+  n_expected_items: number;
+  n_retrieved_chunks: number;
+  context_precision: number;
+  context_recall: number;
+  answer_faithfulness: number;
+  answer_relevancy: number;
+  cost_usd: number;
+}
+
+export interface RagasEvalRun {
+  id: string;
+  project_id: string;
+  scope_run_id: string;
+  status: "running" | "complete" | "failed";
+  started_at: string;
+  completed_at: string | null;
+  error: string | null;
+  fixtures_path: string;
+  n_fixtures: number;
+  context_precision: number | null;
+  context_recall: number | null;
+  answer_faithfulness: number | null;
+  answer_relevancy: number | null;
+  overall_score: number | null;
+  per_fixture: RagasFixture[] | null;
+  total_cost_usd: number;
+  elapsed_sec: number;
 }
 
 export interface AuditLogEntry {

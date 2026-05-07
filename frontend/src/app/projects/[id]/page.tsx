@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, FileText, Receipt, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { use } from "react";
+import { use, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/app-header";
 import { AuthGuard } from "@/components/auth-guard";
@@ -48,6 +48,22 @@ function ProjectDetail({ projectId }: { projectId: string }) {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  // Controlled Tabs — Base UI warns if `defaultValue` changes between
+  // renders (which happens here when the project transitions from
+  // 'setup' → 'open-for-bids' as a bid PDF lands). Initial tab follows
+  // the lifecycle, but the user can override by clicking either tab.
+  const initialInBids = data?.lifecycle_state === "open-for-bids";
+  const [activeTab, setActiveTab] = useState<string>(
+    initialInBids ? "bids" : "project-docs",
+  );
+  // When the project transitions into the bid phase while the page is
+  // open, auto-switch to the bids tab once.
+  useEffect(() => {
+    if (data?.lifecycle_state === "open-for-bids") {
+      setActiveTab((prev) => (prev === "project-docs" ? "bids" : prev));
+    }
+  }, [data?.lifecycle_state]);
 
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">Loading project…</div>;
@@ -123,7 +139,7 @@ function ProjectDetail({ projectId }: { projectId: string }) {
         </div>
       )}
 
-      <Tabs defaultValue={inBids ? "bids" : "project-docs"} className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
           <TabsTrigger value="project-docs">
             <FileText className="size-4" />

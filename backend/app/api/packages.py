@@ -5,10 +5,10 @@ from __future__ import annotations
 from collections import defaultdict
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func as sql_func, select
 from sqlalchemy.orm import selectinload
 
-from ..models import Project, ScopeExtractionRun, ScopeItem, TradePackage
+from ..models import Gap, Project, ScopeExtractionRun, ScopeItem, TradePackage
 from ..schemas import (
     PackageItemMoveIn,
     ScopeItemOut,
@@ -48,6 +48,14 @@ async def _latest_run_id(db, project_id: str) -> str | None:
 async def list_packages(
     project_id: str, db: DB, _: CurrentUser
 ) -> list[TradePackageOut]:
+    """List trade packages for the latest run.
+
+    Augments the persisted TradePackage rows with two on-the-fly counts
+    that reflect what the GC actually cares about per package:
+      - low_confidence_count: items in INFERRED_LOW_CONFIDENCE tier
+      - open_issue_count:     open Gap rows linked to this package's items
+    Both are computed via single grouped queries (no N+1 per package).
+    """
     await _ensure_project(db, project_id)
     run_id = await _latest_run_id(db, project_id)
     if run_id is None:
@@ -59,7 +67,40 @@ async def list_packages(
             .order_by(TradePackage.item_count.desc())
         )
     ).scalars().all()
-    return [TradePackageOut.model_validate(p) for p in rows]
+
+    # Single grouped query: low-confidence-item count per package_id
+    lc_rows = (
+        await db.execute(
+            select(ScopeItem.package_id, sql_func.count(ScopeItem.id))
+            .where(ScopeItem.run_id == run_id)
+            .where(ScopeItem.evidence_tier == "INFERRED_LOW_CONFIDENCE")
+            .where(ScopeItem.package_id.isnot(None))
+            .group_by(ScopeItem.package_id)
+        )
+    ).all()
+    low_conf_by_pkg: dict[str, int] = {pid: int(n) for pid, n in lc_rows}
+
+    # Single grouped query: open Gap count per package_id (joined through
+    # ScopeItem.id = Gap.related_item_id)
+    gap_rows = (
+        await db.execute(
+            select(ScopeItem.package_id, sql_func.count(Gap.id))
+            .join(Gap, Gap.related_item_id == ScopeItem.id)
+            .where(ScopeItem.run_id == run_id)
+            .where(ScopeItem.package_id.isnot(None))
+            .where(Gap.status == "open")
+            .group_by(ScopeItem.package_id)
+        )
+    ).all()
+    gaps_by_pkg: dict[str, int] = {pid: int(n) for pid, n in gap_rows}
+
+    out: list[TradePackageOut] = []
+    for p in rows:
+        item = TradePackageOut.model_validate(p)
+        item.low_confidence_count = low_conf_by_pkg.get(p.id, 0)
+        item.open_issue_count = gaps_by_pkg.get(p.id, 0)
+        out.append(item)
+    return out
 
 
 @router.get("/{package_id}", response_model=TradePackageDetailOut)

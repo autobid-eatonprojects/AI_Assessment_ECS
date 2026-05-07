@@ -36,6 +36,7 @@ from sqlalchemy import select
 from ..config import settings as app_settings
 from ..database import SessionLocal
 from ..models import (
+    Chunk,
     Document,
     ProjectProfile,
     ScopeCitation,
@@ -44,8 +45,7 @@ from ..models import (
     TradeDivisionRelevance,
 )
 from .bilateral_evidence import classify_run as classify_bilateral
-from .conflict_arbitrator import arbitrate_run as arbitrate_conflicts
-from .conflict_detector import detect_run as detect_conflicts
+from .conflict_resolution import run as resolve_conflicts
 from .csi_grounder import ground_code
 from .discipline_agent import (
     DisciplineAgentResult,
@@ -66,6 +66,7 @@ from .citation_validator import (
 from .schedule_miner import mine_schedules
 from .scope_deduper import dedupe
 from .scope_verifier import verify_low_confidence
+from .section_extractor import extract_sections_for_project
 from .package_narrative import write_narratives_for_run
 from .quantity_sanity import check_run as check_quantity_sanity
 from .trade_bundler import bundle_run as bundle_packages
@@ -78,6 +79,7 @@ from .scope_extractor import (
 from .scope_validator import ValidationResult, validate_candidate
 from .trade_list_parser import (
     CSIDivision,
+    CSISection,
     CSITaxonomy,
     get_taxonomy_for_project,
 )
@@ -91,6 +93,79 @@ class _DivisionResult:
     accepted: list[CandidateItem]
     candidates_total: int
     cost_usd: float
+
+
+# ============================================================================
+# Orchestrator pattern — pluggable scope-extraction modes
+# ============================================================================
+#
+# Replaces the previous 50-line `if mode == "per-discipline" / elif "per-section"
+# / elif "hybrid" / else` dispatch chain (and the parallel 17-line chain for
+# `sections_total`) with a single Orchestrator class per mode. Adding a new
+# mode is one new class, not 30+ LoC of dispatch + denominator branches.
+#
+# Each Orchestrator owns:
+#   - The initial `sections_total` denominator for the progress UI
+#   - The execution path: which extractor(s) to run, in what sequence
+#   - Its post-processing (e.g. schedule-miner merge, orphan-division handling)
+#
+# The dispatcher just looks up the class in `_ORCHESTRATORS` and calls
+# `run()`. Future modes (e.g. `per-section + drawing_miner` when the miner
+# module exists) become a single new class registered in the dict.
+
+
+from abc import ABC as _ABC, abstractmethod as _abstractmethod
+from dataclasses import field as _field
+
+
+@dataclass
+class OrchestratorContext:
+    """Everything an Orchestrator needs to execute a run.
+
+    Built once after the run row is created (so run_id is final) and the
+    schedule_miner pre-pass has populated `schedule_candidates_by_division`.
+    Pass-through container; no behaviour.
+    """
+    project_id: str
+    profile: "ProjectProfile"
+    taxonomy: CSITaxonomy
+    run_id: str
+    active_division_codes: set[str]
+    divisions_to_process: list[CSIDivision]
+    schedule_candidates_by_division: dict[str, list[CandidateItem]] = _field(default_factory=dict)
+
+
+@dataclass
+class OrchestratorResult:
+    """What every Orchestrator returns from `run()`."""
+    division_results: list[_DivisionResult]
+    discipline_results: list["DisciplineAgentResult"] = _field(default_factory=list)
+    cost_usd: float = 0.0
+
+
+class Orchestrator(_ABC):
+    """Mode-pluggable scope-extraction orchestrator.
+
+    Subclass to add a new mode. The dispatcher (run_scope_extraction)
+    selects an Orchestrator from `_ORCHESTRATORS[mode]` and calls
+    `run(ctx)`. Tests inject a fake Orchestrator directly — the
+    interface IS the test surface.
+    """
+
+    name: str = ""
+
+    @_abstractmethod
+    def initial_sections_total(
+        self,
+        divisions_to_process: list[CSIDivision],
+        active_division_codes: set[str],
+    ) -> int:
+        """Initial denominator for the progress UI. Computed before the
+        run row is created. May be refined inside run() (per-section
+        recalculates after filtering empty sections)."""
+
+    @_abstractmethod
+    async def run(self, ctx: OrchestratorContext) -> OrchestratorResult: ...
 
 
 class ScopeRunnerUnavailable(Exception):
@@ -261,6 +336,12 @@ async def _persist_discipline_gaps(
     async with SessionLocal() as db:
         for res in discipline_results:
             for entry in res.spec_without_drawing or []:
+                if not isinstance(entry, dict):
+                    log.warning(
+                        "scope_runner: skipping non-dict spec_without_drawing "
+                        "entry in %s (type=%s)", res.discipline, type(entry).__name__,
+                    )
+                    continue
                 desc = (entry.get("summary") or entry.get("description") or "").strip()
                 if not desc:
                     continue
@@ -294,6 +375,8 @@ async def _persist_discipline_gaps(
                 )
                 n_inserted += 1
             for entry in res.drawing_without_spec or []:
+                if not isinstance(entry, dict):
+                    continue
                 desc = (entry.get("description") or "").strip()
                 if not desc:
                     continue
@@ -315,6 +398,8 @@ async def _persist_discipline_gaps(
                 )
                 n_inserted += 1
             for entry in (res.raw or {}).get("unilateral_items") or []:
+                if not isinstance(entry, dict):
+                    continue
                 desc = (entry.get("description") or "").strip()
                 if not desc:
                     continue
@@ -337,6 +422,64 @@ async def _persist_discipline_gaps(
                 n_inserted += 1
         await db.commit()
     return n_inserted
+
+
+async def _merge_schedule_miner_results(
+    division_results: list[_DivisionResult],
+    schedule_candidates_by_division: dict[str, list[CandidateItem]],
+    taxonomy: CSITaxonomy,
+) -> None:
+    """Bolt schedule_miner outputs onto the LLM-extracted division buckets.
+
+    Two cases:
+      - Division already has LLM-emitted items: append miner candidates to
+        the same bucket (post-process dedupe handles overlap with the
+        deterministic miner rows).
+      - Division is fresh (LLM emitted nothing): create a new bucket from
+        deduped miner candidates so the schedule's enumerated rows aren't
+        silently dropped.
+
+    Mutates `division_results` in place. Used by per-discipline and
+    per-section modes; per-division mode does its own merge inline at
+    `_process_division`.
+    """
+    emitted_divisions = {dr.division_code for dr in division_results}
+    for div_code, miner_cands in schedule_candidates_by_division.items():
+        if not miner_cands:
+            continue
+        if div_code in emitted_divisions:
+            bucket = next(
+                (dr for dr in division_results if dr.division_code == div_code),
+                None,
+            )
+            if bucket is not None:
+                for c in miner_cands:
+                    ground = ground_code(c.csi_code, taxonomy)
+                    c.csi_code = ground.code
+                    setattr(c, "_votes", [])
+                    setattr(c, "_confidence", 1.0)
+                    setattr(c, "_ground_method", ground.method)
+                    setattr(c, "_ground_note", ground.note)
+                bucket.accepted.extend(miner_cands)
+                bucket.candidates_total += len(miner_cands)
+            continue
+        # Fresh bucket: LLM emitted nothing for this division
+        for c in miner_cands:
+            ground = ground_code(c.csi_code, taxonomy)
+            c.csi_code = ground.code
+            setattr(c, "_votes", [])
+            setattr(c, "_confidence", 1.0)
+            setattr(c, "_ground_method", ground.method)
+            setattr(c, "_ground_note", ground.note)
+        deduped = await dedupe(miner_cands)
+        division_results.append(
+            _DivisionResult(
+                division_code=div_code,
+                accepted=deduped,
+                candidates_total=len(miner_cands),
+                cost_usd=0.0,
+            )
+        )
 
 
 async def _run_per_discipline(
@@ -389,10 +532,21 @@ async def _run_per_discipline(
     for _ in discipline_results:
         await _bump_progress(run_id, completed_inc=1)
 
-    # Hydrate every cited chunk_id in one go so we don't N+1 the DB
+    # Hydrate every cited chunk_id in one go so we don't N+1 the DB.
+    # Sonnet has been observed under load returning string elements in
+    # arrays that are typed as list[dict] (same failure shape link_judge
+    # and schedule_miner have defensive checks for). Filter non-dicts
+    # rather than crashing the whole run for one malformed item.
     all_chunk_ids: set[str] = set()
     for r in discipline_results:
         for item in r.scope_items:
+            if not isinstance(item, dict):
+                log.warning(
+                    "scope_runner: skipping non-dict scope_item in %s "
+                    "result (type=%s, repr=%r)",
+                    r.discipline, type(item).__name__, str(item)[:120],
+                )
+                continue
             for cid in (item.get("spec_chunk_ids") or []):
                 all_chunk_ids.add(str(cid))
             for cid in (item.get("drawing_chunk_ids") or []):
@@ -404,6 +558,8 @@ async def _run_per_discipline(
     total_emitted = 0
     for r in discipline_results:
         for item in r.scope_items:
+            if not isinstance(item, dict):
+                continue  # already warned above
             cand = _candidate_from_discipline_scope_item(item, chunk_lookup)
             if cand is None:
                 continue
@@ -439,6 +595,278 @@ async def _run_per_discipline(
         total_cost,
     )
     return division_results, discipline_results, total_cost
+
+
+async def _run_per_section(
+    project_id: str,
+    taxonomy: CSITaxonomy,
+    run_id: str,
+    active_division_codes: set[str],
+) -> tuple[list[_DivisionResult], float]:
+    """Per-section orchestration: one Sonnet call per CSI section that has
+    spec content, bucketed by csi_code[:2] for the existing persistence path.
+
+    Items emerge spec-only (no drawing citations). Drawing evidence is
+    layered on later by drawing_grounder when wired (Phase B). The
+    bilateral_evidence/evidence_pattern stages downstream correctly handle
+    spec-only items per the new evidence-pattern semantics — admin items
+    expect spec-only, materials get flagged "missing-drawing" until ground.
+
+    Returns (division_results, total_cost_usd). The persistence path
+    (_persist_results) only consumes division_results; we don't generate
+    DisciplineAgentResult here so the caller passes [] for that slot.
+    """
+    # 1. Resolve target sections from the OBSERVED chunk index (the
+    #    csi_section column populated by the indexer when a section header
+    #    is detected in OCR text), filtered to active divisions.
+    #
+    #    We can't drive this from the taxonomy alone because Trade_List.xlsx
+    #    typically lists sections at the `NN NN 00` parent-code granularity
+    #    (e.g. `04 26 00 Concrete Unit Masonry`) while spec authors write
+    #    the full 6-digit child code (`04 26 13`). An exact-match against
+    #    the taxonomy silently skips ~25 of those orphan-coded sections —
+    #    real bid scope like `09 91 13 Exterior Painting`, `07 84 13
+    #    Penetration Firestopping`, `12 36 61 Solid Surface Countertops`.
+    #    Taxonomy is still used for human-readable titles when available.
+    from sqlalchemy import distinct as sql_distinct
+
+    async with SessionLocal() as db:
+        observed_codes = set(
+            (
+                await db.execute(
+                    select(sql_distinct(Chunk.csi_section))
+                    .join(Document, Chunk.document_id == Document.id)
+                    .where(Chunk.project_id == project_id)
+                    .where(Document.doc_type == "written-spec")
+                    .where(Chunk.csi_section.isnot(None))
+                )
+            ).scalars().all()
+        )
+
+    tax_section_by_code: dict[str, CSISection] = {
+        s.code: s for d in taxonomy.divisions for s in d.sections
+    }
+
+    target_sections: list[CSISection] = []
+    synthetic_count = 0
+    for code in sorted(observed_codes):
+        if not code or len(code) < 2:
+            continue
+        div_code = code[:2]
+        if div_code not in active_division_codes:
+            continue
+        existing = tax_section_by_code.get(code)
+        if existing is not None:
+            target_sections.append(existing)
+        else:
+            target_sections.append(
+                CSISection(
+                    code=code,
+                    title=f"Section {code}",
+                    division_code=div_code,
+                )
+            )
+            synthetic_count += 1
+
+    if not target_sections:
+        log.warning(
+            "scope_runner[per-section]: no spec-tagged sections in active "
+            "divisions %s (observed codes: %d)",
+            sorted(active_division_codes), len(observed_codes),
+        )
+        return [], 0.0
+
+    log.info(
+        "scope_runner[per-section]: extracting %d sections "
+        "(%d from taxonomy + %d synthetic from observed chunk codes) "
+        "— concurrency 8",
+        len(target_sections),
+        len(target_sections) - synthetic_count,
+        synthetic_count,
+    )
+
+    # Update the run's sections_total to the *actual* extraction count so
+    # the progress UI reaches 100% on completion. The initial value set in
+    # run_scope_extraction (sum of all section codes in active divisions)
+    # over-counts because most sections never have spec chunks.
+    async with SessionLocal() as db:
+        run_row = await db.get(ScopeExtractionRun, run_id)
+        if run_row is not None:
+            run_row.sections_total = len(target_sections)
+            await db.commit()
+
+    # 2. Fan out: section_extractor handles concurrency=8 internally.
+    all_items, total_cost, by_division_count = await extract_sections_for_project(
+        project_id, target_sections
+    )
+    # Progress UI tracks sections_total; advance once extraction completes.
+    # Finer-grained per-section progress would need a callback into
+    # section_extractor.
+    await _bump_progress(run_id, completed_inc=len(target_sections))
+
+    # Phase B — drawing_grounder. Section_extractor produces spec-only
+    # candidates (no drawing citations). The grounder runs Sonnet vision
+    # against tiled drawing-sheet renders to find each non-admin item's
+    # location/count and appends a synthetic drawing chunk to the item's
+    # supporting_chunks. Items that vision can't find stay spec-only and
+    # the evidence_pattern rollup correctly marks them missing-drawing.
+    # Mutates `all_items` in place.
+    if app_settings.drawing_grounder_enabled and all_items:
+        from .drawing_grounder import ground_items as _ground_items
+
+        try:
+            t_ground = time.perf_counter()
+            _, ground_result = await _ground_items(project_id, all_items)
+            ground_latency = time.perf_counter() - t_ground
+            log.info(
+                "scope_runner[per-section]: drawing_grounder — %d/%d items "
+                "grounded (%d skipped admin/qc, %d not found on drawings, "
+                "%d sheets skipped by cost guard) — spent $%.2f, %.1fs",
+                ground_result.items_grounded,
+                ground_result.items_total,
+                ground_result.items_skipped_admin,
+                ground_result.items_unfound,
+                ground_result.sheets_skipped_budget,
+                ground_result.cost_usd,
+                ground_latency,
+            )
+        except Exception as e:  # noqa: BLE001
+            # Grounder failures must not crash the run — items survive as
+            # spec-only and surface as missing-drawing in the gap report,
+            # which is exactly what we want when the grounder isn't ready.
+            log.exception(
+                "scope_runner[per-section]: drawing_grounder failed: %s — "
+                "items proceed spec-only", e,
+            )
+
+    # 3. Bucket by csi_code[:2] into _DivisionResult shape. Ground each
+    #    item's csi_code against the project's taxonomy first so persisted
+    #    rows are canonicalised.
+    by_division: dict[str, list[CandidateItem]] = {}
+    for cand in all_items:
+        ground = ground_code(cand.csi_code, taxonomy)
+        cand.csi_code = ground.code
+        setattr(cand, "_ground_method", ground.method)
+        setattr(cand, "_ground_note", ground.note)
+        # _confidence already set by section_extractor (line 306-307);
+        # only fall back to the per-discipline default if missing.
+        if not hasattr(cand, "_confidence"):
+            setattr(cand, "_confidence", 0.85)
+        if not hasattr(cand, "_votes"):
+            setattr(cand, "_votes", [])
+        div = cand.csi_code[:2]
+        by_division.setdefault(div, []).append(cand)
+
+    # 4. Cross-section dedupe inside each division. The kernel groups by
+    #    csi_code first (threshold 0.92) so adjacent-code items don't
+    #    over-merge.
+    division_results: list[_DivisionResult] = []
+    for div_code, cands in by_division.items():
+        deduped = await dedupe(cands)
+        division_results.append(
+            _DivisionResult(
+                division_code=div_code,
+                accepted=deduped,
+                candidates_total=len(cands),
+                cost_usd=0.0,  # cost rolled up at the section level (total_cost)
+            )
+        )
+
+    log.info(
+        "scope_runner[per-section]: %d sections → %d items across "
+        "%d divisions ($%.4f) — by-division: %s",
+        len(target_sections), len(all_items), len(by_division),
+        total_cost, by_division_count,
+    )
+    return division_results, total_cost
+
+
+async def _run_hybrid(
+    project_id: str,
+    profile: ProjectProfile,
+    taxonomy: CSITaxonomy,
+    run_id: str,
+    active_division_codes: set[str],
+) -> tuple[list[_DivisionResult], list[DisciplineAgentResult], float]:
+    """Hybrid: per-section + per-discipline, union results, single dedupe pass.
+
+    Solves the architectural gap exposed by Phase A. section_extractor reads
+    spec content only — accurate on the architectural side (drywall, painting,
+    sealants, firestopping, casework, mirrors) but blind to MEP scope which
+    lives entirely on drawing sheets in this project's spec convention.
+    discipline_agent reads spec + drawing chunks per discipline — captures
+    Div 21/22/26/27/28/31/33 from M0.1, P0.1, E0.1, FP0.1 OCR text.
+
+    Running both and merging via the existing scope_deduper kernel means:
+      - section_extractor's wins on the spec side carry through (824 items
+        in the latest run vs 317 baseline)
+      - discipline_agent's drawing-OCR coverage carries through (~115 MEP
+        items the section-only run dropped)
+      - dedupe at csi_code group + 0.92 cosine similarity merges items
+        the two extractors both find (e.g. drywall in 09 29 00) — citations
+        are unioned during cluster merge so the merged item carries BOTH
+        spec and drawing evidence
+
+    Cost: ~$3 (per-discipline) + ~$9 (per-section) ≈ $12-13/run. Wall time
+    ~12 min sequential (we don't parallelize to avoid burst-rate spikes).
+    """
+    log.info("scope_runner[hybrid]: starting per-section pass")
+    sec_div_results, sec_cost = await _run_per_section(
+        project_id, taxonomy, run_id, active_division_codes,
+    )
+
+    # Expand sections_total for the progress UI: per-discipline will tick
+    # _bump_progress once per discipline. Without this, completed > total.
+    disciplines = disciplines_for_project(active_division_codes)
+    async with SessionLocal() as db:
+        run_row = await db.get(ScopeExtractionRun, run_id)
+        if run_row is not None:
+            run_row.sections_total = (run_row.sections_total or 0) + len(disciplines)
+            await db.commit()
+
+    log.info(
+        "scope_runner[hybrid]: starting per-discipline pass (%d disciplines)",
+        len(disciplines),
+    )
+    disc_div_results, disc_results, disc_cost = await _run_per_discipline(
+        project_id, profile, taxonomy, run_id, active_division_codes,
+    )
+
+    # Union by division_code; concatenate accepted candidates from both
+    # extractors, then re-dedupe within each merged bucket.
+    by_division: dict[str, list[CandidateItem]] = {}
+    candidate_totals: dict[str, int] = {}
+    for r in (*sec_div_results, *disc_div_results):
+        by_division.setdefault(r.division_code, []).extend(r.accepted)
+        candidate_totals[r.division_code] = (
+            candidate_totals.get(r.division_code, 0) + r.candidates_total
+        )
+
+    merged_results: list[_DivisionResult] = []
+    for div_code, cands in by_division.items():
+        deduped = await dedupe(cands)
+        merged_results.append(
+            _DivisionResult(
+                division_code=div_code,
+                accepted=deduped,
+                candidates_total=candidate_totals.get(div_code, 0),
+                cost_usd=0.0,
+            )
+        )
+
+    n_section_items = sum(len(r.accepted) for r in sec_div_results)
+    n_discipline_items = sum(len(r.accepted) for r in disc_div_results)
+    n_merged = sum(len(r.accepted) for r in merged_results)
+    log.info(
+        "scope_runner[hybrid]: section=%d items, discipline=%d items, "
+        "merged=%d unique items (%d duplicates collapsed) across %d divisions, "
+        "$%.4f total ($%.4f section + $%.4f discipline)",
+        n_section_items, n_discipline_items, n_merged,
+        n_section_items + n_discipline_items - n_merged,
+        len(merged_results),
+        sec_cost + disc_cost, sec_cost, disc_cost,
+    )
+    return merged_results, disc_results, sec_cost + disc_cost
 
 
 async def _process_division(
@@ -561,6 +989,80 @@ def _evidence_type_for_doc_type(doc_type: str | None) -> str:
     return "other"
 
 
+# ============================================================================
+# Admission — pure, no DB.
+# ============================================================================
+
+
+@dataclass
+class Admission:
+    """Pre-persistence decision for a single CandidateItem.
+
+    `rejection_reason is None` → the candidate is admitted and
+    `accepted_chunks` is the (non-empty) list of citations to persist.
+
+    Otherwise the candidate is rejected for one of the named reasons and
+    `accepted_chunks` is empty. Persistence MUST skip rejected candidates;
+    persisting one would re-introduce the zero-citation orphan bug class.
+
+    `dropped_verdicts` is informational — the (chunk, verdict) pairs L2
+    rejected, used by the persistence layer to roll up rejection-reason
+    counts for logging.
+    """
+    candidate: "CandidateItem"
+    accepted_chunks: list  # list[RetrievedChunk]
+    rejection_reason: str | None
+    dropped_verdicts: list  # list[tuple[RetrievedChunk, CitationVerdict]]
+
+
+def _admit_candidate(cand: "CandidateItem") -> Admission:
+    """Pure admission decision — no DB, no I/O.
+
+    Schedule-miner candidates skip L2 entirely: their synthetic per-row
+    chunks are deterministic and already passed the miner's hallucination
+    guard. All other candidates must produce at least one citation that
+    survives `filter_valid_citations` (description-token-overlap check),
+    or the candidate is rejected.
+
+    The interface is the test surface: pass synthetic CandidateItems with
+    in-memory RetrievedChunks → assert on the returned Admission. No DB
+    session, no API key, no fixtures.
+    """
+    if cand.extraction_method == "schedule_miner":
+        return Admission(
+            candidate=cand,
+            accepted_chunks=list(cand.supporting_chunks),
+            rejection_reason=None,
+            dropped_verdicts=[],
+        )
+
+    if not cand.supporting_chunks:
+        return Admission(
+            candidate=cand,
+            accepted_chunks=[],
+            rejection_reason="no_supporting_chunks",
+            dropped_verdicts=[],
+        )
+
+    kept, dropped = filter_valid_citations(
+        cand.description, cand.supporting_chunks
+    )
+    if not kept:
+        return Admission(
+            candidate=cand,
+            accepted_chunks=[],
+            rejection_reason="all_l2_rejected",
+            dropped_verdicts=dropped,
+        )
+
+    return Admission(
+        candidate=cand,
+        accepted_chunks=kept,
+        rejection_reason=None,
+        dropped_verdicts=dropped,
+    )
+
+
 async def _persist_results(
     run_id: str,
     project_id: str,
@@ -581,7 +1083,23 @@ async def _persist_results(
     deduped_total = 0
     citations_kept = 0
     citations_dropped: dict[str, int] = {"EMPTY": 0, "HEADER_ONLY": 0, "LOW_OVERLAP": 0}
-    items_zeroed = 0  # items that lost ALL citations to validation
+    items_zeroed = 0  # items that lost ALL citations to validation — NOT persisted
+    items_rejected_no_citations = 0  # items the agent emitted with empty supporting_chunks
+
+    # ====================================================================
+    # Phase 1 — Admission (pure, no DB).
+    # Decide per candidate: admit + which citations to persist, or reject.
+    # The bug fix that previously lived inline (move validation BEFORE
+    # db.add) is now expressed as a structural property: persistence only
+    # ever sees `Admission(rejection_reason=None)` rows. The orphan-item
+    # bug class is impossible by construction.
+    # ====================================================================
+    admissions_by_division: dict[str, list[Admission]] = {}
+    for d in division_results:
+        admissions_by_division[d.division_code] = [
+            _admit_candidate(c) for c in d.accepted
+        ]
+
     async with SessionLocal() as db:
         # Pre-load doc_type for every chunk's source document so each
         # citation insert can stamp evidence_type without an N+1 lookup.
@@ -604,7 +1122,38 @@ async def _persist_results(
             candidates_total += d.candidates_total
             validated_total += len(d.accepted)
             deduped_total += len(d.accepted)
-            for cand in d.accepted:
+            for adm in admissions_by_division.get(d.division_code, []):
+                # Roll up dropped-citation reasons regardless of admission
+                # outcome — useful for both kept and rejected items so the
+                # log line reflects total L2 work done.
+                for _, verdict in adm.dropped_verdicts:
+                    citations_dropped[verdict.reason] = (
+                        citations_dropped.get(verdict.reason, 0) + 1
+                    )
+
+                # Phase 1 already decided. Just act on it.
+                if adm.rejection_reason is not None:
+                    if adm.rejection_reason == "all_l2_rejected":
+                        items_zeroed += 1
+                        log.info(
+                            "citation_validator: rejecting candidate (lost "
+                            "ALL %d citations to L2) — desc=%r reasons=%s",
+                            len(adm.candidate.supporting_chunks),
+                            (adm.candidate.description or "")[:80],
+                            [v.reason for _, v in adm.dropped_verdicts],
+                        )
+                    else:  # no_supporting_chunks
+                        items_rejected_no_citations += 1
+                        log.info(
+                            "scope_runner: rejecting candidate emitted with "
+                            "zero supporting_chunks — desc=%r",
+                            (adm.candidate.description or "")[:80],
+                        )
+                    continue
+
+                cand = adm.candidate
+                chunks_to_persist = adm.accepted_chunks
+
                 section = taxonomy.get_section(cand.csi_code)
                 section_title = section.title if section else None
                 division_label = (
@@ -639,31 +1188,6 @@ async def _persist_results(
                 db.add(item)
                 await db.flush()
 
-                # Strict citations: validate every chunk before persistence.
-                # Schedule-miner candidates use synthetic per-row chunks that
-                # already pass the miner's hallucination guard — skip the
-                # gate for those.
-                if cand.extraction_method == "schedule_miner":
-                    chunks_to_persist = list(cand.supporting_chunks)
-                else:
-                    kept, dropped = filter_valid_citations(
-                        cand.description, cand.supporting_chunks
-                    )
-                    chunks_to_persist = kept
-                    for _, verdict in dropped:
-                        citations_dropped[verdict.reason] = (
-                            citations_dropped.get(verdict.reason, 0) + 1
-                        )
-                    if not chunks_to_persist and cand.supporting_chunks:
-                        items_zeroed += 1
-                        log.info(
-                            "citation_validator: item %s lost ALL %d citations "
-                            "(reasons=%s) — desc=%r",
-                            item.id, len(cand.supporting_chunks),
-                            [v.reason for _, v in dropped],
-                            (cand.description or "")[:80],
-                        )
-
                 # Citations
                 for r in chunks_to_persist:
                     chunk = r.chunk
@@ -688,17 +1212,21 @@ async def _persist_results(
         await db.commit()
 
     total_dropped = sum(citations_dropped.values())
-    if total_dropped or items_zeroed:
+    if total_dropped or items_zeroed or items_rejected_no_citations:
         log.info(
             "citation_validator: kept=%d dropped=%d (empty=%d header=%d "
-            "low_overlap=%d) items_zeroed=%d",
+            "low_overlap=%d) items_zeroed=%d items_no_citations=%d",
             citations_kept,
             total_dropped,
             citations_dropped.get("EMPTY", 0),
             citations_dropped.get("HEADER_ONLY", 0),
             citations_dropped.get("LOW_OVERLAP", 0),
             items_zeroed,
+            items_rejected_no_citations,
         )
+    # Adjust the deduped_total return so it reflects what actually got
+    # persisted (was over-counting by items_zeroed + items_rejected_no_citations).
+    deduped_total -= items_zeroed + items_rejected_no_citations
     return candidates_total, validated_total, deduped_total
 
 
@@ -739,7 +1267,7 @@ def _capture_model_versions() -> dict:
         "schedule_miner": app_settings.classifier_model,
         # Stage 3
         "link_judge": app_settings.classifier_model,
-        "conflict_arbitrator": "claude-opus-4-7",
+        "conflict_resolution": "claude-opus-4-7",
         # Phase 1/2
         "classifier": app_settings.classifier_model,
         "vision": app_settings.vision_model,
@@ -750,6 +1278,166 @@ def _capture_model_versions() -> dict:
         "rerank_model": app_settings.rerank_model,
         "contextualizer_model": app_settings.contextualizer_model,
     }
+
+
+# ============================================================================
+# Concrete Orchestrators — one class per mode.
+# ============================================================================
+#
+# Each wraps the existing `_run_per_*` private helpers + their post-processing
+# (schedule-miner merge, orphan-division handling). The helper functions stay
+# untouched; the Orchestrator class is the test surface.
+
+
+class PerDisciplineOrchestrator(Orchestrator):
+    name = "per-discipline"
+
+    def initial_sections_total(self, divisions_to_process, active_division_codes):
+        # ~10 disciplines mapped from the active division codes.
+        return len(disciplines_for_project(active_division_codes)) or 1
+
+    async def run(self, ctx: OrchestratorContext) -> OrchestratorResult:
+        div_results, disc_results, cost = await _run_per_discipline(
+            ctx.project_id, ctx.profile, ctx.taxonomy,
+            ctx.run_id, ctx.active_division_codes,
+        )
+        await _merge_schedule_miner_results(
+            div_results, ctx.schedule_candidates_by_division, ctx.taxonomy,
+        )
+        return OrchestratorResult(div_results, disc_results, cost)
+
+
+class PerSectionOrchestrator(Orchestrator):
+    name = "per-section"
+
+    def initial_sections_total(self, divisions_to_process, active_division_codes):
+        # Sum of sections in active divisions; per-section's run() refines
+        # this to the count of sections that actually have spec content.
+        return sum(len(d.sections) for d in divisions_to_process) or 1
+
+    async def run(self, ctx: OrchestratorContext) -> OrchestratorResult:
+        div_results, cost = await _run_per_section(
+            ctx.project_id, ctx.taxonomy, ctx.run_id, ctx.active_division_codes,
+        )
+        await _merge_schedule_miner_results(
+            div_results, ctx.schedule_candidates_by_division, ctx.taxonomy,
+        )
+        return OrchestratorResult(div_results, [], cost)
+
+
+class HybridOrchestrator(Orchestrator):
+    name = "hybrid"
+
+    def initial_sections_total(self, divisions_to_process, active_division_codes):
+        # Both phases tick: per-section sections + per-discipline disciplines.
+        return (
+            sum(len(d.sections) for d in divisions_to_process)
+            + len(disciplines_for_project(active_division_codes))
+        ) or 1
+
+    async def run(self, ctx: OrchestratorContext) -> OrchestratorResult:
+        div_results, disc_results, cost = await _run_hybrid(
+            ctx.project_id, ctx.profile, ctx.taxonomy,
+            ctx.run_id, ctx.active_division_codes,
+        )
+        await _merge_schedule_miner_results(
+            div_results, ctx.schedule_candidates_by_division, ctx.taxonomy,
+        )
+        return OrchestratorResult(div_results, disc_results, cost)
+
+
+class PerDivisionOrchestrator(Orchestrator):
+    """Legacy mode — process each division in parallel through the
+    Stage A/B/C/D pipeline (`_process_division`). schedule_miner items
+    are incorporated INSIDE _process_division, so this orchestrator does
+    NOT call the shared `_merge_schedule_miner_results` helper — that
+    would double-count them. Instead it surfaces orphan-division miner
+    items at the end.
+    """
+    name = "per-division"
+
+    def initial_sections_total(self, divisions_to_process, active_division_codes):
+        return len(divisions_to_process)
+
+    async def run(self, ctx: OrchestratorContext) -> OrchestratorResult:
+        sem_div = asyncio.Semaphore(_DIVISION_CONCURRENCY)
+        sem_validate = asyncio.Semaphore(_VALIDATE_CONCURRENCY)
+
+        async def _process_with_sem(division: CSIDivision) -> _DivisionResult:
+            async with sem_div:
+                try:
+                    return await _process_division(
+                        ctx.project_id, division, ctx.profile, ctx.taxonomy,
+                        ctx.run_id, sem_validate,
+                        ctx.schedule_candidates_by_division.get(division.code, []),
+                    )
+                except Exception:  # noqa: BLE001
+                    log.exception(
+                        "scope_runner: division %s failed", division.code,
+                    )
+                    await _bump_progress(ctx.run_id, failed_inc=1)
+                    return _DivisionResult(division.code, [], 0, 0.0)
+
+        division_results = list(await asyncio.gather(
+            *(_process_with_sem(d) for d in ctx.divisions_to_process)
+        ))
+
+        # Surface orphan-division schedule-miner items (their division
+        # wasn't in the relevance set, but the miner found a schedule
+        # whose rows fell into it; valuable line items, don't drop).
+        relevant_codes = {d.code for d in ctx.divisions_to_process}
+        orphan_divisions = (
+            set(ctx.schedule_candidates_by_division) - relevant_codes
+        )
+        for div_code in orphan_divisions:
+            orphan_cands = ctx.schedule_candidates_by_division[div_code]
+            if not orphan_cands:
+                continue
+            log.info(
+                "scope_runner: surfacing %d schedule-miner items in "
+                "non-relevant div %s",
+                len(orphan_cands), div_code,
+            )
+            for c in orphan_cands:
+                ground = ground_code(c.csi_code, ctx.taxonomy)
+                c.csi_code = ground.code
+                setattr(c, "_votes", [])
+                setattr(c, "_confidence", 1.0)
+                setattr(c, "_ground_method", ground.method)
+                setattr(c, "_ground_note", ground.note)
+            deduped_orphans = await dedupe(orphan_cands)
+            division_results.append(
+                _DivisionResult(
+                    division_code=div_code,
+                    accepted=deduped_orphans,
+                    candidates_total=len(orphan_cands),
+                    cost_usd=0.0,
+                )
+            )
+
+        return OrchestratorResult(division_results, [], 0.0)
+
+
+_ORCHESTRATORS: dict[str, type[Orchestrator]] = {
+    "per-discipline": PerDisciplineOrchestrator,
+    "per-section": PerSectionOrchestrator,
+    "hybrid": HybridOrchestrator,
+    "per-division": PerDivisionOrchestrator,
+}
+
+
+def _get_orchestrator(mode: str) -> Orchestrator:
+    """Return an Orchestrator instance for the requested mode, or fall
+    back to PerDisciplineOrchestrator for unknown values (with a warning)."""
+    cls = _ORCHESTRATORS.get(mode)
+    if cls is None:
+        log.warning(
+            "scope_runner: unknown scope_orchestration_mode=%r, falling "
+            "back to per-discipline (valid modes: %s)",
+            mode, sorted(_ORCHESTRATORS.keys()),
+        )
+        cls = PerDisciplineOrchestrator
+    return cls()
 
 
 async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
@@ -764,6 +1452,34 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
         profile = await get_or_create_profile(project_id)
     except ScopeExtractorUnavailable as e:
         raise ScopeRunnerUnavailable(str(e)) from e
+
+    # Hygiene pass: clear stale True-overrides on divisions where every
+    # signal disagrees (LLM=False AND no corpus evidence AND override
+    # forced True). This prevents the missing_division gap report from
+    # being polluted by leftover UI override clicks on irrelevant
+    # divisions (Div 35 Marine, Div 44 Pollution Control, etc. on a
+    # community center). Legitimate operator overrides — where the
+    # user is adding scope they know about from external context —
+    # typically don't match all three conditions, so this is safe by
+    # default. Failures are logged but don't block the run.
+    try:
+        from .trade_filter import reevaluate_corpus_evidence
+
+        cleanup = await reevaluate_corpus_evidence(
+            project_id, clear_stale_true_overrides=True,
+        )
+        if cleanup.get("cleared_overrides") or cleanup.get("flipped"):
+            log.info(
+                "scope_runner: relevance hygiene — flipped is_relevant=%s, "
+                "cleared stale True-overrides=%s",
+                cleanup.get("flipped") or [],
+                cleanup.get("cleared_overrides") or [],
+            )
+    except Exception as e:  # noqa: BLE001
+        log.warning(
+            "scope_runner: relevance hygiene pass failed (proceeding "
+            "with whatever state is in the DB): %s", e,
+        )
 
     async with SessionLocal() as db:
         rel_result = await db.execute(
@@ -796,24 +1512,22 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
     pdf_hash = await _compute_input_pdf_hash(project_id)
     model_versions = _capture_model_versions()
 
-    # Per-discipline mode counts disciplines (~10) instead of divisions
-    # for sections_total so progress UI shows accurate denominator.
+    # Sections_total denominator is mode-dependent so the progress UI
+    # ticks at the right rate:
+    #   per-discipline → ~10 disciplines
+    #   per-division → ~20-30 divisions
+    #   per-section → ~80-150 sections (much finer-grained)
+    #   hybrid → per-section count + per-discipline count (both phases)
     mode = (app_settings.scope_orchestration_mode or "per-discipline").strip()
-    if mode not in ("per-discipline", "per-division"):
-        log.warning(
-            "scope_runner: unknown scope_orchestration_mode=%r, "
-            "falling back to per-discipline",
-            mode,
-        )
-        mode = "per-discipline"
+    orchestrator = _get_orchestrator(mode)
+    # Re-read effective mode from the orchestrator (handles "fell back to
+    # per-discipline" case so the run config records the actual mode used).
+    mode = orchestrator.name
 
     active_division_codes = {d.code for d in divisions_to_process}
-    if mode == "per-discipline":
-        sections_total = (
-            len(disciplines_for_project(active_division_codes)) or 1
-        )
-    else:
-        sections_total = len(divisions_to_process)
+    sections_total = orchestrator.initial_sections_total(
+        divisions_to_process, active_division_codes,
+    )
 
     # Create the run row
     async with SessionLocal() as db:
@@ -865,117 +1579,21 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
         schedule_cost,
     )
 
-    discipline_results: list[DisciplineAgentResult] = []
-    if mode == "per-discipline":
-        division_results, discipline_results, discipline_cost = (
-            await _run_per_discipline(
-                project_id,
-                profile,
-                taxonomy,
-                run_id,
-                active_division_codes,
-            )
-        )
-        # Bolt on schedule-miner items whose division wasn't covered by
-        # any discipline_agent's emitted items — keeps the deterministic
-        # row enumeration as a backstop against the agent dropping a
-        # schedule entirely.
-        emitted_divisions = {dr.division_code for dr in division_results}
-        for div_code, miner_cands in schedule_candidates_by_division.items():
-            if not miner_cands:
-                continue
-            if div_code in emitted_divisions:
-                # Append to the existing bucket (they'll dedupe in
-                # post-process if they overlap with the agent emissions)
-                bucket = next(
-                    (dr for dr in division_results if dr.division_code == div_code),
-                    None,
-                )
-                if bucket is not None:
-                    for c in miner_cands:
-                        ground = ground_code(c.csi_code, taxonomy)
-                        c.csi_code = ground.code
-                        setattr(c, "_votes", [])
-                        setattr(c, "_confidence", 1.0)
-                        setattr(c, "_ground_method", ground.method)
-                        setattr(c, "_ground_note", ground.note)
-                    bucket.accepted.extend(miner_cands)
-                    bucket.candidates_total += len(miner_cands)
-                continue
-            # Fresh bucket: discipline_agent didn't emit for this division
-            for c in miner_cands:
-                ground = ground_code(c.csi_code, taxonomy)
-                c.csi_code = ground.code
-                setattr(c, "_votes", [])
-                setattr(c, "_confidence", 1.0)
-                setattr(c, "_ground_method", ground.method)
-                setattr(c, "_ground_note", ground.note)
-            deduped = await dedupe(miner_cands)
-            division_results.append(
-                _DivisionResult(
-                    division_code=div_code,
-                    accepted=deduped,
-                    candidates_total=len(miner_cands),
-                    cost_usd=0.0,
-                )
-            )
-    else:
-        sem_div = asyncio.Semaphore(_DIVISION_CONCURRENCY)
-        sem_validate = asyncio.Semaphore(_VALIDATE_CONCURRENCY)
-
-        async def process_with_sem(division: CSIDivision):
-            async with sem_div:
-                try:
-                    return await _process_division(
-                        project_id,
-                        division,
-                        profile,
-                        taxonomy,
-                        run_id,
-                        sem_validate,
-                        schedule_candidates_by_division.get(division.code, []),
-                    )
-                except Exception:  # noqa: BLE001
-                    log.exception("scope_runner: division %s failed", division.code)
-                    await _bump_progress(run_id, failed_inc=1)
-                    return _DivisionResult(division.code, [], 0, 0.0)
-
-        division_results = await asyncio.gather(
-            *(process_with_sem(d) for d in divisions_to_process)
-        )
-        discipline_cost = 0.0
-
-        # Surface schedule-miner items whose division wasn't in the
-        # relevance set (e.g. miner classified a schedule into Div 12
-        # but trade filter skipped it). Don't drop them silently —
-        # they're valuable line items.
-        relevant_codes = {d.code for d in divisions_to_process}
-        orphan_divisions = set(schedule_candidates_by_division) - relevant_codes
-        for div_code in orphan_divisions:
-            orphan_cands = schedule_candidates_by_division[div_code]
-            if not orphan_cands:
-                continue
-            log.info(
-                "scope_runner: surfacing %d schedule-miner items in non-relevant div %s",
-                len(orphan_cands),
-                div_code,
-            )
-            for c in orphan_cands:
-                ground = ground_code(c.csi_code, taxonomy)
-                c.csi_code = ground.code
-                setattr(c, "_votes", [])
-                setattr(c, "_confidence", 1.0)
-                setattr(c, "_ground_method", ground.method)
-                setattr(c, "_ground_note", ground.note)
-            deduped_orphans = await dedupe(orphan_cands)
-            division_results.append(
-                _DivisionResult(
-                    division_code=div_code,
-                    accepted=deduped_orphans,
-                    candidates_total=len(orphan_cands),
-                    cost_usd=0.0,
-                )
-            )
+    # Single dispatch — Orchestrator class owns its own execution path,
+    # post-processing, and (where applicable) schedule-miner merge logic.
+    ctx = OrchestratorContext(
+        project_id=project_id,
+        profile=profile,
+        taxonomy=taxonomy,
+        run_id=run_id,
+        active_division_codes=active_division_codes,
+        divisions_to_process=divisions_to_process,
+        schedule_candidates_by_division=schedule_candidates_by_division,
+    )
+    orchestrator_result = await orchestrator.run(ctx)
+    division_results = orchestrator_result.division_results
+    discipline_results = orchestrator_result.discipline_results
+    discipline_cost = orchestrator_result.cost_usd
 
     total_latency_ms = int((time.perf_counter() - t0) * 1000)
 
@@ -985,7 +1603,7 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
 
     # Per-discipline mode also persists the agent's spec-without-drawing /
     # drawing-without-spec / unilateral_items as Gap rows so HITL sees them.
-    if mode == "per-discipline" and discipline_results:
+    if mode in ("per-discipline", "hybrid") and discipline_results:
         n_agent_gaps = await _persist_discipline_gaps(
             run_id, project_id, discipline_results
         )
@@ -1042,24 +1660,24 @@ async def run_scope_extraction(project_id: str) -> ScopeExtractionRun:
         link_judge_cost,
     )
 
-    # Stage F3 — Conflict detection. Pure embedding clustering; no LLM cost.
-    # Surfaces within-CSI qty/unit disagreements + cross-division overlaps.
-    conflict_rollup = await detect_conflicts(run_id)
+    # Stage F3 — Conflict resolution. Detects within-CSI qty/unit
+    # disagreements + cross-division overlaps via embedding clustering
+    # (no LLM), then auto-arbitrates clusters where every member's
+    # confidence > 0.8 via one Opus 4.7 call each. Lower-confidence
+    # clusters stay status='open' for the HITL queue. Two-phase commit
+    # internally — detection persists before arbitration runs, so an
+    # Opus failure mid-batch still leaves conflicts visible to humans.
+    conflict_result = await resolve_conflicts(run_id)
+    arbitration_cost = conflict_result.cost_usd
     log.info(
-        "scope_runner: conflicts — qty=%d unit=%d cross_div=%d",
-        conflict_rollup.qty_mismatch,
-        conflict_rollup.unit_mismatch,
-        conflict_rollup.cross_division,
-    )
-
-    # Stage F4 — Conflict auto-arbitration (Opus 4.7). Picks winners for
-    # high-confidence clusters; ambiguous cases stay status='open' for HITL.
-    arbitrated, deferred, arbitration_cost = await arbitrate_conflicts(run_id)
-    log.info(
-        "scope_runner: arbitrated %d / deferred %d to HITL, $%.3f",
-        arbitrated,
-        deferred,
-        arbitration_cost,
+        "scope_runner: conflicts — detected qty=%d unit=%d cross_div=%d, "
+        "arbitrated=%d deferred=%d to HITL, $%.3f",
+        conflict_result.qty_mismatch,
+        conflict_result.unit_mismatch,
+        conflict_result.cross_division,
+        conflict_result.arbitrated,
+        conflict_result.deferred,
+        conflict_result.cost_usd,
     )
 
     # Stage F5 — Bilateral evidence + tier classification. Now that link

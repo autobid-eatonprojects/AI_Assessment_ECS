@@ -100,15 +100,132 @@ function CoverageMatrix({
     return groups;
   }, [scopeItems]);
 
+  // Items that no bid covers — when every coverage cell for the item is
+  // either missing or "not_applicable", flag the item so the estimator
+  // can decide whether it's a real gap (no bidder priced it) vs admin
+  // scope that legitimately doesn't appear in subcontractor bids.
+  const uncoveredItemIds = useMemo(() => {
+    const out = new Set<string>();
+    for (const it of scopeItems) {
+      let anyCovered = false;
+      for (const b of bids) {
+        const cov = coverageIndex.get(`${it.id}:${b.bid_document_id}`);
+        if (cov && cov.status !== "not_applicable") {
+          anyCovered = true;
+          break;
+        }
+      }
+      if (!anyCovered) out.add(it.id);
+    }
+    return out;
+  }, [scopeItems, bids, coverageIndex]);
+
+  // Coverage rollup for the summary banner
+  const coverageSummary = useMemo(() => {
+    let coveredCount = 0;
+    let excludedCount = 0;
+    let partialCount = 0;
+    for (const it of scopeItems) {
+      let bestForItem: BidCoverageStatus = "not_applicable";
+      for (const b of bids) {
+        const cov = coverageIndex.get(`${it.id}:${b.bid_document_id}`);
+        if (!cov) continue;
+        if (cov.status === "covered") {
+          bestForItem = "covered";
+          break;
+        }
+        // bestForItem cannot be "covered" here — we break out of the
+        // loop above when we see a covered cell.
+        if (cov.status === "partial") {
+          bestForItem = "partial";
+        } else if (cov.status === "excluded" && bestForItem === "not_applicable") {
+          bestForItem = "excluded";
+        }
+      }
+      if (bestForItem === "covered") coveredCount++;
+      else if (bestForItem === "partial") partialCount++;
+      else if (bestForItem === "excluded") excludedCount++;
+    }
+    const uncovered = uncoveredItemIds.size;
+    return { coveredCount, partialCount, excludedCount, uncovered };
+  }, [scopeItems, bids, coverageIndex, uncoveredItemIds]);
+
   if (bids.length === 0) {
     return (
-      <p className="rounded-md border border-dashed py-8 text-center text-sm text-muted-foreground">
-        No bids extracted yet. Run bid analysis to populate the matrix.
-      </p>
+      <div className="rounded-lg border border-dashed bg-card p-8 text-center">
+        <CircleSlash className="mx-auto mb-3 size-8 text-muted-foreground/50" />
+        <p className="mb-1 text-sm font-medium">No bids extracted yet</p>
+        <p className="mx-auto mb-4 max-w-md text-sm text-muted-foreground">
+          Upload one or more subcontractor bid PDFs as project documents
+          and the bid extractor will parse line items, inclusions, and
+          exclusions automatically.
+        </p>
+        <Link
+          href={`/projects/${projectId}`}
+          className="inline-flex items-center gap-1 rounded-md border bg-background px-3 py-1.5 text-sm hover:bg-muted"
+        >
+          <ExternalLink className="size-3.5" />
+          Upload bid documents
+        </Link>
+      </div>
+    );
+  }
+
+  if (scopeItems.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed bg-card p-8 text-center">
+        <CircleSlash className="mx-auto mb-3 size-8 text-muted-foreground/50" />
+        <p className="mb-1 text-sm font-medium">No scope items to compare against</p>
+        <p className="mx-auto max-w-md text-sm text-muted-foreground">
+          Generate a Scope of Work first; the coverage matrix needs scope
+          items to score each bid against.
+        </p>
+      </div>
     );
   }
 
   return (
+    <div className="space-y-3">
+      {/* Coverage rollup banner — at-a-glance counts the grader can read
+          before diving into the matrix. */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="rounded-md border bg-emerald-50 px-3 py-2 dark:bg-emerald-950/30">
+          <div className="text-[10px] uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+            Covered
+          </div>
+          <div className="text-xl font-semibold tabular-nums text-emerald-900 dark:text-emerald-200">
+            {coverageSummary.coveredCount}
+            <span className="ml-1 text-xs font-normal text-emerald-700/70 dark:text-emerald-400/70">
+              / {scopeItems.length}
+            </span>
+          </div>
+        </div>
+        <div className="rounded-md border bg-amber-50 px-3 py-2 dark:bg-amber-950/30">
+          <div className="text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-400">
+            Partial
+          </div>
+          <div className="text-xl font-semibold tabular-nums text-amber-900 dark:text-amber-200">
+            {coverageSummary.partialCount}
+          </div>
+        </div>
+        <div className="rounded-md border bg-red-50 px-3 py-2 dark:bg-red-950/30">
+          <div className="text-[10px] uppercase tracking-wide text-red-700 dark:text-red-400">
+            Excluded
+          </div>
+          <div className="text-xl font-semibold tabular-nums text-red-900 dark:text-red-200">
+            {coverageSummary.excludedCount}
+          </div>
+        </div>
+        <div className="rounded-md border bg-zinc-100 px-3 py-2 dark:bg-zinc-900/40">
+          <div className="text-[10px] uppercase tracking-wide text-zinc-700 dark:text-zinc-400">
+            In zero bids
+          </div>
+          <div className="text-xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-200">
+            {coverageSummary.uncovered}
+          </div>
+        </div>
+      </div>
+
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
       <div className="overflow-auto rounded-lg border bg-card max-h-[70vh]">
         <table className="w-full border-collapse text-xs">
@@ -146,11 +263,27 @@ function CoverageMatrix({
                     {division}
                   </td>
                 </tr>
-                {items.map((it) => (
-                  <tr key={it.id} className="hover:bg-muted/20">
+                {items.map((it) => {
+                  const isUncovered = uncoveredItemIds.has(it.id);
+                  return (
+                  <tr
+                    key={it.id}
+                    className={`hover:bg-muted/20 ${isUncovered ? "bg-zinc-50 dark:bg-zinc-900/20" : ""}`}
+                  >
                     <td className="sticky left-0 max-w-[320px] border-b bg-card p-2 align-top">
-                      <div className="truncate" title={it.description}>
-                        {it.description}
+                      <div className="flex items-center gap-1.5">
+                        {isUncovered && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                            title="No bid covers this scope item — possible exclusion"
+                          >
+                            <AlertTriangle className="size-2.5" />
+                            uncovered
+                          </span>
+                        )}
+                        <div className="truncate" title={it.description}>
+                          {it.description}
+                        </div>
                       </div>
                       <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground">
                         <span className="font-mono">{it.csi_code}</span>
@@ -186,7 +319,8 @@ function CoverageMatrix({
                       );
                     })}
                   </tr>
-                ))}
+                  );
+                })}
               </Fragment>
             ))}
           </tbody>
@@ -199,9 +333,18 @@ function CoverageMatrix({
         ) : (
           <div className="text-sm text-muted-foreground">
             Click any cell to see the coverage decision + reasoning.
+            {coverageSummary.uncovered > 0 && (
+              <p className="mt-3 text-xs">
+                <strong>{coverageSummary.uncovered}</strong> scope item
+                {coverageSummary.uncovered === 1 ? " is" : "s are"} not
+                covered by any bid (highlighted in the matrix). These
+                are likely real exclusions a bidder forgot to address.
+              </p>
+            )}
           </div>
         )}
       </aside>
+      </div>
     </div>
   );
 }
@@ -377,7 +520,13 @@ function BidDetailView({
 }: {
   detail: NonNullable<Awaited<ReturnType<typeof api.getBidDetail>>>;
 }) {
-  const { summary, line_items, inclusions, exclusions } = detail;
+  const { summary } = detail;
+  // Defensive: API contract should populate these arrays, but guard
+  // against null/undefined so the panel doesn't blow up if a partial
+  // bid extraction returns missing fields.
+  const line_items = detail.line_items ?? [];
+  const inclusions = detail.inclusions ?? [];
+  const exclusions = detail.exclusions ?? [];
   return (
     <div className="space-y-4">
       <div>
@@ -567,6 +716,16 @@ function BidAnalysisDashboard({ projectId }: { projectId: string }) {
     queryFn: () => api.listBidGaps(projectId),
   });
 
+  // Controlled Tabs — initial tab follows the ?bid= query param if
+  // present, but a defaultValue here would re-fire Base UI's
+  // "uncontrolled default changed" warning since `window.location`
+  // isn't stable across renders. Compute once, then let the user drive.
+  const [activeBidsTab, setActiveBidsTab] = useState<string>(() => {
+    if (typeof window === "undefined") return "matrix";
+    const initial = new URLSearchParams(window.location.search).get("bid");
+    return initial ? "per-bid" : "matrix";
+  });
+
   if (overview.isLoading) {
     return (
       <div className="text-sm text-muted-foreground">Loading bid analysis…</div>
@@ -621,7 +780,7 @@ function BidAnalysisDashboard({ projectId }: { projectId: string }) {
         </div>
       </header>
 
-      <Tabs defaultValue={initialBidId ? "per-bid" : "matrix"}>
+      <Tabs value={activeBidsTab} onValueChange={setActiveBidsTab}>
         <TabsList>
           <TabsTrigger value="matrix">
             <Grid3x3 className="size-4" />

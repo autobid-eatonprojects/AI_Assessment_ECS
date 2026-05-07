@@ -5,15 +5,24 @@ from __future__ import annotations
 from collections import Counter
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from ..models import Project, ScopeExtractionRun, ScopeItem
-from ..schemas import ScopeItemOut, ScopeOverview, ScopeRunOut, TrustScoreOut
+from ..models import Project, RagasEvalRun, ScopeExtractionRun, ScopeItem
+from ..schemas import (
+    RagasEvalRunOut,
+    ScopeItemOut,
+    ScopeOverview,
+    ScopeRunOut,
+    TrustScoreOut,
+)
+from ..services.ragas_runner import default_fixtures_path, schedule_ragas_eval
 from ..services.scope_runner import (
     ScopeRunnerUnavailable,
     schedule_scope_run,
 )
+from ..services.sow_renderer import render_sow_for_run
 from .deps import DB, CurrentUser
 
 router = APIRouter(prefix="/projects/{project_id}/scope", tags=["scope"])
@@ -167,6 +176,39 @@ async def get_run(
     return ScopeRunOut.model_validate(run)
 
 
+@router.get("/runs/{run_id}/sow.md", response_class=PlainTextResponse)
+async def get_sow_markdown(
+    project_id: str, run_id: str, db: DB, _: CurrentUser
+) -> Response:
+    """Render the run as an industry-standard 10-section Scope of Work
+    document in Markdown. Format follows Procore/Smartsheet/BuildBook
+    conventions: project info, scope summary, included work organized
+    by CSI division, exclusions, assumptions, materials/specs, schedule,
+    submittals/closeout, coordination, change-order process.
+    """
+    await _ensure_project(db, project_id)
+    result = await db.execute(
+        select(ScopeExtractionRun).where(
+            ScopeExtractionRun.id == run_id,
+            ScopeExtractionRun.project_id == project_id,
+        )
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="run not found"
+        )
+    md = await render_sow_for_run(run_id)
+    return Response(
+        content=md,
+        media_type="text/markdown; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="scope-of-work-{run_id[:8]}.md"'
+            ),
+        },
+    )
+
+
 @router.get("/items", response_model=list[ScopeItemOut])
 async def list_items(
     project_id: str,
@@ -216,6 +258,76 @@ async def get_item(
             status_code=status.HTTP_404_NOT_FOUND, detail="scope item not found"
         )
     return ScopeItemOut.model_validate(item)
+
+
+@router.post(
+    "/runs/{run_id}/ragas",
+    response_model=RagasEvalRunOut,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def start_ragas_eval(
+    project_id: str, run_id: str, db: DB, _: CurrentUser
+) -> RagasEvalRunOut:
+    """Benchmark a completed scope run against curated ground-truth fixtures.
+
+    Costs ~$1 / run, takes ~80s. Returns the eval row immediately
+    (status='running'); UI polls GET /ragas until status='complete'.
+    """
+    await _ensure_project(db, project_id)
+    scope_run = (
+        await db.execute(
+            select(ScopeExtractionRun).where(
+                ScopeExtractionRun.id == run_id,
+                ScopeExtractionRun.project_id == project_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if scope_run is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="run not found"
+        )
+    if scope_run.status != "complete":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"scope run not complete (status={scope_run.status})",
+        )
+
+    fixtures_path = default_fixtures_path()
+    eval_run = RagasEvalRun(
+        project_id=project_id,
+        scope_run_id=run_id,
+        status="running",
+        fixtures_path=fixtures_path,
+    )
+    db.add(eval_run)
+    await db.commit()
+    await db.refresh(eval_run)
+
+    schedule_ragas_eval(eval_run.id, fixtures_path)
+    return RagasEvalRunOut.model_validate(eval_run)
+
+
+@router.get(
+    "/runs/{run_id}/ragas",
+    response_model=RagasEvalRunOut | None,
+)
+async def get_latest_ragas_eval(
+    project_id: str, run_id: str, db: DB, _: CurrentUser
+) -> RagasEvalRunOut | None:
+    """Latest RAGAS eval for this scope run, or null if none yet."""
+    await _ensure_project(db, project_id)
+    row = (
+        await db.execute(
+            select(RagasEvalRun)
+            .where(RagasEvalRun.scope_run_id == run_id)
+            .where(RagasEvalRun.project_id == project_id)
+            .order_by(RagasEvalRun.started_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        return None
+    return RagasEvalRunOut.model_validate(row)
 
 
 @router.get("/trust-score", response_model=TrustScoreOut | None)

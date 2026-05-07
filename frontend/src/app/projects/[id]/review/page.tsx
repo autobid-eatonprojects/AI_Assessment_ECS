@@ -105,8 +105,8 @@ function ConflictCard({
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {conflict.members.map((m) => {
-            const snap = conflict.item_snapshots.find(
+          {(conflict.members ?? []).map((m) => {
+            const snap = (conflict.item_snapshots ?? []).find(
               (s) => s.id === m.scope_item_id,
             );
             if (!snap) return null;
@@ -253,7 +253,7 @@ function GapCard({ gap, projectId }: { gap: Gap; projectId: string }) {
               onClick={() => ack.mutate()}
               disabled={ack.isPending}
             >
-              {ack.isPending ? "…" : "Acknowledge"}
+              {ack.isPending ? "Acknowledging…" : "Acknowledge"}
             </Button>
           </div>
         </div>

@@ -21,13 +21,13 @@ import asyncio
 import base64
 import logging
 import time
-from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
 
 from ..config import settings
 from .llm_log import Usage
+from .ocr_types import OCRResult
 
 log = logging.getLogger(__name__)
 
@@ -43,14 +43,6 @@ _concurrency_sem: asyncio.Semaphore | None = None
 
 class MistralOCRUnavailable(Exception):
     """Raised when MISTRAL_API_KEY is not configured."""
-
-
-@dataclass
-class OCRResult:
-    text: str
-    usage: Usage
-    latency_ms: int
-    provider: str = "mistral"
 
 
 def _get_semaphore() -> asyncio.Semaphore:

@@ -58,6 +58,21 @@ _ADMIN_RE = re.compile(
 )
 
 
+def is_admin_description(description: str | None) -> bool:
+    """True if the item description contains admin/QC/closeout boilerplate.
+
+    Public helper — used by `expected_pattern` (force spec_only) AND by
+    conflict_resolution's cross-division clustering (admin scope is
+    inherently per-division, so admin items should not cluster across
+    divisions even when their boilerplate phrasing is similar — e.g. "Product
+    data submittal for X" appears once in every division and clustering them
+    as cross-division overlap is pure noise).
+    """
+    if not description:
+        return False
+    return bool(_ADMIN_RE.search(description))
+
+
 # CSI section / division → expected pattern.
 #
 # Lookup priority (caller logic):

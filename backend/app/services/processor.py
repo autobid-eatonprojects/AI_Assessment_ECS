@@ -26,17 +26,11 @@ from sqlalchemy.orm import selectinload
 from ..config import settings
 from ..database import SessionLocal
 from ..models import Document, DocumentPage, PageExtraction
-from ..services import classifier, gemini_vision_extractor, renderer, vision_extractor
+from ..services import classifier, renderer, vision_extractor
 from ..services.llm_log import record_call
 from ..services.storage import storage
 from ..services.vision_extractor import VisionResult, VisionUnavailable
 
-
-def _get_vision_extractor():
-    """Dispatch to the configured vision provider."""
-    if settings.vision_provider == "google":
-        return gemini_vision_extractor
-    return vision_extractor
 
 log = logging.getLogger(__name__)
 
@@ -51,6 +45,25 @@ def _get_extract_semaphore() -> asyncio.Semaphore:
     if _extract_sem is None:
         _extract_sem = asyncio.Semaphore(settings.vision_concurrency)
     return _extract_sem
+
+
+# OCR dispatch limiter. Inside ocr.py the actual provider calls are bounded
+# by Semaphore(4) per provider. We wrap each per-page task in *another*
+# semaphore here so that asyncio.gather doesn't queue 370 tasks waiting on
+# the inner semaphore — without this, the outer wait_for(90s) timer starts
+# the moment the task is dispatched and most tasks time out while still
+# waiting for the inner semaphore slot, never even reaching the API call.
+_ocr_dispatch_sem: asyncio.Semaphore | None = None
+
+
+def _get_ocr_dispatch_semaphore() -> asyncio.Semaphore:
+    global _ocr_dispatch_sem
+    if _ocr_dispatch_sem is None:
+        # Slightly higher than the inner Sem(4) — gives 4 actively running
+        # API calls and 4 ready-to-go (preprocessing/serialization). Larger
+        # values just queue tasks under the inner semaphore again.
+        _ocr_dispatch_sem = asyncio.Semaphore(8)
+    return _ocr_dispatch_sem
 
 
 def _utcnow() -> datetime:
@@ -195,19 +208,27 @@ async def _ocr_pages_if_needed(document_id: str) -> int:
 
     log.info("ocr: %d pages need OCR for doc %s", len(page_records), document_id)
 
+    dispatch_sem = _get_ocr_dispatch_semaphore()
+
     async def _one(page_id: str, page_number: int, image_rel: str):
         image_path = storage.absolute_path(image_rel)
-        try:
-            r = await asyncio.wait_for(ocr_image(image_path), timeout=90.0)
-        except asyncio.TimeoutError:
-            log.warning("ocr: page %d timed out after 90s — skipping", page_number)
-            return None
-        except OCRUnavailable:
-            log.warning("ocr: GOOGLE_API_KEY not set — skipping page %d", page_number)
-            return None
-        except Exception as e:  # noqa: BLE001
-            log.warning("ocr: page %d failed: %s", page_number, e)
-            return None
+        # Acquire the dispatch slot WITHOUT a timeout. Only wrap the actual
+        # API call (post-acquisition) in wait_for(90s), so the timer reflects
+        # API responsiveness and not queue depth. Without this, dispatching
+        # 370 tasks via asyncio.gather makes most of them time out while
+        # still queued — the API never gets called.
+        async with dispatch_sem:
+            try:
+                r = await asyncio.wait_for(ocr_image(image_path), timeout=90.0)
+            except asyncio.TimeoutError:
+                log.warning("ocr: page %d timed out after 90s — skipping", page_number)
+                return None
+            except OCRUnavailable:
+                log.warning("ocr: GOOGLE_API_KEY not set — skipping page %d", page_number)
+                return None
+            except Exception as e:  # noqa: BLE001
+                log.warning("ocr: page %d failed: %s", page_number, e)
+                return None
         async with SessionLocal() as db:
             await db.execute(
                 sql_update(DocumentPage)
@@ -241,22 +262,33 @@ async def _ocr_pages_if_needed(document_id: str) -> int:
 
 
 async def _seed_page_extractions(document_id: str) -> None:
-    """Create one PageExtraction row per DocumentPage in `pending` state."""
+    """Idempotently ensure one PageExtraction row exists per DocumentPage.
+
+    Insert-or-skip per page. Never wipes existing rows — wiping mid-flight
+    rows breaks any in-flight tasks holding their IDs (the result becomes a
+    silent 'page_extraction not found' on persist, with the Sonnet API call
+    already paid for). Re-processing must go through schedule_reprocess(),
+    which cancels in-flight tasks first and clears terminal-state rows
+    deliberately, then calls this function on a clean slate.
+    """
     async with SessionLocal() as db:
-        # Wipe any prior extractions for idempotency
+        # What's already there?
         result = await db.execute(
-            select(PageExtraction).where(PageExtraction.document_id == document_id)
+            select(PageExtraction.page_id).where(
+                PageExtraction.document_id == document_id
+            )
         )
-        for old in result.scalars().all():
-            await db.delete(old)
-        await db.flush()
+        existing_page_ids = {row[0] for row in result.all()}
 
         result = await db.execute(
             select(DocumentPage)
             .where(DocumentPage.document_id == document_id)
             .order_by(DocumentPage.page_number)
         )
+        added = 0
         for page in result.scalars().all():
+            if page.id in existing_page_ids:
+                continue  # already seeded — leave it alone
             db.add(
                 PageExtraction(
                     document_id=document_id,
@@ -265,7 +297,14 @@ async def _seed_page_extractions(document_id: str) -> None:
                     status="pending",
                 )
             )
-        await db.commit()
+            added += 1
+        if added:
+            await db.commit()
+            log.info(
+                "seed_page_extractions: doc %s — added %d new rows "
+                "(already had %d)",
+                document_id, added, len(existing_page_ids),
+            )
 
 
 async def _persist_extraction(
@@ -347,7 +386,15 @@ async def _persist_extraction(
                     bbox=n.bbox.model_dump() if n.bbox else None,
                 )
             )
+        # Drop discipline-name false positives at write time so they don't
+        # later inflate unresolved_cross_reference gap counts. The vision
+        # extractor occasionally captures phrases like "Architectural
+        # drawings" or "STRUCTURAL" verbatim as `target_sheet`.
+        from .discipline_config import is_valid_sheet_id
+
         for cr in result.extraction.cross_references:
+            if not is_valid_sheet_id(cr.target_sheet):
+                continue
             db.add(
                 ExtractedCrossReference(
                     page_extraction_id=page_extraction_id,
@@ -398,11 +445,10 @@ async def _extract_one_page(
     the UI shows accurate counts of in-flight vs queued.
     """
     sem = _get_extract_semaphore()
-    extractor = _get_vision_extractor()
     async with sem:
         await _set_page_extraction_status(page_extraction_id, "extracting")
         try:
-            result = await extractor.extract_page(
+            result = await vision_extractor.extract_page(
                 image_path,
                 page_number=page_number,
                 document_filename=document_filename,
@@ -649,90 +695,34 @@ async def process_document(document_id: str) -> None:
                 f"{failed} of {ready + failed} pages failed extraction; re-extract from UI"
             )
 
-        # P2 — additive structural extractors that augment the per-page
-        # generic vision_extractor with sheet-level metadata, typed
-        # schedule grids, and revision history. Run after vision_extractor
-        # because the typed schedule extractor needs the PageExtraction
-        # rows it created. All four are individually fault-tolerant —
-        # one failing doesn't fail the document.
-        try:
-            from . import (
-                revision_block_parser,
-                schedule_extractor_typed,
-                schedule_router,
-                sheet_index_extractor,
-            )
-        except Exception:  # noqa: BLE001 — defensive: never break the pipeline
-            log.exception("processor: P2 imports failed; skipping P2 stages")
-        else:
+        # Post-vision enrichment passes (sheet_index, schedule pipeline,
+        # revision blocks, symbol legend). Each pass is independent —
+        # they read DocumentPage / PageExtraction and write to their own
+        # tables — so the orchestrator runs them concurrently via
+        # `asyncio.gather` rather than sequentially. On the Elks drawing
+        # set this cuts post-vision wall time from ~6 min to ~3 min
+        # (max of the four instead of sum). Per-pass fault isolation
+        # is preserved by `run_drawing_enrichment`.
+        await _set_status(document_id, "enriching")
+        async with SessionLocal() as db:
+            doc_row = await db.get(Document, document_id)
+            project_id_for_enrichment = doc_row.project_id if doc_row else None
+        if project_id_for_enrichment:
             try:
-                si = await sheet_index_extractor.extract_for_document(document_id)
-                log.info(
-                    "processor: P2 sheet_index — %d sheets ($%.4f) for %s",
-                    si[0], si[1], filename,
+                from .enrichment_passes import (
+                    EnrichmentContext,
+                    run_drawing_enrichment,
                 )
-            except Exception as e:  # noqa: BLE001
-                log.exception("processor: P2 sheet_index failed: %s", e)
 
-            try:
-                route_result = await schedule_router.route_for_document(document_id)
-                log.info(
-                    "processor: P2 schedule_router — %d schedules in %d pages "
-                    "($%.4f) for %s",
-                    route_result.schedules_found,
-                    route_result.pages_classified,
-                    route_result.cost_usd,
-                    filename,
+                await run_drawing_enrichment(
+                    EnrichmentContext(
+                        document_id=document_id,
+                        project_id=project_id_for_enrichment,
+                        filename=filename,
+                    )
                 )
-                if route_result.schedules:
-                    typed = await schedule_extractor_typed.extract_for_routed_schedules(
-                        route_result.schedules
-                    )
-                    log.info(
-                        "processor: P2 schedule_extractor_typed — "
-                        "%d/%d extracted, %d rows ($%.4f) for %s",
-                        typed["extracted"],
-                        typed["requests"],
-                        typed["rows"],
-                        typed["cost_usd"],
-                        filename,
-                    )
-            except Exception as e:  # noqa: BLE001
-                log.exception("processor: P2 schedule pipeline failed: %s", e)
-
-            try:
-                rev = await revision_block_parser.parse_for_document(document_id)
-                log.info(
-                    "processor: P2 revision_block_parser — %d revisions in "
-                    "%d pages ($%.4f) for %s",
-                    rev["revisions"], rev["pages"], rev["cost_usd"], filename,
-                )
-            except Exception as e:  # noqa: BLE001
-                log.exception("processor: P2 revision_block_parser failed: %s", e)
-
-            # P3 — project-specific symbol legend (W3 mitigation). Idempotent:
-            # wipes + re-extracts every legend sheet across the project, so
-            # safe to call once per drawing-set document upload. Cost is
-            # ~$0.20-1.00 per project depending on how many G-series /
-            # *-001 cover sheets exist.
-            try:
-                async with SessionLocal() as db:
-                    doc_row = await db.get(Document, document_id)
-                    project_id_for_legend = (
-                        doc_row.project_id if doc_row else None
-                    )
-                if project_id_for_legend:
-                    from .symbol_legend_extractor import extract_for_project
-
-                    leg = await extract_for_project(project_id_for_legend)
-                    log.info(
-                        "processor: P3 symbol_legend — %d entries from %d "
-                        "sheets ($%.4f) for project of %s",
-                        leg["entries"], leg["sheets_processed"],
-                        leg["cost_usd"], filename,
-                    )
-            except Exception as e:  # noqa: BLE001
-                log.exception("processor: P3 symbol_legend failed: %s", e)
+            except Exception as e:  # noqa: BLE001 — never break the pipeline
+                log.exception("processor: enrichment phase crashed: %s", e)
     elif doc_type in ("written-spec", "bid-quote", "scope-letter") and pages:
         # Text-bearing docs: OCR any page that lacks native text so the
         # downstream chunker has content to index.
@@ -742,6 +732,7 @@ async def process_document(document_id: str) -> None:
             log.info("processor: OCR'd %d pages for %s", n_ocr, filename)
         except Exception as e:  # noqa: BLE001
             log.exception("processor: OCR failed for %s", filename)
+            extraction_error = f"ocr: {e}"
 
         # P2 — Spec TOC reconstruction → project-specific CSI subset.
         # Only fires for written-spec docs; reads the project's spec
@@ -769,7 +760,8 @@ async def process_document(document_id: str) -> None:
                     )
             except Exception as e:  # noqa: BLE001
                 log.exception("processor: P2 spec_toc failed: %s", e)
-            extraction_error = f"ocr: {e}"
+                # Don't set extraction_error here — spec_toc is best-effort
+                # supplementary data, doesn't block the main pipeline.
 
     # 4. Phase 3 — index for search.
     await _set_status(document_id, "indexing")
@@ -863,21 +855,33 @@ async def reextract_page(page_extraction_id: str) -> None:
 
 
 async def resume_pending() -> None:
-    """On startup, resume any documents/pages that were mid-flight when we died."""
+    """On startup, resume any documents/pages that were mid-flight when we died.
+
+    Skips documents whose task is already running in-process — schedule()
+    is idempotent, but logging the no-op skip is misleading. resume_pending
+    is for cold-start; if the process is already alive and tasks are
+    registered, those tasks will continue.
+    """
     async with SessionLocal() as db:
-        # Documents stuck mid-pipeline → restart from scratch
         result = await db.execute(
             select(Document).where(
                 Document.processing_status.in_(
-                    ("pending", "classifying", "rendering", "extracting", "indexing")
+                    ("pending", "classifying", "rendering", "extracting", "indexing", "ocr")
                 )
             )
         )
         in_flight_docs = list(result.scalars().all())
 
     for doc in in_flight_docs:
+        if get_inflight_task(doc.id) is not None:
+            log.info(
+                "resume: %s already has a running task in-process, skipping",
+                doc.filename,
+            )
+            continue
         log.info(
-            "resume: re-scheduling %s (was '%s')", doc.filename, doc.processing_status
+            "resume: re-scheduling %s (status was '%s')",
+            doc.filename, doc.processing_status,
         )
         schedule(doc.id)
 
@@ -886,14 +890,87 @@ async def resume_pending() -> None:
 # Scheduler
 # -----------------------------------------------------------------------------
 
-# Keep references so asyncio doesn't garbage-collect mid-flight
-_inflight: set[asyncio.Task] = set()
+# Per-document task registry. Lets us:
+#   1. Skip duplicate schedule() calls — if a doc is already processing,
+#      a second schedule() returns the existing task instead of starting
+#      a parallel pipeline that races over the same DB rows.
+#   2. Cancel a doc's task when it gets deleted or re-processed.
+# Keys are document_ids; values are the asyncio.Task driving process_document.
+_inflight_by_doc: dict[str, asyncio.Task] = {}
 
 
-def schedule(document_id: str) -> None:
+def get_inflight_task(document_id: str) -> asyncio.Task | None:
+    """Return the in-flight task for this document, if one is running."""
+    task = _inflight_by_doc.get(document_id)
+    if task is not None and task.done():
+        return None
+    return task
+
+
+def schedule(document_id: str) -> asyncio.Task:
+    """Idempotent schedule. If a task is already running for this doc, return it."""
+    existing = _inflight_by_doc.get(document_id)
+    if existing is not None and not existing.done():
+        log.info(
+            "processor: schedule(%s) skipped — task already running",
+            document_id,
+        )
+        return existing
+
     task = asyncio.create_task(process_document(document_id))
-    _inflight.add(task)
-    task.add_done_callback(_inflight.discard)
+    _inflight_by_doc[document_id] = task
+
+    def _cleanup(t: asyncio.Task) -> None:
+        # Only remove if WE are still the registered task. A subsequent
+        # cancel + re-schedule may have replaced us.
+        if _inflight_by_doc.get(document_id) is t:
+            _inflight_by_doc.pop(document_id, None)
+
+    task.add_done_callback(_cleanup)
+    return task
+
+
+async def cancel_document(document_id: str) -> bool:
+    """Cancel the in-flight task for this document (if any).
+
+    Returns True if a task was cancelled. Use this before deleting a
+    Document or re-seeding its rows — without cancelling, the orphan task
+    keeps running, drains the Sonnet/Mistral API quota for results that
+    will be discarded, and emits 'page_extraction not found' warnings
+    when it tries to persist to deleted rows.
+    """
+    task = _inflight_by_doc.pop(document_id, None)
+    if task is None or task.done():
+        return False
+    log.info("processor: cancelling in-flight task for doc %s", document_id)
+    task.cancel()
+    # Don't await — the cancellation propagates through the asyncio loop
+    # and the task's own exception handlers run independently. Awaiting
+    # here would block the caller (often a synchronous DELETE handler).
+    return True
+
+
+async def schedule_reprocess(document_id: str) -> None:
+    """Cancel any in-flight task, clear terminal-state PageExtraction rows
+    so seed creates fresh ones, then schedule a new pipeline run.
+
+    This is the only safe way to re-process a document. Just calling
+    schedule() while a task is in flight does nothing (idempotent skip).
+    """
+    await cancel_document(document_id)
+    # Clear ONLY terminal-state rows so re-process gets a clean slate
+    # without racing in-flight tasks (there shouldn't be any after
+    # cancel_document, but be defensive).
+    async with SessionLocal() as db:
+        result = await db.execute(
+            select(PageExtraction)
+            .where(PageExtraction.document_id == document_id)
+            .where(PageExtraction.status.in_(("ready", "failed", "extracting")))
+        )
+        for row in result.scalars().all():
+            await db.delete(row)
+        await db.commit()
+    schedule(document_id)
 
 
 def schedule_reextract(page_extraction_id: str) -> None:

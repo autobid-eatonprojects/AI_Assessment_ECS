@@ -4,10 +4,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import func as sql_func, select
 
 from ..config import settings
-from ..models import Document, DocumentPage, Project
+from ..models import Document, DocumentPage, PageExtraction, Project
 from ..schemas import DocumentOut, DocumentPageOut, DocumentPageTextOut
 from ..services import processor
 from ..services.image_mime import detect_image_mime
@@ -166,12 +166,113 @@ async def upload_documents(
     return [DocumentOut.model_validate(d) for d in out]
 
 
+async def _compute_processing_progress(db, doc: Document) -> dict | None:
+    """Compute stage-specific progress so the UI can render granular counts.
+
+    Maps the current Document.processing_status to the right "completed/total"
+    counter from the relevant child table. Only meaningful for non-terminal
+    statuses; returns None for ready / failed.
+    """
+    status = doc.processing_status
+    if status in ("ready", "failed", "needs-api-key"):
+        return None
+
+    if status == "rendering":
+        rendered = (await db.execute(
+            select(sql_func.count(DocumentPage.id))
+            .where(DocumentPage.document_id == doc.id)
+        )).scalar() or 0
+        return {"stage": "rendering", "completed": rendered, "total": doc.page_count or 0}
+
+    if status == "ocr":
+        ocrd = (await db.execute(
+            select(sql_func.count(DocumentPage.id))
+            .where(DocumentPage.document_id == doc.id)
+            .where(sql_func.length(DocumentPage.text_content) > 0)
+        )).scalar() or 0
+        return {"stage": "ocr", "completed": ocrd, "total": doc.page_count or 0}
+
+    if status == "extracting":
+        ready = (await db.execute(
+            select(sql_func.count(PageExtraction.id))
+            .where(PageExtraction.document_id == doc.id)
+            .where(PageExtraction.status == "ready")
+        )).scalar() or 0
+        total = (await db.execute(
+            select(sql_func.count(PageExtraction.id))
+            .where(PageExtraction.document_id == doc.id)
+        )).scalar() or 0
+        return {"stage": "extracting", "completed": ready, "total": total}
+
+    # pending / classifying / indexing — no granular counter (yet)
+    return {"stage": status, "completed": 0, "total": 0}
+
+
 @router.get("/{document_id}", response_model=DocumentOut)
 async def get_document(
     project_id: str, document_id: str, db: DB, _: CurrentUser
 ) -> DocumentOut:
     doc = await _ensure_document(db, project_id, document_id)
-    return DocumentOut.model_validate(doc)
+    progress = await _compute_processing_progress(db, doc)
+    out = DocumentOut.model_validate(doc)
+    out.processing_progress = progress
+    return out
+
+
+@router.get("/{document_id}/citation-summary")
+async def get_citation_summary(
+    project_id: str, document_id: str, db: DB, _: CurrentUser,
+) -> dict:
+    """Pass C3 — per-document citation health.
+
+    Returns counts of how many ScopeCitation rows were created from this
+    document's chunks, broken down by evidence_type and link_judge verdict.
+    Lets the user see how much this document contributed to scope and
+    how much of that contribution survived the L2 + link_judge gates.
+    """
+    from sqlalchemy import case
+    from ..models import ScopeCitation
+
+    await _ensure_document(db, project_id, document_id)
+
+    # Total + by evidence_type
+    rows = (
+        await db.execute(
+            select(
+                ScopeCitation.evidence_type,
+                sql_func.count().label("n"),
+                sql_func.sum(case((ScopeCitation.is_link_judge_pass.is_(True), 1), else_=0)).label("pass_n"),
+                sql_func.sum(case((ScopeCitation.is_link_judge_pass.is_(False), 1), else_=0)).label("fail_n"),
+            )
+            .where(ScopeCitation.document_id == document_id)
+            .group_by(ScopeCitation.evidence_type)
+        )
+    ).all()
+
+    by_type: dict[str, dict[str, int]] = {}
+    total = 0
+    pass_total = 0
+    fail_total = 0
+    for ev_type, n, pass_n, fail_n in rows:
+        key = ev_type or "other"
+        by_type[key] = {
+            "count": int(n or 0),
+            "link_judge_pass": int(pass_n or 0),
+            "link_judge_fail": int(fail_n or 0),
+        }
+        total += int(n or 0)
+        pass_total += int(pass_n or 0)
+        fail_total += int(fail_n or 0)
+
+    return {
+        "total_citations": total,
+        "by_evidence_type": by_type,
+        "link_judge": {
+            "pass": pass_total,
+            "fail": fail_total,
+            "not_run": total - pass_total - fail_total,
+        },
+    }
 
 
 @router.get("/{document_id}/download")
@@ -187,6 +288,13 @@ async def download_document(project_id: str, document_id: str, db: DB, _: Curren
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(project_id: str, document_id: str, db: DB, _: CurrentUser) -> None:
     doc = await _ensure_document(db, project_id, document_id)
+
+    # Cancel any in-flight processor task for this doc BEFORE deleting
+    # rows. Otherwise the task's outstanding API calls (Sonnet vision,
+    # Mistral/Gemini OCR) will return after we've deleted the rows it
+    # holds in memory — money spent for results we can't write anywhere,
+    # plus a flood of "page_extraction not found" warnings in the log.
+    await processor.cancel_document(document_id)
 
     # Delete page artifacts
     page_result = await db.execute(
@@ -213,7 +321,10 @@ async def reclassify_document(
     doc.processing_error = None
     await db.commit()
     await db.refresh(doc)
-    processor.schedule(doc.id)
+    # Re-process must cancel any running task first (otherwise new and
+    # old tasks race over the same rows). schedule_reprocess wraps
+    # cancel + clear-terminal-rows + schedule.
+    await processor.schedule_reprocess(doc.id)
     return DocumentOut.model_validate(doc)
 
 

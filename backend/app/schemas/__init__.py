@@ -28,6 +28,7 @@ from .profile import (
     TradeRelevanceOverrideIn,
 )
 from .project import LifecycleTransition, ProjectCreate, ProjectOut, ProjectUpdate
+from .ragas import RagasEvalRunOut, RagasFixtureOut
 from .review import (
     AuditLogOut,
     ConflictItemSummary,
@@ -97,6 +98,8 @@ __all__ = [
     "ProjectOut",
     "ProjectProfileOut",
     "ProjectUpdate",
+    "RagasEvalRunOut",
+    "RagasFixtureOut",
     "ScheduleOut",
     "ScopeCitationOut",
     "ScopeItemOut",

@@ -112,6 +112,10 @@ class TradePackageOut(BaseModel):
     item_count: int
     bilateral_count: int
     avg_confidence: float | None
+    # Pass D follow-up — actionable counts for the trade-packages list view.
+    # Computed on-the-fly in list_packages, default 0 elsewhere.
+    low_confidence_count: int = 0   # items in INFERRED_LOW_CONFIDENCE tier
+    open_issue_count: int = 0       # open Gap rows linked to items in this package
     narrative_md: str | None
     created_at: datetime
 

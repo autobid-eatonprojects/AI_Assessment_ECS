@@ -36,6 +36,21 @@ export function ScopeOfWorkCard({ projectId }: Props) {
   const data = overview.data;
   const run = data?.latest_run;
   const isRunning = run?.status === "running";
+  // Once sections_completed catches up to sections_total but status is still
+  // "running", the pipeline is past extraction and inside the post-extraction
+  // stages (link_judge, conflicts, bundling, gaps, trust score). The progress
+  // bar otherwise sits stuck at 100% with the "Extracting…" label, which is
+  // confusing. Detect that and switch to "Finalizing…".
+  const isFinalizing =
+    !!run &&
+    isRunning &&
+    (run.sections_total ?? 0) > 0 &&
+    (run.sections_completed ?? 0) >= (run.sections_total ?? 0);
+  const stageLabel = isFinalizing ? "Finalizing…" : "Extracting…";
+  // Prefer the overview's live ScopeItem count over run.items_after_dedupe,
+  // which is only set once the dedupe stage completes (i.e. zero during the
+  // extraction phase even though items are persisted continuously).
+  const liveItemCount = data?.total_items ?? run?.items_after_dedupe ?? 0;
 
   return (
     <div className="rounded-lg border bg-card p-4">
@@ -74,7 +89,7 @@ export function ScopeOfWorkCard({ projectId }: Props) {
             )}
             <span className="ml-1.5">
               {isRunning
-                ? "Extracting…"
+                ? stageLabel
                 : run
                   ? "Re-generate"
                   : "Generate scope"}
@@ -91,17 +106,22 @@ export function ScopeOfWorkCard({ projectId }: Props) {
         <div>
           <div className="mb-2 flex items-center justify-between text-xs">
             <span>
-              {run.sections_completed}/{run.sections_total} divisions ·{" "}
-              {run.items_after_dedupe} items so far · ${run.total_cost_usd.toFixed(3)}
+              {run.sections_completed}/{run.sections_total} stages ·{" "}
+              {liveItemCount} items so far · ${run.total_cost_usd.toFixed(3)}
             </span>
             <span className="text-muted-foreground">
-              ~{Math.max(1, Math.round(((run.sections_total - run.sections_completed) * 30) / 60))} min
-              remaining
+              {isFinalizing
+                ? "post-processing"
+                : `~${Math.max(1, Math.round(((run.sections_total - run.sections_completed) * 30) / 60))} min remaining`}
             </span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-blue-100 dark:bg-blue-950/40">
             <div
-              className="h-full bg-blue-600 transition-all"
+              className={
+                isFinalizing
+                  ? "h-full animate-pulse bg-blue-600"
+                  : "h-full bg-blue-600 transition-all"
+              }
               style={{
                 width: `${(run.sections_completed / Math.max(1, run.sections_total)) * 100}%`,
               }}

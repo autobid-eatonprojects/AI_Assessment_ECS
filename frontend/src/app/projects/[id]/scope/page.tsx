@@ -19,8 +19,16 @@ import { use, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/app-header";
 import { AuthGuard } from "@/components/auth-guard";
-import { CitationViewerModal } from "@/components/citation-viewer-modal";
+import {
+  CitationViewerModal,
+  EvidenceTypeBadge,
+  LinkJudgeBadge,
+} from "@/components/citation-viewer-modal";
+import { DrawingGroundingCard } from "@/components/drawing-grounding-card";
+import { EvidenceTierBadge } from "@/components/evidence-tier-badge";
+import { ExtractionMethodBadge } from "@/components/extraction-method-badge";
 import { QuantityBadge } from "@/components/quantity-badge";
+import { TrustBreakdownPanel } from "@/components/trust-breakdown-panel";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
@@ -162,12 +170,22 @@ function ScopeItemDetail({
   return (
     <div className="space-y-4">
       <div>
-        <div className="mb-1 flex items-center gap-2 text-xs">
+        <div className="mb-1 flex flex-wrap items-center gap-1.5 text-xs">
           <span className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono dark:bg-zinc-800">
             {item.csi_code}
           </span>
           {item.section_title && (
             <span className="text-muted-foreground">{item.section_title}</span>
+          )}
+          <ExtractionMethodBadge method={item.extraction_method} />
+          <EvidenceTierBadge tier={item.evidence_tier} />
+          {item.bilateral_evidence === true && (
+            <span
+              title="Item has citations on both spec and drawing sides"
+              className="inline-flex items-center rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
+            >
+              Bilateral
+            </span>
           )}
           <ConfidenceBadge value={item.confidence} />
           <VerifierBadge item={item} />
@@ -176,6 +194,15 @@ function ScopeItemDetail({
       </div>
 
       <FlagDrillDown item={item} />
+
+      <DrawingGroundingCard item={item} onCitationClick={onCitationClick} />
+
+      <details className="rounded-md border bg-muted/30 p-2 text-sm">
+        <summary className="cursor-pointer select-none font-medium">
+          Trust breakdown
+        </summary>
+        <TrustBreakdownPanel components={item.trust_components} />
+      </details>
 
       <dl className="space-y-2 text-sm">
         {item.specification && (
@@ -207,28 +234,23 @@ function ScopeItemDetail({
             <dd className="mt-0.5">{item.location}</dd>
           </div>
         )}
-        {item.extraction_method && (
-          <div>
-            <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-              Source kind
-            </dt>
-            <dd className="mt-0.5 text-xs text-muted-foreground">
-              {item.extraction_method}
-            </dd>
-          </div>
-        )}
       </dl>
 
       <div>
         <h4 className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
-          Citations ({item.citations.length})
+          Citations ({item.citations?.length ?? 0})
         </h4>
+        {(!item.citations || item.citations.length === 0) ? (
+          <p className="rounded-md border border-dashed py-3 text-center text-xs text-muted-foreground">
+            No citations recorded for this item.
+          </p>
+        ) : (
         <ul className="space-y-2">
           {item.citations.map((c) => {
             const hasBbox = !!c.bbox;
             return (
               <li key={c.id} className="rounded-md border bg-muted/30 p-2 text-xs">
-                <div className="mb-1 flex items-center gap-2">
+                <div className="mb-1 flex flex-wrap items-center gap-1.5">
                   {c.sheet_number && (
                     <span className="rounded bg-blue-100 px-1.5 py-0.5 font-mono font-medium text-blue-900 dark:bg-blue-900/40 dark:text-blue-200">
                       {c.sheet_number}
@@ -239,6 +261,11 @@ function ScopeItemDetail({
                       page {c.page_number}
                     </span>
                   )}
+                  <EvidenceTypeBadge type={c.evidence_type} />
+                  <LinkJudgeBadge
+                    pass={c.is_link_judge_pass}
+                    score={c.link_judge_score}
+                  />
                   {c.extraction_query && (
                     <span className="text-muted-foreground">
                       via {c.extraction_query}
@@ -272,6 +299,7 @@ function ScopeItemDetail({
             );
           })}
         </ul>
+        )}
       </div>
     </div>
   );
@@ -360,6 +388,17 @@ function ScopeView({ projectId }: { projectId: string }) {
   const overview = overviewQuery.data;
   const run = overview?.latest_run;
   const isRunning = run?.status === "running";
+  // Once sections_completed catches up to sections_total but status is still
+  // "running", we're past extraction and inside post-extraction stages
+  // (link_judge, conflicts, bundling, gaps, trust score). Switch label so
+  // users don't see "Extracting…" stuck for minutes after the bar hits 100%.
+  const isFinalizing =
+    !!run &&
+    isRunning &&
+    (run.sections_total ?? 0) > 0 &&
+    (run.sections_completed ?? 0) >= (run.sections_total ?? 0);
+  const stageLabel = isFinalizing ? "Finalizing…" : "Extracting…";
+  const liveItemCount = overview?.total_items ?? run?.items_after_dedupe ?? 0;
 
   const allItems = itemsQuery.data ?? [];
   const items = useMemo(() => {
@@ -403,7 +442,7 @@ function ScopeView({ projectId }: { projectId: string }) {
           {run ? (
             <p className="mt-1 text-sm text-muted-foreground">
               {run.status === "running"
-                ? `Extracting… ${run.sections_completed}/${run.sections_total} divisions complete`
+                ? `${stageLabel} ${run.sections_completed}/${run.sections_total} stages complete`
                 : run.status === "complete"
                   ? `${overview?.total_items ?? 0} items across ${overview?.by_division.length ?? 0} divisions · ${formatRelativeTime(run.completed_at ?? run.started_at)} · $${run.total_cost_usd.toFixed(2)}`
                   : `Last run failed${run.error ? ": " + run.error : ""}`}
@@ -460,7 +499,7 @@ function ScopeView({ projectId }: { projectId: string }) {
             )}
             <span className="ml-1.5">
               {isRunning
-                ? "Extracting…"
+                ? stageLabel
                 : run
                   ? "Re-generate"
                   : "Generate Scope of Work"}
@@ -473,14 +512,23 @@ function ScopeView({ projectId }: { projectId: string }) {
         <div className="mb-6 rounded-lg border bg-blue-50 p-3 text-sm dark:bg-blue-950/30">
           <div className="mb-2 flex items-center justify-between">
             <span>
-              {run.sections_completed}/{run.sections_total} divisions ·{" "}
-              {run.items_after_dedupe} items · ${run.total_cost_usd.toFixed(3)}
+              {run.sections_completed}/{run.sections_total} stages ·{" "}
+              {liveItemCount} items · ${run.total_cost_usd.toFixed(3)}
+              {isFinalizing && (
+                <span className="ml-2 text-muted-foreground">
+                  · post-processing (link judge / conflicts / bundling / gaps)
+                </span>
+              )}
             </span>
             <Loader2 className="size-4 animate-spin text-blue-600" />
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-blue-200 dark:bg-blue-900">
             <div
-              className="h-full bg-blue-600 transition-all"
+              className={
+                isFinalizing
+                  ? "h-full animate-pulse bg-blue-600"
+                  : "h-full bg-blue-600 transition-all"
+              }
               style={{
                 width: `${(run.sections_completed / Math.max(1, run.sections_total)) * 100}%`,
               }}
@@ -545,10 +593,20 @@ function ScopeView({ projectId }: { projectId: string }) {
                     selectedItem === item.id ? "border-primary bg-primary/5" : ""
                   }`}
                 >
-                  <div className="mb-1 flex items-center gap-2">
+                  <div className="mb-1 flex flex-wrap items-center gap-1.5">
                     <span className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] dark:bg-zinc-800">
                       {item.csi_code}
                     </span>
+                    <ExtractionMethodBadge method={item.extraction_method} />
+                    <EvidenceTierBadge tier={item.evidence_tier} />
+                    {item.bilateral_evidence === true && (
+                      <span
+                        title="Item has citations on both spec and drawing sides"
+                        className="inline-flex items-center rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
+                      >
+                        Bilateral
+                      </span>
+                    )}
                     <ConfidenceBadge value={item.confidence} />
                     <VerifierBadge item={item} />
                     <span className="ml-auto">

@@ -60,18 +60,45 @@ class Settings(BaseSettings):
     # detections. When unset, those agents fall back to vision-only.
     yolo_mep_model_path: str | None = None
 
-    # Scope orchestration mode (P3/P4 of design doc).
-    #   "per-discipline" — NEW. Runs one discipline_agent per
-    #     architectural / structural / mechanical / etc. bucket. Each
-    #     agent reads its own ~80K token corpus once (cached) and emits
-    #     bilateral-evidence scope_items in a single Sonnet call.
-    #     Cheaper, more coherent (mandates ↔ work_items cross-checked
-    #     in-context), and cuts call count from ~30 divisions × 3
-    #     queries × 3 votes ≈ 270 calls down to ~10 disciplines.
+    # Scope orchestration mode.
+    #   "hybrid" — RECOMMENDED. Runs per-section (spec-side accuracy) +
+    #     per-discipline (drawing-side coverage) sequentially, then unions
+    #     results via the existing scope_deduper. Closes the per-section
+    #     MEP gap by letting discipline_agent's drawing-OCR reads catch
+    #     scope that lives only on M0.1/P0.1/E0.1/FP0.1 sheets. Cost
+    #     ~$12-13 per project, wall time ~12 min.
+    #   "per-section" — Runs section_extractor with one focused Sonnet
+    #     call per CSI section that has spec content (~70 calls of small
+    #     focused prompts). Best accuracy on dense spec sections; bypasses
+    #     the long-context "drop items in the middle" failure mode of the
+    #     discipline agent. ~$9 per project. SPEC-ONLY — misses MEP scope
+    #     that lives only on drawings.
+    #   "per-discipline" — Runs one discipline_agent per architectural /
+    #     structural / mechanical / etc. bucket. Each agent reads its
+    #     own ~80K token corpus once (cached) and emits bilateral-evidence
+    #     scope_items in a single Sonnet call. Catches MEP from drawings
+    #     but tends to drop items in long contexts. ~$3 per project.
     #   "per-division" — LEGACY. Existing per-CSI-division Stage A/B/C/D
-    #     pipeline. Kept for fallback + diff comparison so we can A/B
-    #     output quality before deprecating.
-    scope_orchestration_mode: str = "per-discipline"
+    #     pipeline. Kept for fallback + diff comparison.
+    scope_orchestration_mode: str = "hybrid"
+
+    # Drawing grounder (Phase B). When True, after section_extractor emits
+    # spec-only items the runner queries Sonnet vision against rendered
+    # drawing-sheet quadrants to add drawing citations to non-admin items.
+    # Emergency kill-switch when something is misbehaving (e.g. SDK bug
+    # spamming retries). Default-on per the product directive: full
+    # coverage > cost optimisation.
+    drawing_grounder_enabled: bool = True
+    # Runaway-protection ceiling — NOT a cost-vs-quality trade-off. The
+    # grounder is allowed to spend whatever it needs to ground every item
+    # on every relevant sheet (the product directive: "cost is unlimited,
+    # quality is main"). This ceiling exists only to abort if something
+    # is genuinely runaway — e.g. infinite SDK retries, API loop, or a
+    # project with truly pathological sheet counts. The default
+    # ($1,000,000) will never trigger in normal operation; a typical
+    # project spends $10-30. Lower it ONLY for cost-controlled
+    # environments (test sandboxes, etc.) where you want a fail-fast.
+    drawing_grounder_max_cost_usd: float = 1_000_000.0
 
     # Phase 3 — Indexing + Retrieval
     # Embeddings: voyage-3-large (1024d) per the design doc — best published

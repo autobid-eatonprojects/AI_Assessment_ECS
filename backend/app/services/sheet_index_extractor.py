@@ -19,9 +19,7 @@ Cost: 1 Sonnet 4.6 vision call per drawing-set document. ~$0.10 / project.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,9 +28,9 @@ from sqlalchemy import select
 from ..config import settings
 from ..database import SessionLocal
 from ..models import Document, DocumentPage, SheetIndex
-from .storage import storage
-from .llm_log import record_call, usage_from_anthropic
+from .anthropic_tool_call import call_with_tool
 from .renderer import render_page_at_dpi
+from .storage import storage
 
 log = logging.getLogger(__name__)
 
@@ -142,98 +140,39 @@ class _ExtractResult:
     latency_ms: int
 
 
-_client = None
-
-
-def _get_client():
-    global _client
-    if _client is not None:
-        return _client
-    if not settings.anthropic_api_key:
-        return None
-    from anthropic import AsyncAnthropic
-
-    _client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-    return _client
-
-
 async def _call_sonnet(image_path: Path, project_id: str, document_id: str) -> _ExtractResult:
     """One Sonnet vision call against the cover sheet."""
     import base64
-
-    client = _get_client()
-    if client is None:
-        raise RuntimeError("ANTHROPIC_API_KEY not configured")
 
     raw = image_path.read_bytes()
     b64 = base64.standard_b64encode(raw).decode("ascii")
     media_type = "image/png" if image_path.suffix.lower() == ".png" else "image/jpeg"
 
-    t0 = time.perf_counter()
-    msg = await client.messages.create(
+    result = await call_with_tool(
         model=settings.vision_model,
+        tool_def=_EXTRACT_TOOL,
+        system=_SYSTEM_PROMPT,
         max_tokens=8192,
-        system=[
+        purpose="sheet-index",
+        project_id=project_id,
+        document_id=document_id,
+        user_content=[
+            {
+                "type": "image",
+                "source": {"type": "base64", "media_type": media_type, "data": b64},
+            },
             {
                 "type": "text",
-                "text": _SYSTEM_PROMPT,
-                "cache_control": {"type": "ephemeral"},
-            }
-        ],
-        tools=[_EXTRACT_TOOL],
-        tool_choice={"type": "tool", "name": "extract_sheet_index"},
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": media_type,
-                            "data": b64,
-                        },
-                    },
-                    {
-                        "type": "text",
-                        "text": (
-                            "Extract the full sheet index from this cover sheet."
-                        ),
-                    },
-                ],
-            }
+                "text": "Extract the full sheet index from this cover sheet.",
+            },
         ],
     )
-    latency_ms = int((time.perf_counter() - t0) * 1000)
-
-    payload: dict = {}
-    for block in msg.content:
-        if (
-            getattr(block, "type", None) == "tool_use"
-            and block.name == "extract_sheet_index"
-        ):
-            payload = block.input
-            break
-
-    cost: float = 0.0
-    async with SessionLocal() as db:
-        c, _ = await record_call(
-            db,
-            purpose="sheet-index",
-            model=settings.vision_model,
-            usage=usage_from_anthropic(msg),
-            latency_ms=latency_ms,
-            project_id=project_id,
-            document_id=document_id,
-        )
-        cost = c or 0.0
-        await db.commit()
-
+    payload = result.parsed_input
     return _ExtractResult(
         sheets=list(payload.get("sheets") or []),
         cover_sheet_id=payload.get("cover_sheet_id"),
-        cost_usd=cost,
-        latency_ms=latency_ms,
+        cost_usd=result.cost_usd,
+        latency_ms=result.latency_ms,
     )
 
 

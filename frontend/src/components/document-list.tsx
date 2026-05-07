@@ -1,8 +1,9 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FileText, Trash2 } from "lucide-react";
+import { Download, FileText, Loader2, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import { toast } from "sonner";
 import { ClassificationBadge } from "@/components/classification-badge";
 import { ProcessingStatusIndicator } from "@/components/processing-status";
@@ -20,6 +21,7 @@ interface Props {
 export function DocumentList({ projectId, source, emptyHint }: Props) {
   const qc = useQueryClient();
   const token = useAuthStore((s) => s.token);
+  const [downloading, setDownloading] = useState<Set<string>>(new Set());
 
   const { data: allDocs, isLoading } = useQuery({
     queryKey: ["documents", projectId],
@@ -53,23 +55,35 @@ export function DocumentList({ projectId, source, emptyHint }: Props) {
   });
 
   const download = async (id: string, filename: string) => {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/projects/${projectId}/documents/${id}/download`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    );
-    if (!res.ok) {
-      toast.error("Download failed");
-      return;
+    if (downloading.has(id)) return;
+    setDownloading((s) => new Set(s).add(id));
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/projects/${projectId}/documents/${id}/download`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!res.ok) {
+        toast.error(`Download failed (HTTP ${res.status})`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(`Download failed: ${(e as Error).message}`);
+    } finally {
+      setDownloading((s) => {
+        const next = new Set(s);
+        next.delete(id);
+        return next;
+      });
     }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
   };
 
   if (isLoading) {
@@ -135,15 +149,29 @@ export function DocumentList({ projectId, source, emptyHint }: Props) {
             variant="ghost"
             size="icon"
             onClick={() => download(d.id, d.filename)}
-            title="Download"
+            disabled={downloading.has(d.id)}
+            title={downloading.has(d.id) ? "Downloading…" : "Download"}
           >
-            <Download className="size-4" />
+            {downloading.has(d.id) ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={() => {
-              if (confirm(`Delete ${d.filename}?`)) del.mutate(d.id);
+              const inFlight =
+                d.processing_status !== "ready" &&
+                d.processing_status !== "failed";
+              const msg = inFlight
+                ? `Delete ${d.filename}?\n\nThis document is currently processing ` +
+                  `(status: ${d.processing_status}). Deleting will cancel any ` +
+                  `in-flight tasks and stop their API calls. Already-spent API ` +
+                  `costs are not refunded.`
+                : `Delete ${d.filename}?`;
+              if (confirm(msg)) del.mutate(d.id);
             }}
             disabled={del.isPending}
             title="Delete"

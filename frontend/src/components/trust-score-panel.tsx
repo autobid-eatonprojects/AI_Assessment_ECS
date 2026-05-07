@@ -10,7 +10,11 @@ interface Props {
 }
 
 const COMPONENT_LABELS: Record<string, string> = {
-  bilateral_coverage: "Bilateral coverage",
+  // bilateral_coverage is the legacy backend key; the metric now reflects
+  // pattern_match (evidence-pattern coverage) after the redesign — see
+  // bilateral_evidence._classify and evidence_pattern.expected_pattern.
+  // Keep the key for back-compat; rename the user-visible label.
+  bilateral_coverage: "Evidence coverage",
   extraction_confidence_avg: "Extraction confidence",
   link_judge_pass_rate: "Citation entailment",
   spec_section_coverage: "Spec section coverage",
@@ -18,6 +22,48 @@ const COMPONENT_LABELS: Record<string, string> = {
   schedule_extraction_validity: "Schedule extraction",
   document_version_consistency: "Doc version consistency",
 };
+
+const COMPONENT_TOOLTIPS: Record<string, string> = {
+  bilateral_coverage:
+    "Items whose evidence matches the pattern expected for their type. Material/equipment items expect bilateral (spec + drawing). Division 1 admin items expect spec-only. Demolition items expect drawing-only.",
+  extraction_confidence_avg:
+    "Average extractor confidence across all items in this run.",
+  link_judge_pass_rate:
+    "Fraction of citations where the Haiku link judge ruled the cited chunk genuinely supports the item.",
+  spec_section_coverage:
+    "Fraction of CSI sections in the project that produced at least one scope item.",
+  ocr_text_coverage: "Fraction of pages that have searchable text content.",
+  schedule_extraction_validity:
+    "Fraction of detected schedules that the typed-extractor parsed cleanly.",
+  document_version_consistency:
+    "Whether the project's documents reference consistent revision dates.",
+};
+
+// Pass D3 — interpret each trust-score component's percentage as a
+// plain-English explanation of what the number means and what would
+// improve it. Surfaces only when the component is below the green
+// threshold (0.8) so high-performing components stay visually clean.
+function interpretComponent(key: string, value: number): string {
+  const pctMissing = Math.round((1 - value) * 100);
+  switch (key) {
+    case "bilateral_coverage":
+      return `${pctMissing}% of items don't meet their expected evidence pattern. Most often: material items missing drawing-side evidence.`;
+    case "extraction_confidence_avg":
+      return `Average extractor confidence is below 80%. Items with lower vote agreement live in the review queue.`;
+    case "link_judge_pass_rate":
+      return `${pctMissing}% of citations were flagged by the Haiku link judge as not actually supporting their item.`;
+    case "spec_section_coverage":
+      return `${pctMissing}% of CSI sections in the project produced zero scope items.`;
+    case "ocr_text_coverage":
+      return `${pctMissing}% of pages have no searchable text content (likely scanned, blank, or image-only).`;
+    case "schedule_extraction_validity":
+      return `${pctMissing}% of detected schedules failed to parse cleanly into rows.`;
+    case "document_version_consistency":
+      return `Document revision dates are inconsistent — possibly a mix of old and new addenda.`;
+    default:
+      return "";
+  }
+}
 
 function tierColor(tier?: string) {
   if (tier === "GREEN") return "text-emerald-600 dark:text-emerald-400";
@@ -158,7 +204,10 @@ export function TrustScorePanel({ trust, loading, compact }: Props) {
               className="rounded-md border bg-background/50 px-3 py-2"
             >
               <div className="flex items-baseline justify-between">
-                <span className="text-xs font-medium">
+                <span
+                  className="text-xs font-medium"
+                  title={COMPONENT_TOOLTIPS[key] ?? key}
+                >
                   {COMPONENT_LABELS[key] ?? key}
                 </span>
                 <span className="text-xs tabular-nums text-muted-foreground">
@@ -183,6 +232,12 @@ export function TrustScorePanel({ trust, loading, compact }: Props) {
                   {pct(pctVal)}
                 </span>
               </div>
+              {/* Pass D3 — concrete interpretation of what this number means */}
+              {pctVal < 0.8 && (
+                <div className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
+                  {interpretComponent(key, pctVal)}
+                </div>
+              )}
             </div>
           );
         })}

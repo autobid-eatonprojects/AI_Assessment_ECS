@@ -43,7 +43,11 @@ log = logging.getLogger(__name__)
 
 
 _SECTION_CONCURRENCY = 8
-_MAX_CHUNKS_PER_PROMPT = 30   # cap to keep prompts bounded; sections rarely exceed
+# Cap to keep prompts bounded. Most sections fit in <30 chunks; dense
+# sections like `08 71 00 Door Hardware` can run longer. Bumped from 30
+# to 50 to cover those without losing tail content; cost increase is
+# marginal because most sections never hit the cap.
+_MAX_CHUNKS_PER_PROMPT = 50
 _MAX_CHUNK_TEXT_CHARS = 1500
 
 # Inline-citation L2 threshold — tighter than the default 0.10 used at
@@ -76,7 +80,15 @@ _EXTRACT_TOOL = {
                         },
                         "description": {
                             "type": "string",
-                            "description": "One concise sentence naming the bid item. Use the spec wording.",
+                            "description": (
+                                "One concise sentence naming the bid item. MUST start "
+                                "with an industry-standard action verb so the line "
+                                "reads like a real bid scope: 'Furnish and install...' "
+                                "(material), 'Furnish, install, and connect...' "
+                                "(equipment), 'Provide...' (admin), 'Remove and dispose...' "
+                                "(demo), 'Test and certify...' (qc). Then describe the "
+                                "specific scope using the spec wording."
+                            ),
                         },
                         "specification": {
                             "type": ["string", "null"],
@@ -180,6 +192,19 @@ def _build_prompt(section: CSISection, chunks: list[Chunk]) -> str:
         f"Quantity rule: for materials use quantity='1' as a placeholder unless the "
         f"spec gives an explicit count — actual quantities come from drawing takeoff. "
         f"For equipment with a count in the spec, use that count.\n\n"
+        f"DESCRIPTION FORMAT — start with an industry-standard action verb so the "
+        f"line reads as a real bid scope an estimator could send to a sub:\n"
+        f"  - material  → 'Furnish and install ...'\n"
+        f"  - equipment → 'Furnish, install, and connect ...'\n"
+        f"  - admin     → 'Provide ...' (e.g. 'Provide samples for', 'Provide submittals')\n"
+        f"  - demo      → 'Remove and dispose of ...'\n"
+        f"  - qc        → 'Test and certify ...' or 'Provide quality control for ...'\n"
+        f"Examples:\n"
+        f"  ✓ 'Furnish and install 5/8\" Type X gypsum board on 3-5/8\" 25 ga metal studs'\n"
+        f"  ✓ 'Provide submittals for grout, including manufacturer's product data'\n"
+        f"  ✓ 'Remove and dispose of existing concrete sidewalk'\n"
+        f"  ✗ 'Gypsum board' (no action verb)\n"
+        f"  ✗ 'Submittals for grout' (no action verb)\n\n"
         f"CITATION RULE — strict. For each item, cite ONLY the specific chunk_ids "
         f"whose text literally describes that item. Do not cite other chunks from "
         f"the same section just because they're related to the section. If a 'Samples' "

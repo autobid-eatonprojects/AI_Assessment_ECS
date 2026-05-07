@@ -18,6 +18,7 @@ import type {
   PageExtraction,
   Project,
   ProjectProfile,
+  RagasEvalRun,
   RfiItem,
   ScopeItem,
   ScopeOverview,
@@ -261,6 +262,17 @@ export const api = {
   getTrustScore: (projectId: string) =>
     request<TrustScore | null>(`/api/projects/${projectId}/scope/trust-score`),
 
+  // ----- RAGAS evaluation -----
+  startRagasEval: (projectId: string, runId: string) =>
+    request<RagasEvalRun>(
+      `/api/projects/${projectId}/scope/runs/${runId}/ragas`,
+      { method: "POST" },
+    ),
+  getRagasEval: (projectId: string, runId: string) =>
+    request<RagasEvalRun | null>(
+      `/api/projects/${projectId}/scope/runs/${runId}/ragas`,
+    ),
+
   // ----- Stage 7 — Review queues -----
   listConflicts: (projectId: string, status?: string) => {
     const qs = status === undefined ? "" : `?status=${encodeURIComponent(status)}`;
@@ -366,6 +378,30 @@ export const api = {
         created_at: string;
       }>
     >(`/api/projects/${projectId}/audit-log/llm-calls${qs}`);
+  },
+  getCitationSummary: (projectId: string, documentId: string) =>
+    request<{
+      total_citations: number;
+      by_evidence_type: Record<
+        string,
+        { count: number; link_judge_pass: number; link_judge_fail: number }
+      >;
+      link_judge: { pass: number; fail: number; not_run: number };
+    }>(`/api/projects/${projectId}/documents/${documentId}/citation-summary`),
+  listActivityEvents: (projectId: string, opts?: { limit?: number }) => {
+    const params = new URLSearchParams();
+    if (opts?.limit !== undefined) params.set("limit", String(opts.limit));
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    return request<
+      Array<{
+        kind: "pipeline" | "cost" | "error" | "user";
+        ts: string | null;
+        title: string;
+        document_id: string | null;
+        ref_id: string | null;
+        severity: "info" | "warn" | "error";
+      }>
+    >(`/api/projects/${projectId}/audit-log/activity-events${qs}`);
   },
 
   // ----- Stage 8 — App settings + system status -----

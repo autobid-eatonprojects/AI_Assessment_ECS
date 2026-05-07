@@ -44,7 +44,7 @@ export function ExtractionOverview({ projectId, documentId, documentStatus }: Pr
       </div>
       {/* per-page mini status grid */}
       <div className="flex flex-wrap gap-1">
-        {data.pages.map((p) => (
+        {(data.pages ?? []).map((p) => (
           <Link
             key={p.page_number}
             href={`/projects/${projectId}/documents/${documentId}/pages/${p.page_number}`}

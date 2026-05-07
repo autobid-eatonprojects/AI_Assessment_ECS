@@ -27,12 +27,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..config import settings
 from . import ocr_mistral, scan_preprocessor
 from .llm_log import Usage
+from .ocr_types import OCRResult
 
 log = logging.getLogger(__name__)
 
@@ -79,19 +79,6 @@ def _get_semaphore() -> asyncio.Semaphore:
         # instead of producing silent failures.
         _concurrency_sem = asyncio.Semaphore(4)
     return _concurrency_sem
-
-
-@dataclass
-class OCRResult:
-    text: str
-    usage: Usage
-    latency_ms: int
-    # Multi-provider audit: which provider's text won, all candidate outputs,
-    # and the disagreement metric. Single-provider runs leave these empty.
-    provider: str = "gemini"
-    candidates: list[dict] = field(default_factory=list)
-    disagreement: float = 0.0  # 0.0 = identical, 1.0 = totally different
-    flagged_low_confidence: bool = False
 
 
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}

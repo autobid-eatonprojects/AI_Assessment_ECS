@@ -46,6 +46,7 @@ from .discipline_config import discipline_for_division
 from .llm_log import record_call, usage_from_anthropic
 from .retriever import RetrievedChunk
 from .scope_extractor import CandidateItem
+from .storage import storage
 
 log = logging.getLogger(__name__)
 
@@ -75,6 +76,7 @@ class DrawingGrounderResult:
     items_skipped_admin: int = 0   # item_type was admin/qc
     items_unfound: int = 0      # tried but vision returned nothing
     sheets_queried: int = 0
+    sheets_skipped_budget: int = 0   # short-circuited by cost guard
     cost_usd: float = 0.0
     latency_ms: int = 0
 
@@ -194,7 +196,11 @@ async def _gather_sheet_metadata(
     ).scalar_one_or_none()
     if d is None:
         raise RuntimeError(f"no drawing-set document for project {project_id}")
-    pdf_path = Path("data/uploads") / d.storage_path
+    # Resolve via storage service so the path works regardless of cwd
+    # (the previous `Path("data/uploads") / storage_path` was relative to
+    # the backend root and silently broke when invoked from a script
+    # launched outside `cd backend/`).
+    pdf_path = storage.absolute_path(d.storage_path)
 
     # SheetIndex: canonical (sheet_id, page_number, title, discipline)
     sheets = (
@@ -296,8 +302,8 @@ async def _query_quadrant(
     quadrant: str,
     png_bytes: bytes,
     items_batch: list[CandidateItem],
-) -> tuple[list[dict], int]:
-    """One vision call. Returns (results, latency_ms)."""
+) -> tuple[list[dict], int, float]:
+    """One vision call. Returns (results, latency_ms, cost_usd)."""
     img_b64 = base64.standard_b64encode(png_bytes).decode("utf-8")
     items_block = _format_items_block(items_batch)
     prompt = (
@@ -338,10 +344,11 @@ async def _query_quadrant(
             payload = block.input
             break
 
-    # Cost log
+    # Cost log — capture so the budget guard can short-circuit subsequent
+    # sheets when the cumulative spend exceeds the configured ceiling.
     from ..database import SessionLocal
     async with SessionLocal() as db:
-        await record_call(
+        cost_usd, _ = await record_call(
             db,
             purpose="drawing-grounder",
             model=settings.vision_model,
@@ -352,8 +359,8 @@ async def _query_quadrant(
         await db.commit()
 
     if payload is None:
-        return [], latency_ms
-    return payload.get("results") or [], latency_ms
+        return [], latency_ms, float(cost_usd or 0.0)
+    return payload.get("results") or [], latency_ms, float(cost_usd or 0.0)
 
 
 def _aggregate_quadrants(
@@ -458,11 +465,25 @@ async def _ground_one_sheet(
     items_on_sheet: list[CandidateItem],
     base_chunks_by_id: dict[str, Chunk],
     sem: asyncio.Semaphore,
-) -> tuple[dict[str, DrawingEvidence], int]:
+    budget: dict,
+) -> tuple[dict[int, DrawingEvidence], int, bool]:
     """Render the sheet, query 4 quadrants, aggregate, return per-item
-    DrawingEvidence keyed by item.id (using id() since CandidateItem isn't
-    hashable by default)."""
+    DrawingEvidence keyed by id(item).
+
+    `budget` is a shared mutable dict {"spent": float, "limit": float}.
+    If `spent >= limit` BEFORE we render this sheet, we short-circuit and
+    return empty (third tuple element `skipped=True`). Otherwise we run
+    the quadrants and accumulate their cost into `spent`.
+
+    Per-sheet overshoot is bounded: when the guard trips mid-batch, the
+    in-flight quadrants finish (~$0.02-0.07 worth), but no new batches or
+    sheets start. With concurrency=4 sheets and ≤12 items/batch, the
+    worst-case overshoot above the ceiling is ~$0.30.
+    """
     async with sem:
+        if budget["spent"] >= budget["limit"]:
+            return {}, 0, True
+
         png = await asyncio.to_thread(
             _render_at_dpi, pdf_path, sheet.page_number, _DPI,
         )
@@ -472,6 +493,15 @@ async def _ground_one_sheet(
         per_item_evidence: dict[int, DrawingEvidence] = {}
         latency = 0
         for batch_start in range(0, len(items_on_sheet), _MAX_ITEMS_PER_PROMPT):
+            # Re-check budget before each batch — long-running sheets with
+            # 30+ items could otherwise drift far past the ceiling.
+            if budget["spent"] >= budget["limit"]:
+                log.info(
+                    "drawing_grounder: %s — budget exhausted mid-sheet, "
+                    "skipping remaining batches (spent=$%.2f, limit=$%.2f)",
+                    sheet.sheet_id, budget["spent"], budget["limit"],
+                )
+                break
             batch = items_on_sheet[batch_start:batch_start + _MAX_ITEMS_PER_PROMPT]
             tasks = [
                 _query_quadrant(client, project_id, sheet, q, png_q, batch)
@@ -486,18 +516,16 @@ async def _ground_one_sheet(
                         sheet.sheet_id, qr,
                     )
                     continue
-                results, lat = qr
+                results, lat, cost = qr
                 cleaned.append(results)
                 latency = max(latency, lat)
+                budget["spent"] += cost
             agg = _aggregate_quadrants(cleaned, batch, sheet)
             for local_idx, ev in agg.items():
-                # Map back to global item index by item identity (we used
-                # the local batch index in vision; here we recover the
-                # CandidateItem and use id() as the dict key).
                 item = batch[local_idx]
                 per_item_evidence[id(item)] = ev
 
-    return per_item_evidence, latency
+    return per_item_evidence, latency, False
 
 
 async def ground_items(
@@ -558,11 +586,24 @@ async def ground_items(
     sem = asyncio.Semaphore(_GROUNDER_CONCURRENCY)
     t0 = time.perf_counter()
 
+    # Cost guard: shared mutable budget threaded through to every sheet's
+    # quadrant calls. Once spent >= limit, in-flight sheets finish their
+    # current batch and subsequent sheets short-circuit with skipped=True.
+    # The previous Phase B run blew past the docstring's $0.60 estimate
+    # to $13.95 because items × discipline-mapped sheets created hundreds
+    # of sheet-batch combinations the per-sheet × 4-quadrant arithmetic
+    # didn't capture. The guard is the floor that makes the grounder
+    # safe to enable by default.
+    budget: dict = {
+        "spent": 0.0,
+        "limit": float(settings.drawing_grounder_max_cost_usd or 5.0),
+    }
+
     async def _run(sheet_id: str, items_on_sheet: list[CandidateItem]):
         sheet = sheets_by_id[sheet_id]
         return await _ground_one_sheet(
             client, project_id, pdf_path, sheet,
-            items_on_sheet, base_chunks_by_id, sem,
+            items_on_sheet, base_chunks_by_id, sem, budget,
         )
 
     sheet_results = await asyncio.gather(
@@ -577,7 +618,11 @@ async def ground_items(
         if isinstance(sheet_result, Exception):
             log.warning("drawing_grounder: sheet failed: %s", sheet_result)
             continue
-        per_item_ev, _ = sheet_result
+        per_item_ev, _, skipped = sheet_result
+        if skipped:
+            result.sheets_skipped_budget += 1
+            continue
+        result.sheets_queried += 1
         for item_id, ev in per_item_ev.items():
             # Find the actual CandidateItem
             item = next((i for i in eligible if id(i) == item_id), None)
@@ -613,10 +658,21 @@ async def ground_items(
     for sheet_result in sheet_results:
         if isinstance(sheet_result, Exception):
             continue
-        per_item_ev, _ = sheet_result
+        per_item_ev, _, skipped = sheet_result
+        if skipped:
+            continue
         grounded_set.update(per_item_ev.keys())
     result.items_grounded = len(grounded_set)
     result.items_unfound = len(eligible) - result.items_grounded
+    result.cost_usd = budget["spent"]
+    result.latency_ms = int((time.perf_counter() - t0) * 1000)
+    if result.sheets_skipped_budget > 0:
+        log.warning(
+            "drawing_grounder: cost guard tripped — spent $%.2f / limit $%.2f, "
+            "%d sheets skipped. Items on those sheets remain spec-only and "
+            "will surface as missing-drawing in the gap report.",
+            budget["spent"], budget["limit"], result.sheets_skipped_budget,
+        )
     result.sheets_queried = len(sheet_to_items)
     result.latency_ms = int((time.perf_counter() - t0) * 1000)
 

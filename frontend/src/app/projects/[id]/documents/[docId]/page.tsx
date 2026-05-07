@@ -16,14 +16,91 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 
+/**
+ * Pass C3 — citation health card. Renders only when the document is in
+ * `ready` state. Shows how many ScopeCitation rows were created from this
+ * document's chunks, broken down by evidence_type and link_judge verdict.
+ * Lets the user see how this specific document contributed to scope and
+ * how much of that contribution survived the entailment gate.
+ */
+function CitationSummaryCard({
+  projectId,
+  documentId,
+}: {
+  projectId: string;
+  documentId: string;
+}) {
+  const { data } = useQuery({
+    queryKey: ["citation-summary", projectId, documentId],
+    queryFn: () => api.getCitationSummary(projectId, documentId),
+  });
+
+  if (!data || data.total_citations === 0) return null;
+
+  const passRate =
+    data.link_judge.pass + data.link_judge.fail > 0
+      ? data.link_judge.pass / (data.link_judge.pass + data.link_judge.fail)
+      : null;
+
+  return (
+    <div className="mb-6 rounded-md border bg-card p-3">
+      <div className="mb-2 flex items-baseline justify-between">
+        <h3 className="text-sm font-semibold">Citation health</h3>
+        <span className="text-xs text-muted-foreground">
+          {data.total_citations} citation{data.total_citations === 1 ? "" : "s"}{" "}
+          created from this document
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+        {Object.entries(data.by_evidence_type).map(([type, counts]) => (
+          <div key={type} className="rounded border bg-muted/20 p-2">
+            <div className="font-medium capitalize">{type}</div>
+            <div className="mt-0.5 text-muted-foreground">
+              {counts.count} cite{counts.count === 1 ? "" : "s"}
+            </div>
+            <div className="mt-1 text-[10px]">
+              <span className="text-emerald-700 dark:text-emerald-300">
+                ✓ {counts.link_judge_pass}
+              </span>
+              {" · "}
+              <span className="text-rose-700 dark:text-rose-300">
+                ✗ {counts.link_judge_fail}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+      {passRate !== null && (
+        <div className="mt-2 text-xs text-muted-foreground">
+          Link-judge entailment: <span className="font-medium">{Math.round(passRate * 100)}%</span> pass rate
+          {data.link_judge.not_run > 0 && (
+            <> · {data.link_judge.not_run} citation{data.link_judge.not_run === 1 ? "" : "s"} not yet judged</>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function isProcessing(status: string): boolean {
   return (
     status === "pending" ||
     status === "classifying" ||
     status === "rendering" ||
-    status === "extracting"
+    status === "extracting" ||
+    status === "ocr" ||
+    status === "indexing"
   );
 }
+
+const STAGE_PLACEHOLDER: Record<string, string> = {
+  pending: "Queued for processing…",
+  classifying: "Classifying document type…",
+  rendering: "Rendering pages…",
+  extracting: "Vision pre-pass on drawings…",
+  ocr: "OCR — reading text from each page…",
+  indexing: "Indexing chunks for retrieval…",
+};
 
 function DocumentDetail({
   projectId,
@@ -100,6 +177,7 @@ function DocumentDetail({
             <ProcessingStatusIndicator
               status={doc.processing_status}
               error={doc.processing_error}
+              progress={doc.processing_progress}
             />
             <span>·</span>
             <span>{formatBytes(doc.size_bytes)}</span>
@@ -127,8 +205,22 @@ function DocumentDetail({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => reclassify.mutate()}
-          disabled={reclassify.isPending || isProcessing(doc.processing_status)}
+          onClick={() => {
+            const inFlight = isProcessing(doc.processing_status);
+            const msg = inFlight
+              ? `Re-process ${doc.filename}?\n\nThis document is currently ` +
+                `processing (${doc.processing_status}). Re-processing will ` +
+                `cancel any in-flight tasks and restart the pipeline from ` +
+                `the beginning. Already-completed work (rendered pages, ` +
+                `committed OCR text) is preserved where possible. Spent ` +
+                `API costs are not refunded.`
+              : `Re-process ${doc.filename}?\n\nThis will re-run the full ` +
+                `pipeline (classify → render → OCR/extract → index). Costs ` +
+                `apply per stage.`;
+            if (confirm(msg)) reclassify.mutate();
+          }}
+          disabled={reclassify.isPending}
+          title="Re-process this document from the start"
         >
           <RefreshCw
             className={`size-4 ${reclassify.isPending ? "animate-spin" : ""}`}
@@ -147,13 +239,43 @@ function DocumentDetail({
         </div>
       )}
 
+      {doc.processing_status === "ready" && (
+        <CitationSummaryCard projectId={projectId} documentId={documentId} />
+      )}
+
       {pages.length === 0 ? (
-        <div className="rounded-md border border-dashed py-12 text-center text-sm text-muted-foreground">
-          {isProcessing(doc.processing_status)
-            ? "Rendering pages…"
-            : doc.processing_status === "failed"
-              ? "Page rendering failed. Try re-process."
-              : "No previewable pages for this document type."}
+        <div className="space-y-3 rounded-md border border-dashed py-12 text-center text-sm text-muted-foreground">
+          <div>
+            {isProcessing(doc.processing_status)
+              ? STAGE_PLACEHOLDER[doc.processing_status] ?? "Processing…"
+              : doc.processing_status === "failed"
+                ? "Page rendering failed. Try re-process."
+                : "No previewable pages for this document type."}
+          </div>
+          {doc.processing_progress &&
+            doc.processing_progress.total > 0 &&
+            doc.processing_progress.stage === doc.processing_status && (
+              <div className="mx-auto w-64 space-y-1">
+                <div className="text-xs">
+                  {doc.processing_progress.completed} / {doc.processing_progress.total} (
+                  {Math.round(
+                    (doc.processing_progress.completed / doc.processing_progress.total) * 100
+                  )}
+                  %)
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        (doc.processing_progress.completed / doc.processing_progress.total) * 100
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">

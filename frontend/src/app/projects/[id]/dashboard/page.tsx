@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use } from "react";
+import { use, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -15,6 +15,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { AuthGuard } from "@/components/auth-guard";
+import { CostBreakdownPanel } from "@/components/cost-breakdown-panel";
 import { TrustScorePanel } from "@/components/trust-score-panel";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +61,113 @@ function StatCard({
       <div className="text-xs text-muted-foreground">{label}</div>
       {hint && <div className="mt-1 text-[10px] text-muted-foreground">{hint}</div>}
     </Link>
+  );
+}
+
+// Pass C2 — merged activity feed combining user audit log + synthesized
+// pipeline events (LLMCall + PageExtraction). Filterable by kind.
+type ActivityEvent = {
+  kind: "pipeline" | "cost" | "error" | "user";
+  ts: string | null;
+  title: string;
+  document_id: string | null;
+  ref_id: string | null;
+  severity: "info" | "warn" | "error";
+};
+
+type ActivityFilter = "all" | "pipeline" | "cost" | "user" | "error";
+
+function ActivityFeed({
+  audit,
+  events,
+  filter,
+  onFilterChange,
+}: {
+  audit: AuditLogEntry[];
+  events: ActivityEvent[];
+  filter: ActivityFilter;
+  onFilterChange: (f: ActivityFilter) => void;
+}) {
+  // Adapt audit log entries into the same shape so we can merge.
+  const merged = useMemo<ActivityEvent[]>(() => {
+    const userEvents: ActivityEvent[] = audit.map((e) => ({
+      kind: "user" as const,
+      ts: e.created_at,
+      title: `${e.actor.replace(/^user:/, "")} ${e.action} ${e.entity_type}${
+        e.note ? ` — ${e.note}` : ""
+      }`,
+      document_id: null,
+      ref_id: e.id,
+      severity: "info" as const,
+    }));
+    const all = [...userEvents, ...events];
+    all.sort((a, b) => (b.ts || "").localeCompare(a.ts || ""));
+    return all;
+  }, [audit, events]);
+
+  const filtered = filter === "all" ? merged : merged.filter((e) => e.kind === filter);
+
+  const counts = {
+    all: merged.length,
+    pipeline: merged.filter((e) => e.kind === "pipeline").length,
+    cost: merged.filter((e) => e.kind === "cost").length,
+    user: merged.filter((e) => e.kind === "user").length,
+    error: merged.filter((e) => e.kind === "error").length,
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {(["all", "pipeline", "cost", "user", "error"] as const).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => onFilterChange(f)}
+            className={cn(
+              "rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors",
+              filter === f
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-muted-foreground/20 bg-card text-muted-foreground hover:bg-muted/50",
+            )}
+          >
+            {f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f]})
+          </button>
+        ))}
+      </div>
+      {filtered.length === 0 ? (
+        <p className="py-4 text-sm text-muted-foreground">
+          No activity yet for this filter.
+        </p>
+      ) : (
+        <div className="max-h-96 divide-y overflow-y-auto pr-1">
+          {filtered.map((e, i) => (
+            <ActivityEventRow key={`${e.ref_id}-${i}`} event={e} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActivityEventRow({ event }: { event: ActivityEvent }) {
+  const dotColor =
+    event.severity === "error"
+      ? "bg-rose-500"
+      : event.kind === "user"
+        ? "bg-primary"
+        : event.kind === "cost"
+          ? "bg-amber-500"
+          : "bg-muted-foreground/40";
+  return (
+    <div className="flex items-start gap-3 py-2 text-sm">
+      <div className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", dotColor)} />
+      <div className="flex-1 min-w-0">
+        <div className="line-clamp-2">{event.title}</div>
+        <div className="text-xs text-muted-foreground">
+          {event.kind} · {event.ts ? formatRelativeTime(event.ts) : "—"}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -131,10 +239,22 @@ function Dashboard({ projectId }: { projectId: string }) {
     refetchInterval: 8_000,
   });
   const { data: audit } = useQuery({
-    queryKey: ["audit-log", projectId, 10],
-    queryFn: () => api.listAuditLog(projectId, { limit: 10 }),
+    queryKey: ["audit-log", projectId, 30],
+    queryFn: () => api.listAuditLog(projectId, { limit: 30 }),
     refetchInterval: 8_000,
   });
+  // Pass C2 — pipeline activity events synthesized from LLMCall +
+  // PageExtraction. Merges into the same card as user audit log so the
+  // estimator sees BOTH "I resolved conflict X" AND "Vision pre-pass
+  // ready on E3.1 ($0.05)" in chronological order.
+  const { data: activityEvents } = useQuery({
+    queryKey: ["activity-events", projectId, 50],
+    queryFn: () => api.listActivityEvents(projectId, { limit: 50 }),
+    refetchInterval: 8_000,
+  });
+  const [activityFilter, setActivityFilter] = useState<
+    "all" | "pipeline" | "cost" | "user" | "error"
+  >("all");
   const { data: llmCalls } = useQuery({
     queryKey: ["llm-calls", projectId],
     queryFn: () => api.listLLMCalls(projectId, { limit: 500 }),
@@ -195,6 +315,9 @@ function Dashboard({ projectId }: { projectId: string }) {
           hint={`${llmCalls?.length ?? 0} API calls logged`}
         />
       </div>
+
+      {/* Cost breakdown — drill into total spend by stage / model / document */}
+      <CostBreakdownPanel calls={llmCalls} />
 
       {/* Trust score + review queue depth */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -270,25 +393,19 @@ function Dashboard({ projectId }: { projectId: string }) {
         </Card>
       </div>
 
-      {/* Recent activity */}
+      {/* Recent activity — merged stream of user actions + pipeline events */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Recent activity</CardTitle>
           </CardHeader>
           <CardContent>
-            {audit && audit.length > 0 ? (
-              <div className="divide-y">
-                {audit.map((e) => (
-                  <ActivityRow key={e.id} entry={e} />
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No recorded activity yet — actions like resolving conflicts and
-                generating outputs will show here.
-              </p>
-            )}
+            <ActivityFeed
+              audit={audit ?? []}
+              events={activityEvents ?? []}
+              filter={activityFilter}
+              onFilterChange={setActivityFilter}
+            />
           </CardContent>
         </Card>
         <Card>

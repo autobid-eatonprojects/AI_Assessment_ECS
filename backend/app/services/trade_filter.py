@@ -10,6 +10,26 @@ for a small commercial project.
 
 Operator override is supported: if the Haiku verdict is wrong, the operator
 can flip a chip in the UI and Phase 4.3 honours `effective_relevance`.
+
+Corpus-evidence gate
+--------------------
+The LLM is told to "be inclusive: when in doubt, mark relevant" — that produces
+optimistic verdicts on building-type stereotypes (e.g. "community centers
+*usually* have kitchen equipment, so Div 11 is relevant") even when the actual
+spec/drawings don't contain that division. To kill those false positives we
+post-filter every True verdict against actual corpus evidence:
+
+    final_is_relevant = llm_says_true AND corpus_has_evidence
+
+Corpus evidence is detected from two sources:
+  1. Spec book — looks for `DIVISION NN` or `SECTION NN XX XX` headers.
+     The "SECTION" / "DIVISION" prefix is what filters AIA contract-clause
+     index ghosts (e.g. "13.4.4.1" → "13 40 41" after OCR strips periods).
+  2. Drawings — sheet IDs map to disciplines via SHEET_PREFIX_DISCIPLINE,
+     and disciplines own divisions (per discipline_mapping.yaml). An `M`
+     sheet implies Div 23 evidence; a `P` sheet implies Div 22; etc.
+This catches MEP trades whose specs live in drawings + cut sheets rather
+than in formal spec sections.
 """
 
 from __future__ import annotations
@@ -17,13 +37,21 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
-from ..models import ProjectProfile, TradeDivisionRelevance
+from ..models import (
+    Chunk,
+    Document,
+    ProjectProfile,
+    SheetIndex,
+    TradeDivisionRelevance,
+)
+from .discipline_config import discipline_for_sheet_prefix, load_disciplines
 from .llm_log import Usage, record_call, usage_from_anthropic
 from .trade_list_parser import CSIDivision, CSITaxonomy
 
@@ -32,6 +60,97 @@ log = logging.getLogger(__name__)
 
 class TradeFilterUnavailable(Exception):
     """Raised when prerequisites are missing (no API key, no trade list, no profile)."""
+
+
+def _division_in_spec_text(div_code: str, spec_text: str) -> bool:
+    """True if `div_code` appears as a real spec header in `spec_text`.
+
+    Real headers come in two forms — `DIVISION NN` or `SECTION NN XX XX`.
+    The leading keyword is what distinguishes them from AIA contract-clause
+    index ghosts where OCR loses the periods (e.g. "13.4.4.1" → "13 40 41").
+    The spec author writes "DIVISION 1" (unpadded) for two-digit-displayed
+    divisions, so we also accept the unpadded form.
+    """
+    if not spec_text:
+        return False
+    div_int = int(div_code)
+    div_re = re.compile(rf"\bDIVISION\s+0*{div_int}\b", re.IGNORECASE)
+    sec_re = re.compile(rf"\bSECTION\s+{div_code}\s\d{{2}}\s\d{{2}}\b", re.IGNORECASE)
+    return bool(div_re.search(spec_text) or sec_re.search(spec_text))
+
+
+def _divisions_with_drawing_evidence(sheet_ids: list[str]) -> set[str]:
+    """For every sheet ID, map its prefix → discipline → owned divisions."""
+    seen: set[str] = set()
+    divs_by_discipline = {d.key: set(d.csi_divisions) for d in load_disciplines()}
+    # Div 00/01 (general/admin) are always implicitly evidenced by any project
+    # — no "DIVISION 0/1" header on a drawing, but every project contains them.
+    seen |= divs_by_discipline.get("general", set())
+    for sid in sheet_ids:
+        disc = discipline_for_sheet_prefix(sid or "")
+        if disc:
+            # discipline_for_sheet_prefix returns the YAML 'key' for most
+            # sheet prefixes, but 'L' returns 'landscape' which isn't a
+            # discipline key — it falls back to 'site' downstream.
+            owned = divs_by_discipline.get(disc, divs_by_discipline.get("site", set()))
+            seen |= owned
+    return seen
+
+
+async def _gather_corpus_evidence(project_id: str) -> set[str]:
+    """Return the set of CSI divisions that have actual project-corpus evidence.
+
+    Combines spec-book header matches and drawing-sheet discipline mapping.
+    Empty if neither spec nor drawings are available — caller should treat
+    "no corpus" as "fall back to LLM verdict alone" (see filter_trades).
+    """
+    from ..database import SessionLocal
+
+    async with SessionLocal() as db:
+        # Spec text: concatenate all chunk text from any written-spec document.
+        spec_text = ""
+        spec_docs = (
+            await db.execute(
+                select(Document.id).where(
+                    Document.project_id == project_id,
+                    Document.doc_type == "written-spec",
+                )
+            )
+        ).scalars().all()
+        if spec_docs:
+            chunk_texts = (
+                await db.execute(
+                    select(Chunk.text).where(Chunk.document_id.in_(spec_docs))
+                )
+            ).scalars().all()
+            spec_text = "\n".join(t for t in chunk_texts if t)
+
+        sheet_rows = (
+            await db.execute(
+                select(SheetIndex.sheet_id).where(SheetIndex.project_id == project_id)
+            )
+        ).scalars().all()
+
+    if not spec_text and not sheet_rows:
+        return set()
+
+    # Divisions evidenced by spec headers
+    evidenced: set[str] = set()
+    if spec_text:
+        # Quick scan: walk every two-digit group preceded by SECTION/DIVISION
+        # once, instead of re-running a regex per division.
+        for m in re.finditer(
+            r"\b(?:DIVISION\s+0*(\d{1,2})|SECTION\s+(\d{2})\s\d{2}\s\d{2})\b",
+            spec_text,
+            re.IGNORECASE,
+        ):
+            div = (m.group(1) or m.group(2) or "").zfill(2)
+            if div:
+                evidenced.add(div)
+
+    # Divisions evidenced by drawing sheets
+    evidenced |= _divisions_with_drawing_evidence(list(sheet_rows))
+    return evidenced
 
 
 _RELEVANCE_TOOL = {
@@ -204,7 +323,15 @@ async def filter_trades(project_id: str, *, force: bool = False) -> list[TradeDi
         return_exceptions=True,
     )
 
+    # Corpus-evidence gate: drop True verdicts that have no spec/drawing
+    # support. Empty set means no corpus is available yet (no spec uploaded,
+    # no sheets indexed) — in that case we fall back to the LLM verdict
+    # alone so we don't block extraction on a chicken-and-egg problem.
+    corpus_evidence = await _gather_corpus_evidence(project_id)
+    apply_corpus_gate = bool(corpus_evidence)
+
     rows: list[TradeDivisionRelevance] = []
+    flipped_by_corpus: list[str] = []
     async with SessionLocal() as db:
         if force:
             # Wipe existing rows so we can re-insert with the new verdicts.
@@ -230,12 +357,29 @@ async def filter_trades(project_id: str, *, force: bool = False) -> list[TradeDi
                 latency_ms=latency_ms,
                 project_id=project_id,
             )
+            llm_relevant = bool(verdict["is_relevant"])
+            llm_reasoning = verdict.get("reasoning") or ""
+            final_relevant = llm_relevant
+            final_reasoning = llm_reasoning
+            if (
+                apply_corpus_gate
+                and llm_relevant
+                and division.code not in corpus_evidence
+            ):
+                final_relevant = False
+                final_reasoning = (
+                    f"{llm_reasoning} [Vetoed by corpus-evidence gate: no "
+                    f"`DIVISION {int(division.code)}` or `SECTION "
+                    f"{division.code} XX XX` header in spec, and no drawing "
+                    f"sheet maps to this division.]"
+                ).strip()
+                flipped_by_corpus.append(division.code)
             row = TradeDivisionRelevance(
                 project_id=project_id,
                 csi_division=division.code,
                 division_label=division.label,
-                is_relevant=bool(verdict["is_relevant"]),
-                reasoning=verdict.get("reasoning"),
+                is_relevant=final_relevant,
+                reasoning=final_reasoning,
                 confidence=float(verdict.get("confidence", 0.0)),
                 operator_override=False,
                 override_value=None,
@@ -245,6 +389,13 @@ async def filter_trades(project_id: str, *, force: bool = False) -> list[TradeDi
             db.add(row)
             rows.append(row)
         await db.commit()
+
+    if flipped_by_corpus:
+        log.info(
+            "trade_filter: corpus-evidence gate vetoed %d LLM-True verdicts: %s",
+            len(flipped_by_corpus),
+            ",".join(sorted(flipped_by_corpus)),
+        )
 
     # Re-fetch all rows (including any pre-existing ones not in this batch)
     async with SessionLocal() as db:
@@ -288,3 +439,80 @@ async def set_operator_override(
         await db.commit()
         await db.refresh(row)
         return row
+
+
+async def reevaluate_corpus_evidence(
+    project_id: str, *, clear_stale_true_overrides: bool = False
+) -> dict:
+    """Re-run the corpus-evidence gate against existing relevance rows.
+
+    Useful after the spec/drawings have been (re-)processed, or to clean up
+    rows from a project that ran before this gate existed. Modifies
+    `is_relevant` in place.
+
+    When `clear_stale_true_overrides=True` we also clear `operator_override`
+    on rows that match the unambiguous "stale True override" pattern: LLM
+    voted False AND corpus has no evidence AND override_value forced True.
+    These can only be artifacts of an earlier experimental session — the
+    division can't apply (LLM and corpus agree) — and the override is
+    actively producing noise in gap detection. We never touch overrides
+    that contradict any single signal alone.
+    """
+    from ..database import SessionLocal
+
+    corpus_evidence = await _gather_corpus_evidence(project_id)
+    if not corpus_evidence:
+        return {"flipped": [], "reason": "no corpus available — gate not applied"}
+
+    flipped: list[str] = []
+    cleared_overrides: list[str] = []
+    async with SessionLocal() as db:
+        rows = (
+            await db.execute(
+                select(TradeDivisionRelevance).where(
+                    TradeDivisionRelevance.project_id == project_id
+                )
+            )
+        ).scalars().all()
+        for row in rows:
+            has_evidence = row.csi_division in corpus_evidence
+
+            # Pass 1: corpus-evidence gate on is_relevant
+            if row.is_relevant and not has_evidence:
+                row.is_relevant = False
+                note = (
+                    f" [Vetoed by corpus-evidence gate: no `DIVISION "
+                    f"{int(row.csi_division)}` or `SECTION {row.csi_division} "
+                    f"XX XX` header in spec, and no drawing sheet maps to "
+                    f"this division.]"
+                )
+                if row.reasoning and "[Vetoed by corpus-evidence gate" not in row.reasoning:
+                    row.reasoning = row.reasoning + note
+                elif not row.reasoning:
+                    row.reasoning = note.strip()
+                flipped.append(row.csi_division)
+
+            # Pass 2: stale True-override cleanup
+            if (
+                clear_stale_true_overrides
+                and row.operator_override
+                and row.override_value is True
+                and not row.is_relevant
+                and not has_evidence
+            ):
+                row.operator_override = False
+                row.override_value = None
+                cleared_overrides.append(row.csi_division)
+        await db.commit()
+
+    log.info(
+        "trade_filter.reevaluate: project %s — flipped %d, cleared %d stale overrides",
+        project_id,
+        len(flipped),
+        len(cleared_overrides),
+    )
+    return {
+        "flipped": sorted(flipped),
+        "cleared_overrides": sorted(cleared_overrides),
+        "evidenced_divisions": sorted(corpus_evidence),
+    }

@@ -32,7 +32,6 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
-import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -47,8 +46,8 @@ from ..models import (
     SheetIndex,
     SymbolLegend,
 )
+from .anthropic_tool_call import call_with_tool
 from .discipline_config import discipline_for_sheet_prefix
-from .llm_log import record_call, usage_from_anthropic
 from .renderer import read_image_for_vision, render_page_at_dpi
 from .storage import storage
 
@@ -184,21 +183,6 @@ Be exhaustive — missing symbols hurts downstream extraction accuracy.
 
 Use extract_symbol_legend now.
 """
-
-
-_client = None
-
-
-def _get_client():
-    global _client
-    if _client is not None:
-        return _client
-    if not settings.anthropic_api_key:
-        return None
-    from anthropic import AsyncAnthropic
-
-    _client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-    return _client
 
 
 @dataclass
@@ -345,10 +329,6 @@ async def _extract_one_legend(
     dpi: int = 300,
 ) -> list[SymbolLegend]:
     """Run Sonnet vision against one candidate legend sheet."""
-    client = _get_client()
-    if client is None:
-        return []
-
     resolved = await _resolve_page_extraction(candidate)
     if resolved is None:
         return []
@@ -361,42 +341,33 @@ async def _extract_one_legend(
     raw, media_type = read_image_for_vision(Path(image_path))
     b64 = base64.standard_b64encode(raw).decode("ascii")
 
-    t0 = time.perf_counter()
     try:
-        msg = await client.messages.create(
+        result = await call_with_tool(
             model=settings.vision_model,
+            tool_def=_EXTRACT_TOOL,
+            system=_SYSTEM_PROMPT,
             max_tokens=8192,
-            system=[
+            purpose="symbol-legend",
+            project_id=candidate.project_id,
+            document_id=candidate.document_id,
+            page_extraction_id=pe.id,
+            user_content=[
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": media_type,
+                        "data": b64,
+                    },
+                },
                 {
                     "type": "text",
-                    "text": _SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
-            tools=[_EXTRACT_TOOL],
-            tool_choice={"type": "tool", "name": "extract_symbol_legend"},
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": b64,
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": (
-                                f"Extract every symbol from sheet "
-                                f"{candidate.sheet_id} "
-                                f"({candidate.title or 'untitled'})."
-                            ),
-                        },
-                    ],
-                }
+                    "text": (
+                        f"Extract every symbol from sheet "
+                        f"{candidate.sheet_id} "
+                        f"({candidate.title or 'untitled'})."
+                    ),
+                },
             ],
         )
     except Exception as e:  # noqa: BLE001
@@ -405,17 +376,8 @@ async def _extract_one_legend(
             candidate.sheet_id, e,
         )
         return []
-    latency_ms = int((time.perf_counter() - t0) * 1000)
 
-    payload: dict = {}
-    for block in msg.content:
-        if (
-            getattr(block, "type", None) == "tool_use"
-            and block.name == "extract_symbol_legend"
-        ):
-            payload = block.input
-            break
-
+    payload = result.parsed_input
     legend_rows: list[SymbolLegend] = []
     sheet_default_discipline = (
         candidate.discipline or discipline_for_sheet_prefix(candidate.sheet_id)
@@ -442,24 +404,9 @@ async def _extract_one_legend(
             )
         )
 
-    cost = 0.0
-    async with SessionLocal() as db:
-        c, _ = await record_call(
-            db,
-            purpose="symbol-legend",
-            model=settings.vision_model,
-            usage=usage_from_anthropic(msg),
-            latency_ms=latency_ms,
-            project_id=candidate.project_id,
-            document_id=candidate.document_id,
-            page_extraction_id=pe.id,
-        )
-        cost = c or 0.0
-        await db.commit()
-
     log.info(
         "symbol_legend: %s — %d entries in %dms ($%.4f)",
-        candidate.sheet_id, len(legend_rows), latency_ms, cost,
+        candidate.sheet_id, len(legend_rows), result.latency_ms, result.cost_usd,
     )
     return legend_rows
 

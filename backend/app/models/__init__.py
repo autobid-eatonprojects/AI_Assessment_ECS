@@ -21,6 +21,7 @@ from .extraction import (
 )
 from .profile import ProjectProfile, TradeDivisionRelevance
 from .project import Project
+from .ragas import RagasEvalRun
 from .review import (
     Conflict,
     ConflictMember,
@@ -56,6 +57,7 @@ __all__ = [
     "PageExtraction",
     "Project",
     "ProjectProfile",
+    "RagasEvalRun",
     "ScopeCitation",
     "ScopeExtractionRun",
     "ScopeItem",

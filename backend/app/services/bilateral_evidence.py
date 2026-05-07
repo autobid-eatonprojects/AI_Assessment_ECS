@@ -176,6 +176,58 @@ async def classify_run(run_id: str) -> dict[str, int]:
             project_id, sorted(project_doc_types), sorted(bilateral_required),
         )
 
+        # Per-DIVISION corpus awareness. The project may have a spec book
+        # AND drawings overall, but for a given CSI division the spec might
+        # be silent (e.g. on a community center, the spec book typically
+        # has no Div 22/26/27/28 sections — MEP scope lives entirely on
+        # M0.1, P0.1, E0.1, FP0.1 sheets). Items in those divisions
+        # CANNOT produce spec citations; flagging them as "missing the
+        # bilateral pair" is wrong by construction. Downgrade their
+        # expected_pattern to drawing_only.
+        from ..models import Chunk
+        import re as _re
+
+        spec_chunks_text = ""
+        if "written-spec" in project_doc_types:
+            spec_text_rows = (
+                await db.execute(
+                    select(Chunk.text)
+                    .join(Document, Chunk.document_id == Document.id)
+                    .where(Chunk.project_id == project_id)
+                    .where(Document.doc_type == "written-spec")
+                    .where(Chunk.csi_section.isnot(None))
+                )
+            ).scalars().all()
+            spec_chunks_text = "\n".join(t for t in spec_text_rows if t)
+
+        # A division has spec evidence iff its DIVISION/SECTION header
+        # appears in the spec text. Mirrors trade_filter._gather_corpus_evidence.
+        divs_with_spec_evidence: set[str] = set()
+        if spec_chunks_text:
+            for m in _re.finditer(
+                r"\b(?:DIVISION\s+0*(\d{1,2})|SECTION\s+(\d{2})\s\d{2}\s\d{2})\b",
+                spec_chunks_text,
+                _re.IGNORECASE,
+            ):
+                div = (m.group(1) or m.group(2) or "").zfill(2)
+                if div:
+                    divs_with_spec_evidence.add(div)
+
+        # Drawing evidence is reachable for any division where a drawing
+        # sheet maps via discipline_config (every project with drawings
+        # touches all main disciplines).
+        divs_with_drawing_evidence: set[str] = set()
+        if "drawing-set" in project_doc_types:
+            from .trade_list_parser import get_taxonomy_for_project as _get_tax
+            tax = await _get_tax(project_id)
+            if tax:
+                divs_with_drawing_evidence = {d.code for d in tax.divisions}
+
+        log.info(
+            "bilateral_evidence: divs with spec evidence: %s",
+            sorted(divs_with_spec_evidence),
+        )
+
         item_ids = [i.id for i in items]
         cit_rows = (
             await db.execute(
@@ -209,19 +261,37 @@ async def classify_run(run_id: str) -> dict[str, int]:
                 and bilateral_required.issubset(ev_types)
             )
 
-            # Expected evidence pattern for this item — derived from CSI
-            # division/section + admin keywords in description. Adjust
-            # down if the project doesn't have that side of evidence
-            # available at all (a drawing-only project can't produce
-            # spec citations even for material items).
+            # Expected evidence pattern for this item. Two-stage downgrade:
+            #
+            # 1. Project-level: if the project has only drawings (no spec)
+            #    or only spec (no drawings), bilateral is impossible by
+            #    definition. Downgrade to whichever side is available.
+            #
+            # 2. Per-division: even when the project has both, this
+            #    division might be one-sided. On a community-center bid
+            #    the spec book typically has zero Div 22/26/27/28 content;
+            #    MEP scope lives entirely on the M*/P*/E*/FP* sheets. An
+            #    item in those divisions CANNOT produce a spec citation
+            #    by construction. Flagging those items as "missing the
+            #    bilateral pair" is wrong; they correctly expect
+            #    drawing_only. Same logic in the other direction for
+            #    admin sections that exist only in the spec.
             expected = expected_pattern(item.csi_code, item.description)
+            div = (item.csi_division or "").strip()
             if expected == "bilateral":
-                # If the project genuinely has no spec docs, downgrade to
-                # drawing_only; if no drawings, downgrade to spec_only.
+                # Stage 1: project-level
                 if not {"spec", "drawing"}.issubset(ev_present):
                     if "drawing" in ev_present and "spec" not in ev_present:
                         expected = "drawing_only"
                     elif "spec" in ev_present and "drawing" not in ev_present:
+                        expected = "spec_only"
+                # Stage 2: per-division
+                elif div:
+                    div_has_spec = div in divs_with_spec_evidence
+                    div_has_drawing = div in divs_with_drawing_evidence
+                    if div_has_drawing and not div_has_spec:
+                        expected = "drawing_only"
+                    elif div_has_spec and not div_has_drawing:
                         expected = "spec_only"
             pattern_match = matches_expected(expected, has_spec, has_drawing)
 

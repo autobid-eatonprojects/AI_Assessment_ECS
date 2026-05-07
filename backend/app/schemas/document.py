@@ -26,6 +26,15 @@ class DocumentOut(BaseModel):
     processing_error: str | None
     processed_at: datetime | None
 
+    # Stage-specific progress so the UI can render "OCR 168/370" instead
+    # of just "OCR (Gemini Flash)" with no count. Optional because we only
+    # bother computing it on the GET document endpoint, not in list views.
+    #   {"stage": "ocr",       "completed": 168, "total": 370}
+    #   {"stage": "extracting","completed": 5,   "total": 54}
+    #   {"stage": "rendering", "completed": 42,  "total": 370}
+    # null when status is terminal (ready/failed) or pre-pipeline.
+    processing_progress: dict | None = None
+
     created_at: datetime
 
 

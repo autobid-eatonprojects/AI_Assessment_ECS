@@ -142,7 +142,16 @@ function ProjectsList() {
     return <p className="text-sm text-muted-foreground">Loading projects…</p>;
   }
   if (error) {
-    return <p className="text-sm text-destructive">Failed to load projects.</p>;
+    return (
+      <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm">
+        <p className="font-medium text-destructive">
+          Couldn&apos;t load projects
+        </p>
+        <p className="mt-1 text-muted-foreground">
+          {(error as Error).message || "Unknown error"}
+        </p>
+      </div>
+    );
   }
   if (!data || data.length === 0) {
     return (

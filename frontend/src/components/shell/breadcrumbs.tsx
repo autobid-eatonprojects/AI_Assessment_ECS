@@ -10,6 +10,7 @@ const SECTION_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
   documents: "Documents",
   scope: "Scope",
+  ragas: "RAGAS Eval",
   packages: "Trade Packages",
   review: "Review",
   bids: "Bid Analysis",

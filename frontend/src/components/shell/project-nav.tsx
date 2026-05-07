@@ -14,6 +14,7 @@ import {
   ListChecks,
   Receipt,
   ScrollText,
+  Target,
   Users,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -32,6 +33,7 @@ function sections(projectId: string): ProjectSection[] {
     { href: `/projects/${projectId}`, label: "Overview & Uploads", icon: Home },
     { href: `/projects/${projectId}/documents`, label: "Documents", icon: FileText },
     { href: `/projects/${projectId}/scope`, label: "Scope", icon: ListChecks },
+    { href: `/projects/${projectId}/ragas`, label: "RAGAS Eval", icon: Target },
     { href: `/projects/${projectId}/packages`, label: "Trade Packages", icon: Layers },
     { href: `/projects/${projectId}/review`, label: "Review", icon: ClipboardCheck },
     { href: `/projects/${projectId}/rfi`, label: "RFI List", icon: HelpCircle },
