@@ -1,22 +1,28 @@
-"""Stage 2 — bilateral evidence + tier classification.
+"""Stage 2 — evidence-pattern coverage + tier classification.
 
 After persistence (and after the Stage 3 link judge once it lands), every
 ScopeItem in a run gets:
 
     bilateral_evidence : bool
         True iff there is at least one citation with evidence_type='drawing'
-        AND at least one citation with evidence_type='spec'. Computed by a
-        single GROUP BY on scope_citations (no JOIN through chunks needed
-        thanks to the Stage 1 denormalization).
+        AND at least one citation with evidence_type='spec'. Kept as a
+        sub-signal regardless of expected pattern.
 
     evidence_tier : enum
-        EXPLICITLY_CITED          — bilateral=True AND confidence ≥ 0.85
+        EXPLICITLY_CITED          — pattern_match=True AND confidence ≥ 0.85
                                     AND link-judge passes (Stage 3 onwards).
-                                    Until Stage 3 lands, the link-judge
-                                    requirement is implicitly skipped.
-        INFERRED_HIGH_CONFIDENCE  — strong support but missing one side, or
-                                    bilateral with weaker confidence.
+        INFERRED_HIGH_CONFIDENCE  — strong support but pattern not met, or
+                                    pattern met with weaker confidence.
         INFERRED_LOW_CONFIDENCE   — surfaces in HITL low-confidence queue.
+
+KEY CHANGE FROM v1:
+The tier no longer demands `bilateral=True` for the top tier. It demands
+`pattern_match=True`, where pattern_match is computed against the item's
+EXPECTED evidence pattern (from `evidence_pattern.expected_pattern()`).
+A Division 1 item like "Submittal procedures" expects spec_only; if it
+has a spec citation, that's a top-tier item — not a unilateral red flag.
+A material/equipment item like "Cast-in-place concrete" expects bilateral;
+spec-only is a real gap and lands in INFERRED_HIGH at best.
 
 The tier rule is intentionally tunable. We persist the per-item rationale
 into ``ScopeItem.trust_components`` so the UI can explain why an item landed
@@ -32,6 +38,7 @@ from sqlalchemy import select
 
 from ..database import SessionLocal
 from ..models import ScopeCitation, ScopeItem
+from .evidence_pattern import expected_pattern, matches_expected
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +55,8 @@ CONFIDENCE_THRESHOLD = 0.85
 
 def _classify(
     *,
+    pattern_match: bool,
+    expected: str,
     bilateral: bool,
     confidence: float,
     link_judge_pass: bool | None,
@@ -55,48 +64,54 @@ def _classify(
 ) -> tuple[str, dict]:
     """Return (tier, rationale_dict) for a single item.
 
-    Rationale is shaped to render as a tooltip on the EvidenceTierBadge:
-        {"bilateral": bool, "confidence": float, "link_judge": "n/a"|"pass"|"fail",
-         "tier_reason": str}
+    The top tier now requires `pattern_match=True` (the item's evidence
+    matches its expected pattern), not raw `bilateral=True`. A spec_only
+    item with a clean spec citation is top-tier; a bilateral_expected
+    item missing one side is at best INFERRED_HIGH.
     """
     link_judge_state = (
         "n/a" if link_judge_pass is None else ("pass" if link_judge_pass else "fail")
     )
-
-    # Top tier requires all three signals (link-judge "n/a" treated as
-    # neutral so Stage 2 can ship without Stage 3).
-    if (
-        bilateral
-        and confidence >= CONFIDENCE_THRESHOLD
-        and link_judge_pass is not False
-    ):
-        return EXPLICITLY_CITED, {
-            "bilateral": True,
-            "confidence": confidence,
-            "link_judge": link_judge_state,
-            "tier_reason": "bilateral evidence + high confidence",
-        }
-
-    # High tier: either bilateral OR strong-confidence-with-strong-citation.
-    if bilateral or (
-        confidence >= CONFIDENCE_THRESHOLD and has_strong_citation
-    ):
-        return INFERRED_HIGH, {
-            "bilateral": bilateral,
-            "confidence": confidence,
-            "link_judge": link_judge_state,
-            "tier_reason": (
-                "bilateral evidence (lower confidence)"
-                if bilateral
-                else "strong single-side citation"
-            ),
-        }
-
-    return INFERRED_LOW, {
+    base_rationale = {
+        "expected_pattern": expected,
+        "pattern_match": pattern_match,
         "bilateral": bilateral,
         "confidence": confidence,
         "link_judge": link_judge_state,
-        "tier_reason": "one-sided evidence and/or weak validator support",
+    }
+
+    # Top tier: pattern matches + high confidence + link-judge isn't an
+    # explicit fail. (link_judge "n/a" treated as neutral so Stage 2 can
+    # ship without Stage 3 actually having run.)
+    if (
+        pattern_match
+        and confidence >= CONFIDENCE_THRESHOLD
+        and link_judge_pass is not False
+    ):
+        reason = {
+            "spec_only": "spec citation present (drawing not expected)",
+            "drawing_only": "drawing citation present (spec not expected)",
+            "bilateral": "bilateral evidence + high confidence",
+        }[expected]
+        return EXPLICITLY_CITED, {**base_rationale, "tier_reason": reason}
+
+    # High tier: pattern matches at lower confidence, OR doesn't match
+    # but has a strong single citation that crosses the confidence bar.
+    if pattern_match or (
+        confidence >= CONFIDENCE_THRESHOLD and has_strong_citation
+    ):
+        reason = (
+            f"pattern matched ({expected}, lower confidence)"
+            if pattern_match
+            else "strong single-side citation; pattern not fully met"
+        )
+        return INFERRED_HIGH, {**base_rationale, "tier_reason": reason}
+
+    return INFERRED_LOW, {
+        **base_rationale,
+        "tier_reason": (
+            f"expected {expected}; evidence missing or weak"
+        ),
     }
 
 
@@ -184,12 +199,31 @@ async def classify_run(run_id: str) -> dict[str, int]:
 
         for item in items:
             ev_types = ev_types_by_item.get(item.id, set())
-            # Project-aware: bilateral when the item cites every
-            # evidence_type that exists on this project.
+            has_spec = "spec" in ev_types
+            has_drawing = "drawing" in ev_types
+            # Raw bilateral: true iff both sides have at least one citation.
+            # Kept as a sub-signal for transparency; tier no longer requires
+            # this directly.
             bilateral = bool(
                 bilateral_required
                 and bilateral_required.issubset(ev_types)
             )
+
+            # Expected evidence pattern for this item — derived from CSI
+            # division/section + admin keywords in description. Adjust
+            # down if the project doesn't have that side of evidence
+            # available at all (a drawing-only project can't produce
+            # spec citations even for material items).
+            expected = expected_pattern(item.csi_code, item.description)
+            if expected == "bilateral":
+                # If the project genuinely has no spec docs, downgrade to
+                # drawing_only; if no drawings, downgrade to spec_only.
+                if not {"spec", "drawing"}.issubset(ev_present):
+                    if "drawing" in ev_present and "spec" not in ev_present:
+                        expected = "drawing_only"
+                    elif "spec" in ev_present and "drawing" not in ev_present:
+                        expected = "spec_only"
+            pattern_match = matches_expected(expected, has_spec, has_drawing)
 
             # link_judge_pass: True iff at least one citation passed and
             # none failed; False if any citation failed; None if not yet run.
@@ -209,6 +243,8 @@ async def classify_run(run_id: str) -> dict[str, int]:
             has_strong_citation = max_rerank_by_item.get(item.id, 0.0) >= 0.5
 
             tier, rationale = _classify(
+                pattern_match=pattern_match,
+                expected=expected,
                 bilateral=bilateral,
                 confidence=item.confidence,
                 link_judge_pass=link_judge_pass,

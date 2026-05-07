@@ -201,12 +201,13 @@ async def detect_gaps(run_id: str) -> GapStats:
                     )
                     stats.missing_section += 1
 
-        # ---- 3. unilateral_evidence ----
-        # Group items by (csi_division, csi_section). When a single
-        # section has many one-sided items (typical: 30-80 fixture
-        # schedule rows lacking spec coverage), surface ONE grouped
-        # gap with the count rather than 80 individual rows. Operators
-        # action on the section, not per-row.
+        # ---- 3. evidence-pattern shortfall ----
+        # Items in INFERRED_LOW_CONFIDENCE didn't meet their expected
+        # evidence pattern (a Division 1 item lacking spec, or a material
+        # item lacking the bilateral pair, etc.). The evidence_pattern
+        # module handles WHY an item lands in LOW — this just surfaces
+        # them. Group by (division, section) so a section with 80 weak
+        # items raises ONE gap, not 80.
         from collections import defaultdict
 
         unilateral_items = [
@@ -216,20 +217,29 @@ async def detect_gaps(run_id: str) -> GapStats:
         for item in unilateral_items:
             by_section[(item.csi_division, item.csi_code)].append(item)
 
+        def _expected_label(item) -> str:
+            tc = item.trust_components or {}
+            return tc.get("expected_pattern", "bilateral")
+
         for (div_code, section_code), group in by_section.items():
             if len(group) == 1:
-                # Single — keep the verbose per-item description
                 item = group[0]
                 description = (
-                    f"Item lacks bilateral evidence (drawing AND spec). "
+                    f"Item did not meet its expected evidence pattern "
+                    f"({_expected_label(item)}). "
                     f"Description: {item.description[:140]}"
                 )
                 related_id = item.id
             else:
-                # Many — group into one rolled-up gap
+                # Group: report the dominant expected pattern for context
+                from collections import Counter as _Counter
+                top_expected = _Counter(
+                    _expected_label(i) for i in group
+                ).most_common(1)[0][0]
                 description = (
-                    f"{len(group)} items in section {section_code} lack "
-                    f"bilateral evidence (one-sided citations only). "
+                    f"{len(group)} items in section {section_code} did not "
+                    f"meet their expected evidence pattern "
+                    f"(mostly {top_expected}). "
                     f"Sample: {group[0].description[:120]}"
                 )
                 related_id = None  # No single related item

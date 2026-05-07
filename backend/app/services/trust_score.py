@@ -110,9 +110,21 @@ async def compute_run(run_id: str) -> TrustScoreResult:
 
         project_id = items[0].project_id
 
-        # ---- Component 1: bilateral coverage rate ----
+        # ---- Component 1: evidence-pattern coverage rate ----
+        # Replaces the raw bilateral count. An item counts toward coverage
+        # when it meets its EXPECTED pattern (spec_only / drawing_only /
+        # bilateral) — derived from CSI section + admin-keyword override.
+        # See bilateral_evidence._classify and evidence_pattern module.
+        # We read the per-item rationale that bilateral_evidence wrote
+        # into trust_components.pattern_match. Falls back to the legacy
+        # bilateral flag when an item hasn't been classified yet.
         total_items = len(items)
-        bilateral_items = sum(1 for i in items if i.bilateral_evidence)
+        def _matched(item) -> bool:
+            tc = item.trust_components or {}
+            if "pattern_match" in tc:
+                return bool(tc["pattern_match"])
+            return bool(item.bilateral_evidence)
+        bilateral_items = sum(1 for i in items if _matched(i))
         bilateral_rate = bilateral_items / total_items if total_items else 0.0
 
         # ---- Component 2: extraction confidence average ----
