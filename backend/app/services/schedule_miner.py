@@ -208,6 +208,59 @@ def _detect_schedule_type(schedule_name: str) -> str | None:
     return m.group(1).lower() if m else None
 
 
+# Column keywords that identify a *catalog* schedule — defines material
+# codes (B1, P1, LVT1) with manufacturer/spec details. Catalog rows ARE
+# bid items.
+_CATALOG_COL_KEYWORDS = {
+    "code", "mark", "tag", "symbol", "designation",
+    "item", "material", "product", "name",
+    "manufacturer", "mfr", "brand", "supplier", "vendor",
+    "description", "spec", "remarks", "size",
+    "sku", "model", "pattern", "style", "collection",
+}
+
+# Column keywords that identify a *mapping* schedule — assigns codes to
+# rooms (Room 101 → Floor LVT1, Base B1, Wall P1). Mapping rows are NOT
+# bid items by themselves; the catalog schedule defines them and the
+# floor-plan takeoff measures the quantity.
+_MAPPING_COL_KEYWORDS = {
+    "room", "room_number", "room_name", "room_no", "space",
+    "floor", "flooring", "floor_finish",
+    "base", "wall", "walls", "wall_finish", "wainscot",
+    "ceiling", "ceilings", "ceiling_finish", "trim", "soffit",
+}
+
+
+def _classify_schedule_kind(columns: list[str] | None) -> str:
+    """Inspect column names to decide what kind of schedule this is.
+
+    Returns one of: 'catalog' (material-code rows), 'mapping' (room→code
+    assignments), 'mixed' (both kinds of columns), 'unknown' (no clear
+    signal — let the LLM decide row-by-row as before).
+    """
+    if not columns:
+        return "unknown"
+    cols = {(c or "").lower().replace("-", "_").strip() for c in columns}
+    cols.discard("")
+    catalog_hits = sum(
+        1 for c in cols
+        if c in _CATALOG_COL_KEYWORDS
+        or any(c == kw or c.endswith("_" + kw) for kw in _CATALOG_COL_KEYWORDS)
+    )
+    mapping_hits = sum(
+        1 for c in cols
+        if c in _MAPPING_COL_KEYWORDS
+        or any(c == kw or c.endswith("_" + kw) for kw in _MAPPING_COL_KEYWORDS)
+    )
+    if catalog_hits >= 2 and mapping_hits == 0:
+        return "catalog"
+    if mapping_hits >= 2 and catalog_hits == 0:
+        return "mapping"
+    if catalog_hits and mapping_hits:
+        return "mixed"
+    return "unknown"
+
+
 def _row_is_empty(row: dict, columns: list[str]) -> bool:
     """A row is 'empty' when it has only a tag/index column populated."""
     populated = [c for c in columns if row.get(c) not in (None, "", "<UNKNOWN>")]
@@ -543,6 +596,23 @@ async def _mine_one_schedule(
         )
         return [], Usage(), 0
 
+    # L3 semantic split: when a finish schedule's columns describe a
+    # room→code mapping (room/room_number/base/wall/ceiling), the rows
+    # are NOT bid items — they're takeoff metadata that maps codes onto
+    # locations. Emitting them as candidates produces phantom items
+    # ("B2 flooring" from a row that just says room=B2). The catalog
+    # version of the same schedule (CODE/ITEM/MANUFACTURER) survives
+    # dedupe and emits the real bid items.
+    schedule_kind = _classify_schedule_kind(s.columns)
+    schedule_type_pre = _detect_schedule_type(s.name)
+    if schedule_type_pre == "finish" and schedule_kind == "mapping":
+        log.info(
+            "schedule_miner: skipping mapping-shape finish schedule %r "
+            "(columns=%s) — room→code data, not bid items",
+            s.name, s.columns,
+        )
+        return [], Usage(), 0
+
     prompt_body = _format_schedule_for_prompt(s, ctx.sheet_number)
 
     # Layer 1: type-aware prompt augmentation
@@ -767,11 +837,24 @@ async def mine_schedules(
 
         # Dedupe — the schedule extractor sometimes runs both an untyped pass
         # and a typed (`[typed:X]`) pass over the same source page, so the
-        # same logical schedule appears twice with different IDs and slightly
-        # different LLM-picked units. When both exist for the same
-        # (page_extraction_id, normalized_name), prefer the typed version.
+        # same logical schedule appears twice with different IDs.
+        #
+        # Selection priority for the chosen pass:
+        #   1. catalog-shaped columns (CODE/ITEM/MANUFACTURER/...) — emits
+        #      one bid item per material code.
+        #   2. typed pass — better type-aware prompting.
+        #   3. anything else.
+        # Mapping-shaped passes are deprioritized because the typed extractor
+        # sometimes mis-routes catalog data into a room/floor/base/wall/
+        # ceiling schema, garbling the column→content alignment.
         def _strip_type_prefix(name: str) -> str:
             return re.sub(r"^\s*\[typed:[^\]]+\]\s*", "", name or "", flags=re.IGNORECASE).strip().lower()
+
+        def _selection_score(s: ExtractedSchedule) -> tuple[int, int]:
+            kind = _classify_schedule_kind(s.columns)
+            kind_rank = {"catalog": 3, "unknown": 2, "mixed": 1, "mapping": 0}[kind]
+            typed_rank = 1 if (s.name or "").lstrip().lower().startswith("[typed:") else 0
+            return (kind_rank, typed_rank)
 
         groups: dict[tuple, list] = defaultdict(list)
         for row in schedules:
@@ -785,10 +868,18 @@ async def mine_schedules(
             if len(group) == 1:
                 deduped.append(group[0])
                 continue
-            typed = [r for r in group if (r[0].name or "").lstrip().lower().startswith("[typed:")]
-            chosen = typed[0] if typed else group[0]
+            chosen = max(group, key=lambda r: _selection_score(r[0]))
             deduped.append(chosen)
             dropped += len(group) - 1
+            log.info(
+                "schedule_miner: dedupe pick for page %s '%s' — kept %s (%s) "
+                "out of %d candidates",
+                chosen[0].page_extraction_id,
+                key[1],
+                chosen[0].name,
+                _classify_schedule_kind(chosen[0].columns),
+                len(group),
+            )
         if dropped:
             log.info(
                 "schedule_miner: deduped %d redundant schedule pass(es) "
