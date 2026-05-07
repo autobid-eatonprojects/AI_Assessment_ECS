@@ -71,6 +71,15 @@ class Chunk(Base):
     extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     bbox: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
+    # CSI section ID for spec chunks (e.g. "08 14 16"). Populated at index
+    # time for chunks belonging to a written-spec document, by detecting
+    # SECTION headers in the page stream. Lets section_extractor pull all
+    # chunks for one section with a single indexed equality query — no
+    # substring matching, no fragile heuristics. Null for non-spec chunks.
+    csi_section: Mapped[str | None] = mapped_column(
+        String(16), nullable=True, index=True
+    )
+
     # Dense embedding lives here in pgvector. Nullable so chunk rows can be
     # written before embedding completes (the embedder backfills). The HNSW
     # index defined in the Alembic migration accelerates ANN over this column.

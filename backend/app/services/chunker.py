@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 
 import fitz  # PyMuPDF
@@ -60,6 +61,18 @@ class ChunkPayload:
     page_number: int | None = None
     extra: dict | None = None
     bbox: dict | None = None
+    # CSI section this chunk belongs to (e.g. "08 14 16"). Populated by
+    # _chunks_from_other for written-spec docs as it walks pages in order
+    # and tracks the active SECTION header. Null for non-spec chunks.
+    csi_section: str | None = None
+
+
+# SECTION header pattern — "SECTION 08 14 16" or just "08 14 16" at the
+# start of a line.
+_SECTION_HEADER_RE = re.compile(
+    r"(?:^|\n)\s*(?:SECTION\s+)?(\d{2}\s+\d{2}\s+\d{2})\b",
+    re.IGNORECASE | re.MULTILINE,
+)
 
 
 def _format_schedule(s: ExtractedSchedule) -> str:
@@ -225,6 +238,11 @@ async def _chunks_from_other(db: AsyncSession, doc: Document) -> list[ChunkPaylo
       - the renderer (native PyMuPDF text for digital PDFs), or
       - the OCR service (Gemini Flash for scanned PDFs).
     Either way the chunker treats it the same.
+
+    For written-spec docs we additionally track the active CSI SECTION
+    header as we walk pages in order, and stamp each emitted chunk with
+    `csi_section`. Lets section_extractor pull all chunks for one section
+    with a single indexed equality query.
     """
     payloads: list[ChunkPayload] = []
     page_result = await db.execute(
@@ -236,8 +254,19 @@ async def _chunks_from_other(db: AsyncSession, doc: Document) -> list[ChunkPaylo
     if not pages:
         return payloads
 
+    is_spec = doc.doc_type == "written-spec"
+    current_section: str | None = None
+
     for p in pages:
         text = (p.text_content or "").strip()
+        # Update active section before emitting this page's chunks. The
+        # section header may appear partway through the page; chunks
+        # emitted from that page still belong to the new section since
+        # spec sections always start at the top of a fresh page.
+        if is_spec and text:
+            for m in _SECTION_HEADER_RE.finditer(text):
+                current_section = m.group(1).strip()
+
         if not text:
             payloads.append(
                 ChunkPayload(
@@ -246,6 +275,7 @@ async def _chunks_from_other(db: AsyncSession, doc: Document) -> list[ChunkPaylo
                     page_id=p.id,
                     page_number=p.page_number,
                     extra={"doc_type": doc.doc_type, "source": doc.source},
+                    csi_section=current_section if is_spec else None,
                 )
             )
             continue
@@ -265,6 +295,7 @@ async def _chunks_from_other(db: AsyncSession, doc: Document) -> list[ChunkPaylo
                         "chunk_index": i,
                         "total_chunks": len(pieces),
                     },
+                    csi_section=current_section if is_spec else None,
                 )
             )
 
@@ -333,6 +364,7 @@ async def write_chunks(
             contextualized_text=contextualize(p, document_filename),
             extra=p.extra,
             bbox=p.bbox,
+            csi_section=p.csi_section,
             embedded=False,
         )
         db.add(c)
