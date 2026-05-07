@@ -58,6 +58,11 @@ from .link_judge import judge_run as judge_links
 from .project_profiler import get_or_create_profile
 from .quantity_resolver import resolve_quantities
 from .retriever import RetrievedChunk
+from .citation_validator import (
+    DEFAULT_MIN_OVERLAP,
+    CitationVerdict,
+    filter_valid_citations,
+)
 from .schedule_miner import mine_schedules
 from .scope_deduper import dedupe
 from .scope_verifier import verify_low_confidence
@@ -562,10 +567,21 @@ async def _persist_results(
     division_results: list[_DivisionResult],
     taxonomy: CSITaxonomy,
 ) -> tuple[int, int, int]:
-    """Write ScopeItem + ScopeCitation rows. Returns (candidates, validated, deduped)."""
+    """Write ScopeItem + ScopeCitation rows. Returns (candidates, validated, deduped).
+
+    L2 — strict citations: every citation runs through citation_validator
+    before persistence. Citations that are EMPTY / HEADER_ONLY / LOW_OVERLAP
+    are dropped; the bilateral-evidence rollup downstream then reflects
+    only structurally-grounded citations. Schedule-miner candidates skip
+    this gate — their synthetic per-row chunks are deterministic and
+    already pass the miner's hallucination guard.
+    """
     candidates_total = 0
     validated_total = 0
     deduped_total = 0
+    citations_kept = 0
+    citations_dropped: dict[str, int] = {"EMPTY": 0, "HEADER_ONLY": 0, "LOW_OVERLAP": 0}
+    items_zeroed = 0  # items that lost ALL citations to validation
     async with SessionLocal() as db:
         # Pre-load doc_type for every chunk's source document so each
         # citation insert can stamp evidence_type without an N+1 lookup.
@@ -622,8 +638,34 @@ async def _persist_results(
                 )
                 db.add(item)
                 await db.flush()
+
+                # Strict citations: validate every chunk before persistence.
+                # Schedule-miner candidates use synthetic per-row chunks that
+                # already pass the miner's hallucination guard — skip the
+                # gate for those.
+                if cand.extraction_method == "schedule_miner":
+                    chunks_to_persist = list(cand.supporting_chunks)
+                else:
+                    kept, dropped = filter_valid_citations(
+                        cand.description, cand.supporting_chunks
+                    )
+                    chunks_to_persist = kept
+                    for _, verdict in dropped:
+                        citations_dropped[verdict.reason] = (
+                            citations_dropped.get(verdict.reason, 0) + 1
+                        )
+                    if not chunks_to_persist and cand.supporting_chunks:
+                        items_zeroed += 1
+                        log.info(
+                            "citation_validator: item %s lost ALL %d citations "
+                            "(reasons=%s) — desc=%r",
+                            item.id, len(cand.supporting_chunks),
+                            [v.reason for _, v in dropped],
+                            (cand.description or "")[:80],
+                        )
+
                 # Citations
-                for r in cand.supporting_chunks:
+                for r in chunks_to_persist:
                     chunk = r.chunk
                     extra = chunk.extra or {}
                     src_doc_type = doc_type_by_id.get(chunk.document_id) if chunk.document_id else None
@@ -642,7 +684,21 @@ async def _persist_results(
                             doc_type_at_capture=src_doc_type,
                         )
                     )
+                    citations_kept += 1
         await db.commit()
+
+    total_dropped = sum(citations_dropped.values())
+    if total_dropped or items_zeroed:
+        log.info(
+            "citation_validator: kept=%d dropped=%d (empty=%d header=%d "
+            "low_overlap=%d) items_zeroed=%d",
+            citations_kept,
+            total_dropped,
+            citations_dropped.get("EMPTY", 0),
+            citations_dropped.get("HEADER_ONLY", 0),
+            citations_dropped.get("LOW_OVERLAP", 0),
+            items_zeroed,
+        )
     return candidates_total, validated_total, deduped_total
 
 
