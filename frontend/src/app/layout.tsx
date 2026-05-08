@@ -30,7 +30,19 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-background text-foreground">
+      {/*
+        suppressHydrationWarning on <body> is required because some
+        browser extensions (Grammarly, ColorZilla, LastPass) inject
+        attributes like data-new-gr-c-s-check-loaded onto <body> before
+        React hydrates. The server-rendered HTML lacks them, the client
+        DOM has them, and React reports a hydration mismatch. This flag
+        tells React to ignore attribute drift on this element only —
+        descendants still get full hydration checking.
+      */}
+      <body
+        className="min-h-full bg-background text-foreground"
+        suppressHydrationWarning
+      >
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>

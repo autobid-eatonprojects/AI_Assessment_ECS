@@ -31,6 +31,7 @@ export type ProcessingStatus =
   | "classifying"
   | "rendering"
   | "extracting"
+  | "enriching"
   | "ocr"
   | "indexing"
   | "ready"

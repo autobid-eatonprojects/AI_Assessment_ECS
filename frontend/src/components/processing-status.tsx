@@ -9,6 +9,7 @@ const STATUS: Record<
   classifying: { label: "Classifying", icon: Loader2, className: "text-blue-600" },
   rendering: { label: "Rendering pages", icon: Loader2, className: "text-blue-600" },
   extracting: { label: "Vision pre-pass", icon: Loader2, className: "text-purple-600" },
+  enriching: { label: "Enriching metadata", icon: Loader2, className: "text-violet-600" },
   ocr: { label: "OCR (Gemini Flash)", icon: Loader2, className: "text-cyan-600" },
   indexing: { label: "Indexing", icon: Loader2, className: "text-blue-600" },
   ready: { label: "Ready", icon: CheckCircle2, className: "text-emerald-600" },
@@ -29,13 +30,22 @@ export function ProcessingStatusIndicator({
   error?: string | null;
   progress?: ProcessingProgress | null;
 }) {
-  const cfg = STATUS[status];
+  // Defensive fallback: if the backend ever sends a status the UI
+  // doesn't know about (e.g. a new pipeline stage shipped on the
+  // server but not yet here), don't blow up the page — render the
+  // unknown status as a neutral "Processing" chip.
+  const cfg = STATUS[status] ?? {
+    label: status || "Processing",
+    icon: Loader2,
+    className: "text-zinc-500",
+  };
   const Icon = cfg.icon;
   const spin =
     status === "pending" ||
     status === "classifying" ||
     status === "rendering" ||
     status === "extracting" ||
+    status === "enriching" ||
     status === "ocr" ||
     status === "indexing";
   // When the backend supplies stage-aware progress, append the count to
