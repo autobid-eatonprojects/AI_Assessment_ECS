@@ -1,0 +1,56 @@
+# P3 — CSI division → discipline mapping for the 9-discipline parallelism
+# unit per the design doc. Each discipline gets one agent that loads its
+# discipline-scoped corpus once and emits scope items with the 4-step
+# protocol (spec → drawings → cross-check → emit).
+#
+# 9 disciplines per the design doc:
+#   civil, site, architectural, interior, structural, fire-protection,
+#   plumbing, mechanical, electrical
+#
+# A division can map to ONLY ONE discipline. Divisions not mapped here
+# get bucketed into 'general' (last-resort agent that catches misc items).
+
+disciplines:
+  - key: general
+    label: "General"
+    csi_divisions: ["00", "01"]   # Procurement + General Requirements
+
+  - key: civil
+    label: "Civil"
+    csi_divisions: ["02", "31", "33"]  # Existing Conditions, Earthwork, Utilities
+
+  - key: site
+    label: "Site"
+    csi_divisions: ["32"]   # Exterior Improvements
+
+  - key: structural
+    label: "Structural"
+    csi_divisions: ["03", "04", "05", "06"]  # Concrete, Masonry, Metals, Wood
+
+  - key: architectural
+    label: "Architectural"
+    csi_divisions: ["07", "08"]  # Thermal/Moisture, Openings
+
+  - key: interior
+    label: "Interior / Finishes"
+    csi_divisions: ["09", "10", "12"]  # Finishes, Specialties, Furnishings
+
+  - key: equipment-special
+    label: "Equipment & Special Construction"
+    csi_divisions: ["11", "13", "14"]  # Equipment, Special Construction, Conveying
+
+  - key: fire-protection
+    label: "Fire Protection"
+    csi_divisions: ["21"]
+
+  - key: plumbing
+    label: "Plumbing"
+    csi_divisions: ["22"]
+
+  - key: mechanical
+    label: "Mechanical / HVAC"
+    csi_divisions: ["23"]
+
+  - key: electrical
+    label: "Electrical, Comms & Security"
+    csi_divisions: ["25", "26", "27", "28"]

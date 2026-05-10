@@ -1,0 +1,78 @@
+# Default trade-package breakdown ("bid packages") used by Stage 4 bundler.
+#
+# Maps CSI MasterFormat divisions to the bid package an estimator would
+# typically send out for that scope. This file is one OPINIONATED default —
+# different general contractors break trades differently. Two override paths:
+#
+#   1. Per-project override: insert a TradePackage row with
+#      bundling_rule_source='override'. Any divisions claimed by an override
+#      take precedence over this file.
+#
+#   2. Edit this file directly for system-wide changes. Restart not required
+#      — bundling_rules.get_bundling_rules() reloads on each call.
+#
+# Coverage: Divisions 00–33. Electrical / Communications / Security are
+# bundled into one electrical package by default to avoid double-mapping.
+# Divisions outside this set get a synthesized "unbundled-NN" package so
+# scope items are never silently dropped.
+
+packages:
+  - key: general-conditions
+    label: "General Conditions"
+    divisions: ["00", "01"]
+
+  - key: sitework
+    label: "Sitework, Earthwork & Utilities"
+    divisions: ["02", "31", "32", "33"]
+
+  - key: concrete-masonry
+    label: "Concrete & Masonry"
+    divisions: ["03", "04"]
+
+  - key: structural-metals
+    label: "Structural Steel & Metals"
+    divisions: ["05"]
+
+  - key: rough-carpentry
+    label: "Wood, Plastics & Composites"
+    divisions: ["06"]
+
+  - key: thermal-moisture
+    label: "Thermal & Moisture Protection"
+    divisions: ["07"]
+
+  - key: openings
+    label: "Doors, Windows & Storefronts"
+    divisions: ["08"]
+
+  - key: finishes
+    label: "Finishes"
+    divisions: ["09"]
+
+  - key: specialties
+    label: "Specialties"
+    divisions: ["10"]
+
+  - key: equipment-furnishings
+    label: "Equipment & Furnishings"
+    divisions: ["11", "12"]
+
+  - key: special-construction
+    label: "Special Construction & Conveying"
+    divisions: ["13", "14"]
+
+  - key: fire-protection
+    label: "Fire Protection"
+    divisions: ["21"]
+
+  - key: plumbing
+    label: "Plumbing"
+    divisions: ["22"]
+
+  - key: hvac
+    label: "HVAC"
+    divisions: ["23"]
+
+  - key: electrical-low-voltage
+    label: "Electrical, Communications & Security"
+    divisions: ["26", "27", "28"]

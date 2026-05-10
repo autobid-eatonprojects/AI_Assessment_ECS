@@ -1,0 +1,243 @@
+# Eval set for drawing retrieval recall — Elks Drawings Combined.pdf (54 sheets).
+#
+# Each query is a representative estimator question about the drawings.
+# Ground-truth `relevant_sheets` is the set of sheet IDs (e.g. "A1.1",
+# "P0.1") that SHOULD appear in retrieval results. A retrieval is judged
+# "successful" if the top-K chunks include at least one chunk from each
+# relevant sheet.
+#
+# Difficulty tiers:
+#   sheet_named   — query names a specific sheet ("show me A1.1")
+#   schedule      — query about a schedule (door, fixture, panel, etc.)
+#   detail        — query about a specific detail or section
+#   discipline    — discipline-level filter ("all electrical sheets")
+#   element       — query about a building element (where is it shown?)
+#   cross_sheet   — element shown on multiple sheets
+#   no_match      — query about something the project doesn't have
+
+queries:
+  # =========================================================================
+  # SHEET-NAMED queries — easy lookups — 6 queries
+  # =========================================================================
+  - id: d01
+    text: "What's on sheet A1.1?"
+    relevant_sheets: ["A1.1"]
+    difficulty: sheet_named
+
+  - id: d02
+    text: "Show me the door schedule sheet"
+    relevant_sheets: ["A2.1"]
+    difficulty: sheet_named
+
+  - id: d03
+    text: "Life safety plan"
+    relevant_sheets: ["A0.1"]
+    difficulty: sheet_named
+
+  - id: d04
+    text: "Foundation plan"
+    relevant_sheets: ["S1.1"]
+    difficulty: sheet_named
+
+  - id: d05
+    text: "Roof framing plan"
+    relevant_sheets: ["S1.2"]
+    difficulty: sheet_named
+
+  - id: d06
+    text: "Lighting plan"
+    relevant_sheets: ["E1.1"]
+    difficulty: sheet_named
+
+  # =========================================================================
+  # SCHEDULE queries — schedule tables — 7 queries
+  # =========================================================================
+  - id: d10
+    text: "Door schedule with sizes and types"
+    relevant_sheets: ["A2.1"]
+    difficulty: schedule
+
+  - id: d11
+    text: "Plumbing fixture schedule"
+    relevant_sheets: ["P0.1"]
+    difficulty: schedule
+
+  - id: d12
+    text: "Electrical panel schedule"
+    relevant_sheets: ["E0.3"]
+    difficulty: schedule
+
+  - id: d13
+    text: "HVAC equipment schedule"
+    relevant_sheets: ["M0.1"]
+    difficulty: schedule
+
+  - id: d14
+    text: "Lighting fixture schedule with model numbers"
+    relevant_sheets: ["E0.3", "E1.1"]
+    difficulty: schedule
+
+  - id: d15
+    text: "Fire protection equipment list"
+    relevant_sheets: ["FP0.1"]
+    difficulty: schedule
+
+  - id: d16
+    text: "Finish schedule for floors and walls"
+    relevant_sheets: ["F1.1", "F2.1"]
+    difficulty: schedule
+
+  # =========================================================================
+  # DETAIL queries — sections, details, callouts — 6 queries
+  # =========================================================================
+  - id: d20
+    text: "Wall section details"
+    relevant_sheets: ["A5.2", "A5.3"]
+    difficulty: detail
+
+  - id: d21
+    text: "Building cross sections"
+    relevant_sheets: ["A5.1"]
+    difficulty: detail
+
+  - id: d22
+    text: "Foundation details and sections"
+    relevant_sheets: ["S2.1"]
+    difficulty: detail
+
+  - id: d23
+    text: "Reflected ceiling plan"
+    relevant_sheets: ["A7.1"]
+    difficulty: detail
+
+  - id: d24
+    text: "Millwork sections and details"
+    relevant_sheets: ["F3.1"]
+    difficulty: detail
+
+  - id: d25
+    text: "Site civil details"
+    relevant_sheets: ["C800", "C801", "C902"]
+    difficulty: detail
+
+  # =========================================================================
+  # DISCIPLINE-FILTER queries — pull all from a discipline — 5 queries
+  # =========================================================================
+  - id: d30
+    text: "All electrical sheets in the drawing set"
+    relevant_sheets: ["E0.1", "E0.2", "E0.3", "E1.1", "E2.1", "E3.1", "E4.1", "ES0.1"]
+    difficulty: discipline
+
+  - id: d31
+    text: "Plumbing drawings"
+    relevant_sheets: ["P0.1", "P1.1", "P1.2", "P2.1", "P2.2"]
+    difficulty: discipline
+
+  - id: d32
+    text: "Civil site drawings"
+    relevant_sheets: ["C001", "C100", "C200", "C300", "C500", "C800", "C801", "C900", "C901", "C902"]
+    difficulty: discipline
+
+  - id: d33
+    text: "Structural drawings"
+    relevant_sheets: ["S0.1", "S1.1", "S1.2", "S1.3", "S2.1", "S3.1", "S3.2", "S4.1"]
+    difficulty: discipline
+
+  - id: d34
+    text: "Architectural drawings"
+    relevant_sheets: ["A0.0", "A0.1", "A1.1", "A2.1", "A3.1", "A4.1", "A4.2", "A5.1", "A5.2", "A5.3", "A6.1", "A7.1"]
+    difficulty: discipline
+
+  # =========================================================================
+  # ELEMENT queries — where is X shown? — 8 queries
+  # =========================================================================
+  - id: d40
+    text: "Where are the floor drains shown?"
+    relevant_sheets: ["P1.1", "P0.1"]
+    difficulty: element
+
+  - id: d41
+    text: "Fire alarm devices and notification appliances"
+    relevant_sheets: ["E4.1"]
+    difficulty: element
+
+  - id: d42
+    text: "Site grading and drainage"
+    relevant_sheets: ["C300"]
+    difficulty: element
+
+  - id: d43
+    text: "Existing site conditions"
+    relevant_sheets: ["C100"]
+    difficulty: element
+
+  - id: d44
+    text: "EPSC erosion control plan"
+    relevant_sheets: ["C900", "C901"]
+    difficulty: element
+
+  - id: d45
+    text: "Shear wall details"
+    relevant_sheets: ["S4.1"]
+    difficulty: element
+
+  - id: d46
+    text: "Site utility connections"
+    relevant_sheets: ["C500"]
+    difficulty: element
+
+  - id: d47
+    text: "Domestic water distribution"
+    relevant_sheets: ["P2.1", "P2.2"]
+    difficulty: element
+
+  # =========================================================================
+  # CROSS-SHEET queries — same element on multiple sheets — 5 queries
+  # =========================================================================
+  - id: d50
+    text: "Sanitary plumbing — plan and isometric views"
+    relevant_sheets: ["P1.1", "P1.2"]
+    difficulty: cross_sheet
+
+  - id: d51
+    text: "Domestic water plan and riser diagram"
+    relevant_sheets: ["P2.1", "P2.2"]
+    difficulty: cross_sheet
+
+  - id: d52
+    text: "Building exterior — elevations and 3D views"
+    relevant_sheets: ["A4.1", "A4.2"]
+    difficulty: cross_sheet
+
+  - id: d53
+    text: "All wall section information across sheets"
+    relevant_sheets: ["A5.2", "A5.3"]
+    difficulty: cross_sheet
+
+  - id: d54
+    text: "Electrical site plan and lighting"
+    relevant_sheets: ["ES0.1", "E1.1"]
+    difficulty: cross_sheet
+
+  # =========================================================================
+  # NO-MATCH queries — control — 4 queries
+  # =========================================================================
+  - id: d90
+    text: "Elevator pit details and machine room"
+    relevant_sheets: []
+    difficulty: no_match
+
+  - id: d91
+    text: "Helipad markings and clearances"
+    relevant_sheets: []
+    difficulty: no_match
+
+  - id: d92
+    text: "Solar PV array layout"
+    relevant_sheets: []
+    difficulty: no_match
+
+  - id: d93
+    text: "Greenhouse glazing details"
+    relevant_sheets: []
+    difficulty: no_match

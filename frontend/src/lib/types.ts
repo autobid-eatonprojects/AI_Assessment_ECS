@@ -1,0 +1,782 @@
+export type LifecycleState = "setup" | "open-for-bids" | "complete";
+export type DocumentSource = "project_document" | "bid_submission";
+
+export interface Project {
+  id: string;
+  name: string;
+  description: string | null;
+  lifecycle_state: LifecycleState;
+  created_at: string;
+  updated_at: string;
+  document_count: number;
+  project_document_count: number;
+  bid_submission_count: number;
+  // Stage 6 — mirror of latest scope run's trust score
+  trust_score_latest: number | null;
+}
+
+export type DocType =
+  | "drawing-set"
+  | "written-spec"
+  | "trade-list"
+  | "bid-quote"
+  | "scope-letter"
+  | "license-insurance"
+  | "safety-manual"
+  | "contractor-info"
+  | "other";
+
+export type ProcessingStatus =
+  | "pending"
+  | "classifying"
+  | "rendering"
+  | "extracting"
+  | "enriching"
+  | "ocr"
+  | "indexing"
+  | "ready"
+  | "failed"
+  | "needs-api-key";
+
+export interface ProcessingProgress {
+  stage: string;       // current stage name (matches ProcessingStatus values)
+  completed: number;   // pages/items completed at this stage
+  total: number;       // pages/items expected at this stage
+}
+
+export interface Document {
+  id: string;
+  project_id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  sha256: string;
+  source: DocumentSource;
+  vendor_name: string | null;
+  doc_type: DocType | null;
+  classification_confidence: number | null;
+  classification_reasoning: string | null;
+  page_count: number | null;
+  processing_status: ProcessingStatus;
+  processing_error: string | null;
+  processed_at: string | null;
+  // Set by GET /documents/{id} only (not in list endpoints). Tells the
+  // UI granular per-stage progress like "OCR 168/370" instead of just
+  // showing the bare status. Null in terminal states.
+  processing_progress?: ProcessingProgress | null;
+  created_at: string;
+}
+
+export interface DocumentPage {
+  id: string;
+  document_id: string;
+  page_number: number;
+  width: number;
+  height: number;
+  created_at: string;
+}
+
+export interface DocumentPageText {
+  page_number: number;
+  width: number;
+  height: number;
+  text: string | null;
+  text_source: "pymupdf" | "ocr-gemini" | "ocr-anthropic" | null;
+  char_count: number;
+}
+
+export interface BoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export type EntityType =
+  | "material"
+  | "manufacturer"
+  | "code"
+  | "dimension"
+  | "room"
+  | "equipment"
+  | "symbol"
+  | "other";
+
+export type ExtractionStatus = "pending" | "extracting" | "ready" | "failed";
+
+export interface ExtractedSchedule {
+  id: string;
+  name: string;
+  columns: string[];
+  rows: Record<string, unknown>[];
+  bbox: BoundingBox | null;
+}
+
+export interface ExtractedNote {
+  id: string;
+  text: string;
+  bbox: BoundingBox | null;
+}
+
+export interface ExtractedCrossReference {
+  id: string;
+  target_sheet: string;
+  detail_id: string | null;
+  context: string | null;
+  bbox: BoundingBox | null;
+}
+
+export interface ExtractedEntity {
+  id: string;
+  entity_type: EntityType;
+  value: string;
+  bbox: BoundingBox | null;
+  extra: Record<string, unknown> | null;
+}
+
+export interface PageExtraction {
+  id: string;
+  document_id: string;
+  page_id: string;
+  page_number: number;
+  sheet_number: string | null;
+  sheet_title: string | null;
+  discipline: string | null;
+  drawing_scale: string | null;
+  status: ExtractionStatus;
+  error: string | null;
+  model: string | null;
+  cost_usd: number | null;
+  latency_ms: number | null;
+  created_at: string;
+  extracted_at: string | null;
+  schedules: ExtractedSchedule[];
+  notes: ExtractedNote[];
+  cross_references: ExtractedCrossReference[];
+  entities: ExtractedEntity[];
+}
+
+export interface PageExtractionSummary {
+  page_number: number;
+  status: ExtractionStatus;
+  sheet_number: string | null;
+  sheet_title: string | null;
+  discipline: string | null;
+  schedule_count: number;
+  note_count: number;
+  cross_reference_count: number;
+  entity_count: number;
+  cost_usd: number | null;
+}
+
+export interface DocumentExtractionOverview {
+  document_id: string;
+  total_pages: number;
+  pages_ready: number;
+  pages_failed: number;
+  pages_pending: number;
+  pages_extracting: number;
+  total_cost_usd: number;
+  pages: PageExtractionSummary[];
+}
+
+export interface SearchHit {
+  chunk_id: string;
+  document_id: string;
+  document_filename: string;
+  page_id: string | null;
+  page_number: number | null;
+  chunk_type: string;
+  text: string;
+  snippet: string | null;
+  bbox: BoundingBox | null;
+  sheet_number: string | null;
+  sheet_title: string | null;
+  discipline: string | null;
+  dense_score: number;
+  sparse_score: number;
+  rrf_score: number;
+  rerank_score: number | null;
+}
+
+export interface SearchResponse {
+  query: string;
+  hits: SearchHit[];
+  candidates_considered: number;
+  rerank_used: "cohere" | "claude" | "none";
+}
+
+export interface TradeDivisionRelevance {
+  id: string;
+  project_id: string;
+  csi_division: string;
+  division_label: string;
+  is_relevant: boolean;
+  reasoning: string | null;
+  confidence: number | null;
+  operator_override: boolean;
+  override_value: boolean | null;
+  cost_usd: number | null;
+  latency_ms: number | null;
+  created_at: string;
+}
+
+export interface TradeRelevanceMatrix {
+  project_id: string;
+  relevant_count: number;
+  skipped_count: number;
+  total_cost_usd: number;
+  divisions: TradeDivisionRelevance[];
+}
+
+export interface ScopeCitation {
+  id: string;
+  chunk_id: string;
+  document_id: string | null;
+  page_number: number | null;
+  sheet_number: string | null;
+  bbox: BoundingBox | null;
+  rerank_score: number | null;
+  extraction_query: string | null;
+  excerpt: string | null;
+  // Stage 1/3 — denormalized source-type + link-judge entailment
+  evidence_type: "drawing" | "spec" | "bid" | "other" | null;
+  is_link_judge_pass: boolean | null;
+  link_judge_score: number | null;
+}
+
+export type QtyConfidence = "high" | "medium" | "conflicting" | "unverified";
+export type VerifierStatus = "keep" | "revised" | "rejected";
+
+export interface VerifierReview {
+  verdict: VerifierStatus;
+  reasoning: string | null;
+  consistency_check: {
+    schedule_says?: string | null;
+    note_says?: string | null;
+    spec_says?: string | null;
+    agree?: boolean | null;
+  } | null;
+  model: string | null;
+  latency_ms?: number | null;
+  cost_usd?: number | null;
+}
+
+/**
+ * Trust components — populated by bilateral_evidence._classify on every
+ * scope_item. Drives the EvidenceTierBadge AND the trust-breakdown
+ * drill-down panel. Field meanings:
+ *   - expected_pattern: what evidence shape the item should have based on
+ *     CSI division + admin keywords (spec_only for Div 1, drawing_only for
+ *     demo, bilateral for material/equipment).
+ *   - pattern_match: did the item's actual evidence meet that expectation?
+ *     This is the new metric replacing raw bilateral_evidence in the
+ *     coverage rollup.
+ *   - bilateral: legacy raw flag — has BOTH spec + drawing citations.
+ *   - confidence: extraction confidence average for this item's votes.
+ *   - link_judge: aggregate Haiku entailment verdict across the item's
+ *     citations. "n/a" until link_judge runs.
+ *   - tier_reason: one-line explanation of why the item landed in its tier.
+ */
+export interface TrustComponents {
+  expected_pattern?: "bilateral" | "spec_only" | "drawing_only";
+  pattern_match?: boolean;
+  bilateral?: boolean;
+  confidence?: number;
+  link_judge?: "pass" | "fail" | "n/a";
+  tier_reason?: string;
+}
+
+export interface ScopeItem {
+  id: string;
+  project_id: string;
+  run_id: string;
+  csi_code: string;
+  csi_division: string;
+  division_label: string;
+  section_title: string | null;
+  description: string;
+  specification: string | null;
+  quantity: string | null;
+  unit: string | null;
+  qty_value: number | null;
+  qty_uom: string | null;
+  location: string | null;
+  confidence: number;
+  extraction_method: string | null;
+  qty_confidence: QtyConfidence | null;
+  qty_provenance: Record<string, unknown> | null;
+  verifier_status: VerifierStatus | null;
+  verifier_review: VerifierReview | null;
+  // Stage 2 — bilateral evidence + tier
+  evidence_tier: EvidenceTier | null;
+  bilateral_evidence: boolean | null;
+  trust_components: TrustComponents | null;
+  // Stage 4 — trade bundling
+  package_id: string | null;
+  citations: ScopeCitation[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScopeRun {
+  id: string;
+  project_id: string;
+  status: "running" | "complete" | "failed" | "cancelled";
+  started_at: string;
+  completed_at: string | null;
+  error: string | null;
+  sections_total: number;
+  sections_completed: number;
+  sections_failed: number;
+  candidates_generated: number;
+  items_validated: number;
+  items_after_dedupe: number;
+  total_cost_usd: number;
+  total_latency_ms: number;
+  config: Record<string, unknown> | null;
+}
+
+export interface ScopeOverview {
+  project_id: string;
+  latest_run: ScopeRun | null;
+  total_items: number;
+  by_division: { csi_division: string; division_label: string; count: number }[];
+}
+
+export interface ProjectProfile {
+  id: string;
+  project_id: string;
+  building_type: string | null;
+  size_sf: number | null;
+  occupancy: string | null;
+  construction_type: string | null;
+  sprinklered: boolean | null;
+  stories: number | null;
+  location: string | null;
+  project_number: string | null;
+  codes: string[] | null;
+  reasoning: string | null;
+  model: string | null;
+  cost_usd: number | null;
+  latency_ms: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Phase 11 — vendor profile + bid leveling
+export interface VendorQualifications {
+  has_license_or_insurance: boolean;
+  has_safety_manual: boolean;
+  has_contractor_info: boolean;
+  is_complete: boolean;
+  license_or_insurance_count: number;
+  safety_manual_count: number;
+  contractor_info_count: number;
+}
+
+export interface VendorCoverageStats {
+  covered: number;
+  partial: number;
+  excluded: number;
+  not_covered: number;
+}
+
+export interface VendorSummary {
+  canonical_vendor: string;
+  primary_csi_divisions: string[];
+  bid_total_usd: number | null;
+  line_item_count: number;
+  inclusion_count: number;
+  exclusion_count: number;
+  document_count: number;
+  has_priced_bid: boolean;
+  qualifications: VendorQualifications;
+  coverage: VendorCoverageStats | null;
+  aliases: string[];
+}
+
+export interface VendorDocSummary {
+  id: string;
+  filename: string;
+  doc_type: string | null;
+  classification_confidence: number | null;
+  processing_status: string;
+  page_count: number | null;
+}
+
+export interface VendorProfile {
+  canonical_vendor: string;
+  primary_csi_divisions: string[];
+  bid_total_usd: number | null;
+  line_item_count: number;
+  inclusion_count: number;
+  exclusion_count: number;
+  qualifications: VendorQualifications;
+  coverage: VendorCoverageStats | null;
+  aliases: string[];
+  documents: VendorDocSummary[];
+  line_items: Array<{
+    id: string;
+    description: string;
+    quantity: string | null;
+    unit: string | null;
+    unit_price_usd: number | null;
+    total_price_usd: number | null;
+    csi_section_guess: string | null;
+    page_number: number | null;
+  }>;
+  inclusions: Array<{ id: string; text: string; page_number: number | null }>;
+  exclusions: Array<{ id: string; text: string; page_number: number | null }>;
+  covered_scope_item_ids: string[];
+  partial_scope_item_ids: string[];
+  excluded_scope_item_ids: string[];
+  not_covered_scope_item_ids: string[];
+}
+
+export interface BidLevelingCell {
+  vendor: string;
+  status: BidCoverageStatus;
+  matched_line_description: string | null;
+  matched_line_total_usd: number | null;
+  confidence: number;
+  reasoning: string | null;
+}
+
+export interface BidLevelingRow {
+  scope_item_id: string;
+  csi_code: string;
+  description: string;
+  quantity: string | null;
+  unit: string | null;
+  cells: BidLevelingCell[];
+}
+
+export interface BidLevelingResponse {
+  csi_division: string | null;
+  vendors: string[];
+  rows: BidLevelingRow[];
+}
+
+// Phase 8 — bid analysis
+export interface BidLineItem {
+  id: string;
+  bid_document_id: string;
+  description: string;
+  quantity: string | null;
+  unit: string | null;
+  unit_price_usd: number | null;
+  total_price_usd: number | null;
+  csi_section_guess: string | null;
+  page_number: number | null;
+}
+
+export interface BidExclusion {
+  id: string;
+  bid_document_id: string;
+  text: string;
+  page_number: number | null;
+}
+
+export interface BidInclusion {
+  id: string;
+  bid_document_id: string;
+  text: string;
+  page_number: number | null;
+}
+
+export interface BidSummary {
+  id: string;
+  project_id: string;
+  run_id: string;
+  bid_document_id: string;
+  vendor_name: string | null;
+  bid_total_usd: number | null;
+  primary_csi_divisions: string[] | null;
+  line_item_count: number;
+  inclusion_count: number;
+  exclusion_count: number;
+  extraction_cost_usd: number | null;
+  extraction_latency_ms: number | null;
+}
+
+export type BidCoverageStatus =
+  | "covered"
+  | "partial"
+  | "excluded"
+  | "not_covered"
+  | "not_applicable";
+
+export interface BidCoverage {
+  id: string;
+  scope_item_id: string;
+  bid_document_id: string;
+  status: BidCoverageStatus;
+  confidence: number;
+  reasoning: string | null;
+  matched_line_item_id: string | null;
+  judge_model: string | null;
+}
+
+export interface BidRun {
+  id: string;
+  project_id: string;
+  scope_run_id: string | null;
+  status: "running" | "complete" | "failed";
+  started_at: string;
+  completed_at: string | null;
+  error: string | null;
+  bids_total: number;
+  bids_extracted: number;
+  coverage_pairs_total: number;
+  coverage_pairs_completed: number;
+  total_cost_usd: number;
+  total_latency_ms: number;
+  config: Record<string, unknown> | null;
+}
+
+export interface BidAnalysisOverview {
+  project_id: string;
+  latest_run: BidRun | null;
+  bid_summaries: BidSummary[];
+  coverage_counts: {
+    covered: number;
+    partial: number;
+    excluded: number;
+    not_covered: number;
+  };
+}
+
+export interface BidDetail {
+  summary: BidSummary;
+  line_items: BidLineItem[];
+  inclusions: BidInclusion[];
+  exclusions: BidExclusion[];
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+export interface User {
+  email: string;
+}
+
+export interface ApiError {
+  detail: string | { msg: string }[];
+}
+
+// ----- Stage 3+ — review queue / packages / trust score / audit -----
+
+export type EvidenceTier =
+  | "EXPLICITLY_CITED"
+  | "INFERRED_HIGH_CONFIDENCE"
+  | "INFERRED_LOW_CONFIDENCE";
+
+export type ConflictType =
+  | "qty_mismatch"
+  | "unit_mismatch"
+  | "spec_contradiction"
+  | "cross_division_overlap";
+
+export type ConflictStatus = "open" | "resolved" | "deferred" | "ignored";
+
+export type GapType =
+  | "missing_division"
+  | "missing_section"
+  | "unilateral_evidence"
+  | "unresolved_cross_reference";
+
+export type GapSeverity = "blocker" | "warn" | "info";
+
+export interface ConflictMember {
+  id: string;
+  scope_item_id: string;
+  role: "primary" | "contradictor";
+  citation_id: string | null;
+  is_winner: boolean | null;
+}
+
+export interface ConflictItemSummary {
+  id: string;
+  csi_code: string;
+  csi_division: string;
+  description: string;
+  quantity: string | null;
+  unit: string | null;
+  confidence: number;
+  evidence_tier: EvidenceTier | null;
+}
+
+export interface Conflict {
+  id: string;
+  project_id: string;
+  run_id: string;
+  conflict_type: ConflictType;
+  csi_division: string | null;
+  status: ConflictStatus;
+  arbitrated_value: Record<string, unknown> | null;
+  arbitration_reasoning: string | null;
+  arbitrator: string | null;
+  created_at: string;
+  resolved_at: string | null;
+  members: ConflictMember[];
+  item_snapshots: ConflictItemSummary[];
+}
+
+export interface Gap {
+  id: string;
+  project_id: string;
+  run_id: string;
+  gap_type: GapType;
+  csi_division: string | null;
+  csi_section: string | null;
+  description: string;
+  severity: GapSeverity;
+  suggested_remediation: string | null;
+  related_item_id: string | null;
+  status: "open" | "acknowledged" | "resolved";
+  created_at: string;
+  acknowledged_at: string | null;
+}
+
+export interface TradePackage {
+  id: string;
+  project_id: string;
+  run_id: string;
+  package_key: string;
+  package_label: string;
+  csi_divisions: string[] | null;
+  bundling_rule_source: "yaml" | "override";
+  item_count: number;
+  bilateral_count: number;
+  avg_confidence: number | null;
+  // Pass D follow-up — actionable counts for the trade-packages list view.
+  low_confidence_count?: number;   // items in INFERRED_LOW_CONFIDENCE tier
+  open_issue_count?: number;       // open Gap rows linked to this package
+  narrative_md: string | null;
+  created_at: string;
+}
+
+export interface TradePackageDetail extends TradePackage {
+  items_by_section: {
+    csi_section: string;
+    section_title: string | null;
+    items: ScopeItem[];
+  }[];
+}
+
+export interface TrustScore {
+  score: number;
+  tier: "GREEN" | "YELLOW" | "RED";
+  components: {
+    bilateral_coverage?: number;
+    extraction_confidence_avg?: number;
+    link_judge_pass_rate?: number;
+    spec_section_coverage?: number;
+    ocr_text_coverage?: number;
+    schedule_extraction_validity?: number;
+    document_version_consistency?: number;
+  };
+  weights: Record<string, number>;
+  tier_thresholds: Record<string, number>;
+  dropped_components: string[];
+  rationale: string;
+}
+
+export interface RagasFixture {
+  csi_section: string;
+  section_title: string;
+  n_extracted_items: number;
+  n_expected_items: number;
+  n_retrieved_chunks: number;
+  context_precision: number;
+  context_recall: number;
+  answer_faithfulness: number;
+  answer_relevancy: number;
+  cost_usd: number;
+}
+
+export interface RagasEvalRun {
+  id: string;
+  project_id: string;
+  scope_run_id: string;
+  status: "running" | "complete" | "failed";
+  started_at: string;
+  completed_at: string | null;
+  error: string | null;
+  fixtures_path: string;
+  n_fixtures: number;
+  context_precision: number | null;
+  context_recall: number | null;
+  answer_faithfulness: number | null;
+  answer_relevancy: number | null;
+  overall_score: number | null;
+  per_fixture: RagasFixture[] | null;
+  total_cost_usd: number;
+  elapsed_sec: number;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  project_id: string;
+  run_id: string | null;
+  entity_type: string;
+  entity_id: string | null;
+  action: string;
+  actor: string;
+  payload: Record<string, unknown> | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface ProviderKeyInfo {
+  configured: boolean;
+  masked: string | null;
+  source: "db" | "env" | "none";
+  signup_url: string;
+}
+
+export interface AppSettings {
+  classifier_model: string;
+  vision_model: string;
+  vision_provider: string;
+  vision_concurrency: number;
+  embedding_model: string;
+  rerank_model: string;
+  contextualizer_model: string;
+  index_concurrency: number;
+  page_dpi: number;
+  thumbnail_max_dim: number;
+  default_theme: "light" | "dark" | "system";
+  provider_keys_configured: Record<string, boolean>;
+  provider_keys: Record<string, ProviderKeyInfo>;
+  overrides_in_use: string[];
+  needs_restart_for: string[];
+}
+
+export interface SystemStatus {
+  backend_version: string;
+  db_path: string;
+  project_count: number;
+  document_count: number;
+  scope_run_count: number;
+  llm_call_count: number;
+  total_cost_usd: number;
+  audit_log_count: number;
+}
+
+// P9 — Opus-drafted RFI items for the design team.
+export interface RfiItem {
+  rfi_number: string;
+  subject: string;
+  discipline: string;
+  csi_section: string | null;
+  sheet_refs: string[] | null;
+  issue: string;
+  ask: string;
+  impact: string | null;
+  priority: "critical" | "high" | "medium" | "low";
+}

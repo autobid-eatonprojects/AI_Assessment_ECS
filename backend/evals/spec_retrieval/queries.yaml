@@ -1,0 +1,300 @@
+# Eval set for spec retrieval recall — Elks Community Center Project Manual.
+#
+# Each query is a representative estimator question. Ground-truth `relevant_csi`
+# is the set of CSI sections that SHOULD appear in retrieval results. A
+# retrieval is judged "successful" if the chunks returned cover the relevant
+# sections (recall@K).
+#
+# Difficulty tiers:
+#   direct       — one specific section is the obvious answer (named in query)
+#   material     — a material/product query that should pull 1-2 sections
+#   cross_csi    — a concept that genuinely lives in multiple sections
+#   ambiguous    — query has multiple equally-valid interpretations
+#   compound     — combines two unrelated trades in one question
+#   abbrev       — uses industry abbreviations (GWB, RTU, FCU, etc.)
+#   no_match     — query about something the project doesn't cover (control)
+
+queries:
+  # =========================================================================
+  # DIRECT (named-section) queries — 12 queries
+  # =========================================================================
+  - id: q01
+    text: "What's the specification for water closets / toilets?"
+    relevant_csi: ["10 28 00"]
+    difficulty: direct
+    note: |
+      This project doesn't have a 22 41 13 plumbing fixture spec; closest is
+      10 28 00 toilet accessories.
+
+  - id: q02
+    text: "Ceramic tile installation requirements"
+    relevant_csi: ["09 30 13"]
+    difficulty: direct
+
+  - id: q03
+    text: "Specification for flush wood doors"
+    relevant_csi: ["08 14 16"]
+    difficulty: direct
+
+  - id: q04
+    text: "Door hardware schedule and requirements"
+    relevant_csi: ["08 71 00"]
+    difficulty: direct
+
+  - id: q05
+    text: "Asphalt paving requirements"
+    relevant_csi: ["32 12 16"]
+    difficulty: direct
+
+  - id: q06
+    text: "Aluminum-framed entrances and storefronts"
+    relevant_csi: ["08 41 13"]
+    difficulty: direct
+
+  - id: q07
+    text: "Concrete masonry unit specifications"
+    relevant_csi: ["04 22 00"]
+    difficulty: direct
+
+  - id: q08
+    text: "Acoustical ceiling tile installation"
+    relevant_csi: ["09 51 23", "09 54 46"]
+    difficulty: direct
+
+  - id: q09
+    text: "Rough carpentry framing specifications"
+    relevant_csi: ["06 10 00"]
+    difficulty: direct
+
+  - id: q30
+    text: "Sheathing material requirements"
+    relevant_csi: ["06 16 00"]
+    difficulty: direct
+
+  - id: q31
+    text: "Composite decking and railing specifications"
+    relevant_csi: ["06 73 00"]
+    difficulty: direct
+
+  - id: q32
+    text: "Metal fabrications spec — handrails, ornamental metal"
+    relevant_csi: ["05 50 00"]
+    difficulty: direct
+
+  # =========================================================================
+  # MATERIAL queries (slightly indirect) — 10 queries
+  # =========================================================================
+  - id: q10
+    text: "Insulation thickness and R-value requirements"
+    relevant_csi: ["07 21 00"]
+    difficulty: material
+
+  - id: q11
+    text: "Vapor barrier requirements for the building envelope"
+    relevant_csi: ["07 26 00", "07 25 00"]
+    difficulty: material
+
+  - id: q12
+    text: "Pavement marking colors and stripe widths"
+    relevant_csi: ["32 17 23"]
+    difficulty: material
+
+  - id: q13
+    text: "Specifications for wood framing lumber"
+    relevant_csi: ["06 10 00"]
+    difficulty: material
+
+  - id: q14
+    text: "Resilient flooring specifications"
+    relevant_csi: ["09 65 19"]
+    difficulty: material
+
+  - id: q15
+    text: "Exterior paint schedule and product requirements"
+    relevant_csi: ["09 91 13"]
+    difficulty: material
+
+  - id: q16
+    text: "Interior paint product requirements"
+    relevant_csi: ["09 91 23"]
+    difficulty: material
+
+  - id: q33
+    text: "Stone masonry veneer details"
+    relevant_csi: ["04 43 13"]
+    difficulty: material
+
+  - id: q34
+    text: "Solid surface countertop fabrication"
+    relevant_csi: ["12 36 61"]
+    difficulty: material
+
+  - id: q35
+    text: "Mirror specifications"
+    relevant_csi: ["08 83 00"]
+    difficulty: material
+
+  # =========================================================================
+  # CROSS-SECTION queries — span multiple CSI sections — 9 queries
+  # =========================================================================
+  - id: q20
+    text: "Fire-rated assemblies and firestopping requirements"
+    relevant_csi: ["07 84 13", "07 84 43"]
+    difficulty: cross_csi
+
+  - id: q21
+    text: "Joint sealants for interior and exterior applications"
+    relevant_csi: ["07 92 00", "07 92 19"]
+    difficulty: cross_csi
+
+  - id: q22
+    text: "Glazing and mirror specifications"
+    relevant_csi: ["08 80 00", "08 83 00"]
+    difficulty: cross_csi
+
+  - id: q23
+    text: "Submittal procedures and timing requirements"
+    relevant_csi: ["01 33 00"]
+    difficulty: cross_csi
+
+  - id: q24
+    text: "Wood interior finish trim and millwork"
+    relevant_csi: ["06 20 23", "06 22 00"]
+    difficulty: cross_csi
+
+  - id: q40
+    text: "Painting requirements throughout the building"
+    relevant_csi: ["09 91 13", "09 91 23"]
+    difficulty: cross_csi
+
+  - id: q41
+    text: "Site work — paving, marking, parking"
+    relevant_csi: ["32 12 16", "32 17 13", "32 17 23"]
+    difficulty: cross_csi
+
+  - id: q42
+    text: "Wood-related sections in the spec"
+    relevant_csi: ["06 10 00", "06 16 00", "06 20 23", "06 22 00", "06 73 00", "08 14 16"]
+    difficulty: cross_csi
+    note: Genuinely covers all wood-related sections; tests broad recall
+
+  - id: q43
+    text: "Building envelope — barriers, insulation, sealants"
+    relevant_csi: ["07 21 00", "07 25 00", "07 26 00", "07 92 00", "07 92 19"]
+    difficulty: cross_csi
+
+  # =========================================================================
+  # AMBIGUOUS queries — multiple equally-valid interpretations — 5 queries
+  # =========================================================================
+  - id: q50
+    text: "What are the toilet accessories and partitions?"
+    relevant_csi: ["10 28 00"]
+    difficulty: ambiguous
+    note: Could mean fixture spec (Div 22) or accessories (Div 10)
+
+  - id: q51
+    text: "Window specifications"
+    relevant_csi: ["08 41 13"]
+    difficulty: ambiguous
+    note: Project has only storefront windows, no separate window section
+
+  - id: q52
+    text: "Flooring specifications"
+    relevant_csi: ["09 30 13", "09 65 19"]
+    difficulty: ambiguous
+    note: Could be tile, resilient, or carpet — multiple candidates
+
+  - id: q53
+    text: "Wall finishes"
+    relevant_csi: ["09 29 00", "09 91 23"]
+    difficulty: ambiguous
+    note: Gypsum board + paint both qualify
+
+  - id: q54
+    text: "What's required for life safety?"
+    relevant_csi: ["07 84 13", "07 84 43"]
+    difficulty: ambiguous
+    note: Firestopping is the most concrete answer in this spec
+
+  # =========================================================================
+  # COMPOUND queries — two trades in one question — 4 queries
+  # =========================================================================
+  - id: q60
+    text: "Specifications for both door hardware and door finishes"
+    relevant_csi: ["08 71 00", "08 14 16", "09 91 23"]
+    difficulty: compound
+
+  - id: q61
+    text: "Insulation and weather barriers for the wall assembly"
+    relevant_csi: ["07 21 00", "07 25 00"]
+    difficulty: compound
+
+  - id: q62
+    text: "Concrete masonry walls plus stone veneer"
+    relevant_csi: ["04 22 00", "04 43 13"]
+    difficulty: compound
+
+  - id: q63
+    text: "Asphalt paving and pavement markings"
+    relevant_csi: ["32 12 16", "32 17 23"]
+    difficulty: compound
+
+  # =========================================================================
+  # ABBREVIATION / industry-jargon queries — 4 queries
+  # =========================================================================
+  - id: q70
+    text: "GWB partition specs"
+    relevant_csi: ["09 29 00"]
+    difficulty: abbrev
+    note: GWB = gypsum wall board
+
+  - id: q71
+    text: "Spec for ACT ceilings"
+    relevant_csi: ["09 51 23", "09 54 46"]
+    difficulty: abbrev
+    note: ACT = acoustical ceiling tile
+
+  - id: q72
+    text: "VCT or LVT flooring"
+    relevant_csi: ["09 65 19"]
+    difficulty: abbrev
+    note: VCT = vinyl composition tile, LVT = luxury vinyl tile
+
+  - id: q73
+    text: "MFI or HM door specifications"
+    relevant_csi: ["08 14 16"]
+    difficulty: abbrev
+    note: MFI = manufacturer; HM = hollow metal — project uses wood doors
+
+  # =========================================================================
+  # NO-MATCH queries — control set — 6 queries
+  # =========================================================================
+  - id: q90
+    text: "Elevator car capacity and machine room requirements"
+    relevant_csi: []
+    difficulty: no_match
+
+  - id: q91
+    text: "Cooling tower water treatment specifications"
+    relevant_csi: []
+    difficulty: no_match
+
+  - id: q92
+    text: "Site stormwater detention pond requirements"
+    relevant_csi: []
+    difficulty: no_match
+
+  - id: q93
+    text: "Solar panel specifications and installation"
+    relevant_csi: []
+    difficulty: no_match
+
+  - id: q94
+    text: "Kitchen equipment specifications"
+    relevant_csi: []
+    difficulty: no_match
+
+  - id: q95
+    text: "Audio-visual equipment installation"
+    relevant_csi: []
+    difficulty: no_match

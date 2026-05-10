@@ -1,0 +1,394 @@
+#!/usr/bin/env bash
+# One-shot dev bootstrap for AI_Assessment_ECS.
+#
+# Usage: ./scripts/start-dev.sh
+#
+# What this does, in order:
+#   1. Checks prerequisites (uv, node, npm, psql).
+#   2. Creates backend/.env and frontend/.env.local if missing (prompts for
+#      any API keys not already exported in the parent shell environment).
+#   3. Installs Python deps via `uv sync` (backend).
+#   4. Installs JS deps via `npm install` (frontend).
+#   5. Creates the Postgres database + pgvector extension if missing.
+#   6. Runs Alembic migrations to head.
+#   7. Starts the FastAPI backend on :8000 and the Next.js frontend on :3000.
+#   8. Tails their logs in this terminal; Ctrl-C kills both cleanly.
+#
+# Idempotent — safe to re-run after Postgres restart, code edits, or
+# partial first runs.
+
+set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Output helpers
+# ---------------------------------------------------------------------------
+
+_color() {
+  local code="$1"; shift
+  if [ -t 1 ]; then
+    printf '\033[%sm%s\033[0m\n' "$code" "$*"
+  else
+    printf '%s\n' "$*"
+  fi
+}
+_step()  { _color '1;34' "==> $*"; }
+_ok()    { _color '1;32' "    ok: $*"; }
+_warn()  { _color '1;33' "    warn: $*"; }
+_fail()  { _color '1;31' "    fail: $*" >&2; }
+_info()  { _color '0;37' "    $*"; }
+
+# ---------------------------------------------------------------------------
+# Locate the repo root (one level up from this script)
+# ---------------------------------------------------------------------------
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+BACKEND_DIR="${REPO_ROOT}/backend"
+FRONTEND_DIR="${REPO_ROOT}/frontend"
+
+cd "${REPO_ROOT}"
+
+# ---------------------------------------------------------------------------
+# 1. Prerequisite checks
+# ---------------------------------------------------------------------------
+
+_step "Checking prerequisites"
+
+_need() {
+  local cmd="$1"; local install_hint="$2"
+  if command -v "$cmd" >/dev/null 2>&1; then
+    _ok "$cmd  ($($cmd --version 2>&1 | head -1))"
+  else
+    _fail "$cmd is missing — install with: ${install_hint}"
+    exit 1
+  fi
+}
+
+case "$(uname -s)" in
+  Darwin*) PLATFORM="macos" ;;
+  Linux*)  PLATFORM="linux" ;;
+  *)       PLATFORM="other" ;;
+esac
+
+_need "node" "https://nodejs.org/  (need >= 20)"
+_need "npm" "comes with node"
+_need "uv" "curl -LsSf https://astral.sh/uv/install.sh | sh"
+
+if ! command -v psql >/dev/null 2>&1; then
+  if [ "$PLATFORM" = "macos" ]; then
+    _fail "psql missing — install with: brew install postgresql@16 && brew services start postgresql@16"
+  else
+    _fail "psql missing — install postgresql-16 from your package manager"
+  fi
+  exit 1
+fi
+_ok "psql ($(psql --version))"
+
+# Check Postgres is reachable
+PG_USER="${PGUSER:-${USER}}"
+PG_HOST="${PGHOST:-localhost}"
+PG_PORT="${PGPORT:-5432}"
+if ! psql -U "${PG_USER}" -h "${PG_HOST}" -p "${PG_PORT}" -d postgres -c '\q' >/dev/null 2>&1; then
+  _fail "psql can't connect to ${PG_HOST}:${PG_PORT} as ${PG_USER}."
+  if [ "$PLATFORM" = "macos" ]; then
+    _info "If Homebrew Postgres isn't running: brew services start postgresql@16"
+  fi
+  _info "Or set PGUSER / PGHOST / PGPORT env vars to match your install."
+  exit 1
+fi
+_ok "Postgres reachable at ${PG_HOST}:${PG_PORT} as ${PG_USER}"
+
+# ---------------------------------------------------------------------------
+# 2. .env setup — prompt for any API keys we don't already have
+# ---------------------------------------------------------------------------
+
+_step "Checking environment configuration"
+
+# Database URL — default to a local DB named ecs_estimator for the repo user.
+DEFAULT_DB="postgresql+asyncpg://${PG_USER}@${PG_HOST}:${PG_PORT}/ecs_estimator"
+
+# Read or prompt for an API key. If the variable is already exported in the
+# parent shell, use that. Otherwise prompt the user (silently, so the key
+# isn't echoed). Empty input is allowed — keeps the value blank in .env.
+_resolve_key() {
+  local var_name="$1"
+  local human_name="$2"
+  local existing="${!var_name:-}"
+  if [ -n "$existing" ]; then
+    printf '%s' "$existing"
+    return
+  fi
+  if [ -t 0 ]; then
+    printf '\n  %s API key (%s — leave blank to skip): ' "${human_name}" "${var_name}" >&2
+    read -rs entered
+    printf '\n' >&2
+    printf '%s' "$entered"
+  else
+    printf ''
+  fi
+}
+
+if [ ! -f "${BACKEND_DIR}/.env" ]; then
+  _info "backend/.env not found — creating with defaults + interactive key prompts."
+
+  ANTHROPIC_API_KEY_VAL="$(_resolve_key ANTHROPIC_API_KEY 'Anthropic')"
+  VOYAGE_API_KEY_VAL="$(_resolve_key VOYAGE_API_KEY 'Voyage')"
+  COHERE_API_KEY_VAL="$(_resolve_key COHERE_API_KEY 'Cohere')"
+  MISTRAL_API_KEY_VAL="$(_resolve_key MISTRAL_API_KEY 'Mistral')"
+  GOOGLE_API_KEY_VAL="$(_resolve_key GOOGLE_API_KEY 'Google (Gemini)')"
+
+  cat > "${BACKEND_DIR}/.env" <<EOF
+# Auto-generated by scripts/start-dev.sh on $(date)
+# Edit freely; re-running this script won't overwrite an existing .env.
+
+APP_ENV=development
+APP_PORT=8000
+
+# Postgres + pgvector
+DATABASE_URL=${DEFAULT_DB}
+
+# Storage root for uploaded files (relative to backend/)
+STORAGE_ROOT=./data/uploads
+
+# Auth — single dev user
+DEV_USER_EMAIL=admin@ecs.local
+DEV_USER_PASSWORD=admin
+JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || echo "change-me-$(date +%s)")
+JWT_ALGORITHM=HS256
+JWT_EXPIRES_MINUTES=1440
+
+# CORS
+CORS_ORIGINS=http://localhost:3000
+
+# Upload limits
+MAX_UPLOAD_MB=200
+
+# Anthropic — Sonnet 4.6 (vision/extract), Haiku 4.5 (judge), Opus 4.7 (arbitrate)
+ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY_VAL}
+CLASSIFIER_MODEL=claude-haiku-4-5
+VISION_MODEL=claude-sonnet-4-6
+VISION_PROVIDER=anthropic
+VISION_CONCURRENCY=5
+VISION_MAX_RETRIES=2
+
+# PDF rendering
+PAGE_DPI=150
+THUMBNAIL_MAX_DIM=320
+
+# Embeddings — Voyage-3-large (1024d)
+VOYAGE_API_KEY=${VOYAGE_API_KEY_VAL}
+EMBEDDING_MODEL=voyage-3-large
+INDEX_CONCURRENCY=10
+CONTEXTUALIZER_MODEL=claude-haiku-4-5
+
+# Reranker — Cohere Rerank v3.5
+COHERE_API_KEY=${COHERE_API_KEY_VAL}
+RERANK_MODEL=rerank-v3.5
+
+# OCR — Mistral OCR + Gemini 2.5 Flash ensemble (longest-non-empty wins)
+MISTRAL_API_KEY=${MISTRAL_API_KEY_VAL}
+GOOGLE_API_KEY=${GOOGLE_API_KEY_VAL}
+GEMINI_VISION_MODEL=gemini-2.5-pro
+EOF
+  _ok "wrote backend/.env"
+else
+  _ok "backend/.env exists — leaving it alone"
+fi
+
+if [ ! -f "${FRONTEND_DIR}/.env.local" ]; then
+  cat > "${FRONTEND_DIR}/.env.local" <<EOF
+# Auto-generated by scripts/start-dev.sh on $(date)
+NEXT_PUBLIC_API_URL=http://localhost:8000
+EOF
+  _ok "wrote frontend/.env.local"
+else
+  _ok "frontend/.env.local exists — leaving it alone"
+fi
+
+# Pull values back out so the rest of the script can use them.
+# (Sourcing .env files needs the strict-mode workaround.)
+set +u
+# shellcheck disable=SC1091
+source <(grep -E '^(DATABASE_URL|ANTHROPIC_API_KEY|VOYAGE_API_KEY|COHERE_API_KEY|MISTRAL_API_KEY|GOOGLE_API_KEY)=' "${BACKEND_DIR}/.env" | sed 's/^/export /')
+set -u
+
+# ---------------------------------------------------------------------------
+# 3. Backend Python deps
+# ---------------------------------------------------------------------------
+
+_step "Installing backend Python dependencies (uv sync)"
+(cd "${BACKEND_DIR}" && uv sync --quiet)
+_ok "backend deps installed"
+
+# ---------------------------------------------------------------------------
+# 4. Frontend JS deps
+# ---------------------------------------------------------------------------
+
+_step "Installing frontend JS dependencies (npm install)"
+if [ -d "${FRONTEND_DIR}/node_modules" ] && [ "${FRONTEND_DIR}/package-lock.json" -ot "${FRONTEND_DIR}/node_modules" ]; then
+  _ok "node_modules is fresh — skipping"
+else
+  (cd "${FRONTEND_DIR}" && npm install --silent)
+  _ok "frontend deps installed"
+fi
+
+# ---------------------------------------------------------------------------
+# 5. Postgres database + pgvector extension
+# ---------------------------------------------------------------------------
+
+_step "Bootstrapping Postgres (database + pgvector)"
+
+# Parse the DB name out of the asyncpg URL.
+DB_NAME="$(printf '%s' "${DATABASE_URL}" | sed -n 's|^postgresql+asyncpg://[^/]*/\([^?]*\).*$|\1|p')"
+if [ -z "${DB_NAME}" ]; then
+  _fail "couldn't parse DB name from DATABASE_URL=${DATABASE_URL}"
+  exit 1
+fi
+
+# Create DB if missing.
+if psql -U "${PG_USER}" -h "${PG_HOST}" -p "${PG_PORT}" -lqt | cut -d \| -f 1 | grep -qw "${DB_NAME}"; then
+  _ok "database '${DB_NAME}' already exists"
+else
+  createdb -U "${PG_USER}" -h "${PG_HOST}" -p "${PG_PORT}" "${DB_NAME}"
+  _ok "created database '${DB_NAME}'"
+fi
+
+# Ensure pgvector extension.
+if psql -U "${PG_USER}" -h "${PG_HOST}" -p "${PG_PORT}" -d "${DB_NAME}" -tAc \
+    "SELECT 1 FROM pg_extension WHERE extname='vector';" | grep -q 1; then
+  _ok "pgvector extension already installed"
+else
+  if ! psql -U "${PG_USER}" -h "${PG_HOST}" -p "${PG_PORT}" -d "${DB_NAME}" \
+      -c "CREATE EXTENSION IF NOT EXISTS vector;" >/dev/null 2>&1; then
+    _fail "couldn't install pgvector extension on '${DB_NAME}'."
+    if [ "$PLATFORM" = "macos" ]; then
+      _info "Try: brew install pgvector  (then restart Postgres)"
+    else
+      _info "Install pgvector from your package manager or https://github.com/pgvector/pgvector"
+    fi
+    exit 1
+  fi
+  _ok "installed pgvector extension"
+fi
+
+# ---------------------------------------------------------------------------
+# 6. Alembic migrations
+# ---------------------------------------------------------------------------
+
+_step "Running database migrations (alembic upgrade head)"
+(cd "${BACKEND_DIR}" && uv run alembic upgrade head 2>&1 | tail -5 | sed 's/^/      /')
+_ok "migrations applied"
+
+# ---------------------------------------------------------------------------
+# 7 + 8. Start the dev servers
+# ---------------------------------------------------------------------------
+
+_step "Starting backend (FastAPI on :8000) and frontend (Next.js on :3000)"
+
+LOG_DIR="${REPO_ROOT}/.dev-logs"
+mkdir -p "${LOG_DIR}"
+BACKEND_LOG="${LOG_DIR}/backend.log"
+FRONTEND_LOG="${LOG_DIR}/frontend.log"
+
+# Kill anything already bound to those ports so re-running the script
+# doesn't error out with "address already in use".
+_kill_port() {
+  local port="$1"
+  local pids
+  pids="$(lsof -ti tcp:"$port" 2>/dev/null || true)"
+  if [ -n "$pids" ]; then
+    _warn "killing existing process(es) on port ${port}: $pids"
+    kill $pids 2>/dev/null || true
+    sleep 1
+  fi
+}
+_kill_port 8000
+_kill_port 3000
+
+# Start backend
+(cd "${BACKEND_DIR}" && uv run uvicorn app.main:app --port 8000 --host 127.0.0.1 \
+  > "${BACKEND_LOG}" 2>&1) &
+BACKEND_PID=$!
+
+# Start frontend
+(cd "${FRONTEND_DIR}" && npm run dev > "${FRONTEND_LOG}" 2>&1) &
+FRONTEND_PID=$!
+
+# Cleanup on exit / Ctrl-C.
+cleanup() {
+  echo
+  _step "Shutting down (Ctrl-C received)"
+  kill ${BACKEND_PID} ${FRONTEND_PID} 2>/dev/null || true
+  wait ${BACKEND_PID} 2>/dev/null || true
+  wait ${FRONTEND_PID} 2>/dev/null || true
+  _ok "stopped"
+}
+trap cleanup EXIT INT TERM
+
+# Wait for backend to come up (timeout 30s).
+_step "Waiting for backend to become ready"
+for i in $(seq 1 30); do
+  if curl -fsS -o /dev/null "http://127.0.0.1:8000/openapi.json" 2>/dev/null; then
+    _ok "backend up (PID ${BACKEND_PID})"
+    break
+  fi
+  if ! kill -0 ${BACKEND_PID} 2>/dev/null; then
+    _fail "backend died before responding. Last log lines:"
+    tail -20 "${BACKEND_LOG}" | sed 's/^/      /'
+    exit 1
+  fi
+  sleep 1
+  if [ "$i" = "30" ]; then
+    _fail "backend didn't respond within 30s. Tail of ${BACKEND_LOG}:"
+    tail -20 "${BACKEND_LOG}" | sed 's/^/      /'
+    exit 1
+  fi
+done
+
+# Wait for frontend (Next.js prints "Ready in" or starts serving on :3000).
+_step "Waiting for frontend to become ready"
+for i in $(seq 1 60); do
+  if curl -fsS -o /dev/null "http://127.0.0.1:3000" 2>/dev/null; then
+    _ok "frontend up (PID ${FRONTEND_PID})"
+    break
+  fi
+  if ! kill -0 ${FRONTEND_PID} 2>/dev/null; then
+    _fail "frontend died before responding. Last log lines:"
+    tail -20 "${FRONTEND_LOG}" | sed 's/^/      /'
+    exit 1
+  fi
+  sleep 1
+  if [ "$i" = "60" ]; then
+    _fail "frontend didn't respond within 60s. Tail of ${FRONTEND_LOG}:"
+    tail -20 "${FRONTEND_LOG}" | sed 's/^/      /'
+    exit 1
+  fi
+done
+
+cat <<EOF
+
+  ┌────────────────────────────────────────────────────────────────┐
+  │  AI_Assessment_ECS is up                                       │
+  │                                                                │
+  │  Frontend  →  http://localhost:3000                            │
+  │  Backend   →  http://localhost:8000                            │
+  │  API docs  →  http://localhost:8000/docs                       │
+  │                                                                │
+  │  Login     →  admin@ecs.local / admin                          │
+  │                                                                │
+  │  Logs      →  ${LOG_DIR##*/}/backend.log                                  │
+  │              ${LOG_DIR##*/}/frontend.log                                 │
+  │                                                                │
+  │  Ctrl-C to stop both servers.                                  │
+  └────────────────────────────────────────────────────────────────┘
+
+EOF
+
+# Tail logs interleaved so the user sees activity from both servers.
+# `wait -n` returns when either process exits — if one dies, the trap
+# tears down the other.
+tail -n 0 -F "${BACKEND_LOG}" "${FRONTEND_LOG}" &
+TAIL_PID=$!
+trap 'cleanup; kill ${TAIL_PID} 2>/dev/null || true' EXIT INT TERM
+
+wait ${BACKEND_PID} ${FRONTEND_PID}

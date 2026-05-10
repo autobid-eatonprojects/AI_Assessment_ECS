@@ -1,0 +1,691 @@
+# P4 — Industry-canonical AEC drawing-symbol → CSI 6-digit section map.
+#
+# This is the BOOTSTRAP dictionary loaded before any project's symbol
+# legend is extracted. It seeds csi_section_hint for the most common
+# AEC symbols so that:
+#   - SymbolLegend rows whose vision pass didn't tag a csi_section_hint
+#     can still be linked to a CSI bucket
+#   - The discipline_agent has a baseline symbol→CSI mapping even when
+#     a project's legend is partial or missing
+#   - The link_judge can use it as a tier-3 (WEAK) signal: "the chunk
+#     references a symbol whose canonical CSI matches the item's CSI"
+#
+# IMPORTANT: project-specific SymbolLegend.csi_section_hint always wins.
+# This file is the FALLBACK when the project legend is silent.
+#
+# Many symbols are context-dependent (e.g. "DP" = Distribution Panel
+# in Electrical, but Dry Pipe valve in Fire Protection; "FD" = Floor
+# Drain in Plumbing, but Fire Damper in Mechanical). Each entry lists
+# every plausible interpretation with the discipline that disambiguates.
+# Lookup is keyed by (glyph, discipline) when the discipline is known.
+#
+# CSI codes follow the 2024 MasterFormat 6-digit "NN NN NN" convention.
+
+symbols:
+  # =========================================================================
+  # Plumbing (Div 22)
+  # =========================================================================
+  - glyph: "WC"
+    expansions:
+      - csi_section: "22 41 13"
+        meaning: "Water Closet (Toilet)"
+        discipline: plumbing
+  - glyph: "LAV"
+    expansions:
+      - csi_section: "22 41 16"
+        meaning: "Lavatory"
+        discipline: plumbing
+  - glyph: "UR"
+    expansions:
+      - csi_section: "22 41 19"
+        meaning: "Urinal"
+        discipline: plumbing
+  - glyph: "SK"
+    expansions:
+      - csi_section: "22 41 19"
+        meaning: "Sink"
+        discipline: plumbing
+  - glyph: "DF"
+    expansions:
+      - csi_section: "22 47 13"
+        meaning: "Drinking Fountain"
+        discipline: plumbing
+  - glyph: "EWC"
+    expansions:
+      - csi_section: "22 47 13"
+        meaning: "Electric Water Cooler"
+        discipline: plumbing
+  - glyph: "HB"
+    expansions:
+      - csi_section: "22 11 23"
+        meaning: "Hose Bib"
+        discipline: plumbing
+  - glyph: "WHB"
+    expansions:
+      - csi_section: "22 11 23"
+        meaning: "Wall Hose Bib"
+        discipline: plumbing
+  - glyph: "WH"
+    expansions:
+      - csi_section: "22 33 30"
+        meaning: "Water Heater"
+        discipline: plumbing
+  - glyph: "BFP"
+    expansions:
+      - csi_section: "22 11 19"
+        meaning: "Backflow Preventer"
+        discipline: plumbing
+  - glyph: "WCO"
+    expansions:
+      - csi_section: "22 05 76"
+        meaning: "Wall Cleanout"
+        discipline: plumbing
+  - glyph: "FCO"
+    expansions:
+      - csi_section: "22 05 76"
+        meaning: "Floor Cleanout"
+        discipline: plumbing
+  - glyph: "GCO"
+    expansions:
+      - csi_section: "22 05 76"
+        meaning: "Grade Cleanout"
+        discipline: plumbing
+  - glyph: "RD"
+    expansions:
+      - csi_section: "22 14 23"
+        meaning: "Roof Drain"
+        discipline: plumbing
+  - glyph: "ORD"
+    expansions:
+      - csi_section: "22 14 23"
+        meaning: "Overflow Roof Drain"
+        discipline: plumbing
+  - glyph: "AD"
+    expansions:
+      - csi_section: "22 14 26"
+        meaning: "Area Drain"
+        discipline: plumbing
+  - glyph: "TD"
+    expansions:
+      - csi_section: "22 14 23"
+        meaning: "Trench Drain"
+        discipline: plumbing
+  - glyph: "MS"
+    expansions:
+      - csi_section: "22 11 23"
+        meaning: "Mop Sink / Service Sink"
+        discipline: plumbing
+  - glyph: "SHWR"
+    expansions:
+      - csi_section: "22 41 23"
+        meaning: "Shower"
+        discipline: plumbing
+  - glyph: "TUB"
+    expansions:
+      - csi_section: "22 41 23"
+        meaning: "Bathtub"
+        discipline: plumbing
+  - glyph: "GT"
+    expansions:
+      - csi_section: "22 13 23"
+        meaning: "Grease Trap / Interceptor"
+        discipline: plumbing
+  - glyph: "OS"
+    expansions:
+      - csi_section: "22 13 23"
+        meaning: "Oil Separator / Interceptor"
+        discipline: plumbing
+
+  # =========================================================================
+  # Mechanical / HVAC (Div 23)
+  # =========================================================================
+  - glyph: "AHU"
+    expansions:
+      - csi_section: "23 73 23"
+        meaning: "Air Handling Unit"
+        discipline: mechanical
+  - glyph: "RTU"
+    expansions:
+      - csi_section: "23 74 23"
+        meaning: "Rooftop Unit"
+        discipline: mechanical
+  - glyph: "FCU"
+    expansions:
+      - csi_section: "23 81 23"
+        meaning: "Fan Coil Unit"
+        discipline: mechanical
+  - glyph: "VAV"
+    expansions:
+      - csi_section: "23 36 13"
+        meaning: "Variable Air Volume Terminal"
+        discipline: mechanical
+  - glyph: "CAV"
+    expansions:
+      - csi_section: "23 36 13"
+        meaning: "Constant Air Volume Terminal"
+        discipline: mechanical
+  - glyph: "ERV"
+    expansions:
+      - csi_section: "23 72 23"
+        meaning: "Energy Recovery Ventilator"
+        discipline: mechanical
+  - glyph: "HRV"
+    expansions:
+      - csi_section: "23 72 23"
+        meaning: "Heat Recovery Ventilator"
+        discipline: mechanical
+  - glyph: "EF"
+    expansions:
+      - csi_section: "23 34 23"
+        meaning: "Exhaust Fan"
+        discipline: mechanical
+  - glyph: "SF"
+    expansions:
+      - csi_section: "23 34 23"
+        meaning: "Supply Fan"
+        discipline: mechanical
+  - glyph: "RF"
+    expansions:
+      - csi_section: "23 34 23"
+        meaning: "Return Fan"
+        discipline: mechanical
+  - glyph: "CU"
+    expansions:
+      - csi_section: "23 62 13"
+        meaning: "Condensing Unit"
+        discipline: mechanical
+  - glyph: "AC"
+    expansions:
+      - csi_section: "23 81 19"
+        meaning: "Air Conditioner / Split System"
+        discipline: mechanical
+  - glyph: "FH"
+    expansions:
+      - csi_section: "23 33 53"
+        meaning: "Fume Hood"
+        discipline: mechanical
+  - glyph: "VFD"
+    expansions:
+      - csi_section: "23 09 33"
+        meaning: "Variable Frequency Drive"
+        discipline: mechanical
+  - glyph: "TSTAT"
+    expansions:
+      - csi_section: "23 09 23"
+        meaning: "Thermostat"
+        discipline: mechanical
+  - glyph: "BAS"
+    expansions:
+      - csi_section: "23 09 13"
+        meaning: "Building Automation System"
+        discipline: mechanical
+  - glyph: "SD"
+    expansions:
+      - csi_section: "23 33 13"
+        meaning: "Smoke Damper"
+        discipline: mechanical
+      - csi_section: "28 31 11"
+        meaning: "Smoke Detector"
+        discipline: fire-protection
+  - glyph: "FSD"
+    expansions:
+      - csi_section: "23 33 13"
+        meaning: "Combination Fire-Smoke Damper"
+        discipline: mechanical
+  - glyph: "FD"
+    expansions:
+      - csi_section: "22 14 23"
+        meaning: "Floor Drain"
+        discipline: plumbing
+      - csi_section: "23 33 13"
+        meaning: "Fire Damper"
+        discipline: mechanical
+  - glyph: "BD"
+    expansions:
+      - csi_section: "23 33 13"
+        meaning: "Backdraft Damper"
+        discipline: mechanical
+  - glyph: "OBD"
+    expansions:
+      - csi_section: "23 33 13"
+        meaning: "Opposed Blade Damper"
+        discipline: mechanical
+  - glyph: "MOD"
+    expansions:
+      - csi_section: "23 09 33"
+        meaning: "Motor Operated Damper"
+        discipline: mechanical
+  - glyph: "CHW"
+    expansions:
+      - csi_section: "23 21 13"
+        meaning: "Chilled Water Piping"
+        discipline: mechanical
+  - glyph: "CHWS"
+    expansions:
+      - csi_section: "23 21 13"
+        meaning: "Chilled Water Supply"
+        discipline: mechanical
+  - glyph: "CHWR"
+    expansions:
+      - csi_section: "23 21 13"
+        meaning: "Chilled Water Return"
+        discipline: mechanical
+  - glyph: "HHW"
+    expansions:
+      - csi_section: "23 21 13"
+        meaning: "Heating Hot Water Piping"
+        discipline: mechanical
+  - glyph: "CWS"
+    expansions:
+      - csi_section: "23 25 13"
+        meaning: "Condenser Water Supply"
+        discipline: mechanical
+  - glyph: "CWR"
+    expansions:
+      - csi_section: "23 25 13"
+        meaning: "Condenser Water Return"
+        discipline: mechanical
+
+  # =========================================================================
+  # Plumbing piping (Div 22) — context-dependent with HVAC
+  # =========================================================================
+  - glyph: "CW"
+    expansions:
+      - csi_section: "22 11 16"
+        meaning: "Cold Water Piping (Domestic)"
+        discipline: plumbing
+  - glyph: "HW"
+    expansions:
+      - csi_section: "22 11 16"
+        meaning: "Hot Water Piping (Domestic)"
+        discipline: plumbing
+  - glyph: "HWR"
+    expansions:
+      - csi_section: "22 11 16"
+        meaning: "Hot Water Return / Recirculation"
+        discipline: plumbing
+  - glyph: "G"
+    expansions:
+      - csi_section: "22 11 23"
+        meaning: "Gas Piping"
+        discipline: plumbing
+  - glyph: "S"
+    expansions:
+      - csi_section: "22 13 16"
+        meaning: "Sanitary Sewer Piping"
+        discipline: plumbing
+  - glyph: "ST"
+    expansions:
+      - csi_section: "22 14 13"
+        meaning: "Storm Drain Piping"
+        discipline: plumbing
+  - glyph: "V"
+    expansions:
+      - csi_section: "22 13 19"
+        meaning: "Sanitary Vent Piping"
+        discipline: plumbing
+
+  # =========================================================================
+  # Fire Protection (Div 21)
+  # =========================================================================
+  - glyph: "SP"
+    expansions:
+      - csi_section: "21 13 13"
+        meaning: "Wet Pipe Sprinkler"
+        discipline: fire-protection
+  - glyph: "DP"
+    expansions:
+      - csi_section: "21 13 16"
+        meaning: "Dry Pipe Valve"
+        discipline: fire-protection
+      - csi_section: "26 24 16"
+        meaning: "Distribution Panel"
+        discipline: electrical
+  - glyph: "PG"
+    expansions:
+      - csi_section: "21 13 39"
+        meaning: "Pre-Action Sprinkler Riser"
+        discipline: fire-protection
+  - glyph: "FDC"
+    expansions:
+      - csi_section: "21 11 19"
+        meaning: "Fire Department Connection"
+        discipline: fire-protection
+  - glyph: "FH"
+    expansions:
+      - csi_section: "21 12 13"
+        meaning: "Fire Hose / Hose Cabinet"
+        discipline: fire-protection
+  - glyph: "FHC"
+    expansions:
+      - csi_section: "21 12 13"
+        meaning: "Fire Hose Cabinet"
+        discipline: fire-protection
+  - glyph: "FE"
+    expansions:
+      - csi_section: "10 44 13"
+        meaning: "Fire Extinguisher"
+        discipline: fire-protection
+  - glyph: "FEC"
+    expansions:
+      - csi_section: "10 44 16"
+        meaning: "Fire Extinguisher Cabinet"
+        discipline: fire-protection
+  - glyph: "OS&Y"
+    expansions:
+      - csi_section: "21 11 19"
+        meaning: "Outside Stem & Yoke Valve (sprinkler isolation)"
+        discipline: fire-protection
+  - glyph: "PIV"
+    expansions:
+      - csi_section: "21 11 19"
+        meaning: "Post Indicator Valve"
+        discipline: fire-protection
+
+  # =========================================================================
+  # Fire Alarm / Electronic Safety (Div 28)
+  # =========================================================================
+  - glyph: "FACP"
+    expansions:
+      - csi_section: "28 31 11"
+        meaning: "Fire Alarm Control Panel"
+        discipline: fire-protection
+  - glyph: "FAAP"
+    expansions:
+      - csi_section: "28 31 11"
+        meaning: "Fire Alarm Annunciator Panel"
+        discipline: fire-protection
+  - glyph: "HD"
+    expansions:
+      - csi_section: "28 31 11"
+        meaning: "Heat Detector"
+        discipline: fire-protection
+      - csi_section: "21 13 13"
+        meaning: "Sprinkler Head"
+        discipline: fire-protection
+  - glyph: "AV"
+    expansions:
+      - csi_section: "28 31 11"
+        meaning: "Audio/Visual Notification Device"
+        discipline: fire-protection
+  - glyph: "PS"
+    expansions:
+      - csi_section: "28 31 11"
+        meaning: "Manual Pull Station"
+        discipline: fire-protection
+  - glyph: "DUCT-SD"
+    expansions:
+      - csi_section: "28 31 11"
+        meaning: "Duct Smoke Detector"
+        discipline: fire-protection
+
+  # =========================================================================
+  # Electrical (Div 26)
+  # =========================================================================
+  - glyph: "LP"
+    expansions:
+      - csi_section: "26 24 16"
+        meaning: "Lighting Panel"
+        discipline: electrical
+  - glyph: "PP"
+    expansions:
+      - csi_section: "26 24 16"
+        meaning: "Power Panel"
+        discipline: electrical
+  - glyph: "MCC"
+    expansions:
+      - csi_section: "26 24 19"
+        meaning: "Motor Control Center"
+        discipline: electrical
+  - glyph: "MCP"
+    expansions:
+      - csi_section: "26 24 19"
+        meaning: "Motor Control Panel"
+        discipline: electrical
+  - glyph: "XFMR"
+    expansions:
+      - csi_section: "26 22 13"
+        meaning: "Transformer (Dry Type)"
+        discipline: electrical
+  - glyph: "SWBD"
+    expansions:
+      - csi_section: "26 24 13"
+        meaning: "Switchboard"
+        discipline: electrical
+  - glyph: "ATS"
+    expansions:
+      - csi_section: "26 36 23"
+        meaning: "Automatic Transfer Switch"
+        discipline: electrical
+  - glyph: "GEN"
+    expansions:
+      - csi_section: "26 32 13"
+        meaning: "Generator (Engine-Driven)"
+        discipline: electrical
+  - glyph: "UPS"
+    expansions:
+      - csi_section: "26 33 53"
+        meaning: "Uninterruptible Power Supply"
+        discipline: electrical
+  - glyph: "DISC"
+    expansions:
+      - csi_section: "26 28 16"
+        meaning: "Disconnect Switch"
+        discipline: electrical
+  - glyph: "CT"
+    expansions:
+      - csi_section: "26 27 13"
+        meaning: "Current Transformer / Metering"
+        discipline: electrical
+  - glyph: "REC"
+    expansions:
+      - csi_section: "26 27 26"
+        meaning: "Receptacle"
+        discipline: electrical
+  - glyph: "GFI"
+    expansions:
+      - csi_section: "26 27 26"
+        meaning: "GFI Receptacle"
+        discipline: electrical
+  - glyph: "WP"
+    expansions:
+      - csi_section: "26 27 26"
+        meaning: "Weatherproof Receptacle"
+        discipline: electrical
+  - glyph: "JB"
+    expansions:
+      - csi_section: "26 05 33"
+        meaning: "Junction Box"
+        discipline: electrical
+  - glyph: "OL"
+    expansions:
+      - csi_section: "26 51 13"
+        meaning: "Occupancy Sensor"
+        discipline: electrical
+  - glyph: "EM"
+    expansions:
+      - csi_section: "26 52 13"
+        meaning: "Emergency Lighting Fixture"
+        discipline: electrical
+  - glyph: "EXIT"
+    expansions:
+      - csi_section: "26 53 00"
+        meaning: "Exit Sign"
+        discipline: electrical
+
+  # =========================================================================
+  # Architectural — door / window / room (Div 08, 09)
+  # =========================================================================
+  - glyph: "DR"
+    expansions:
+      - csi_section: "08 14 16"
+        meaning: "Door (generic; consult door schedule for type)"
+        discipline: architectural
+  - glyph: "WIN"
+    expansions:
+      - csi_section: "08 51 13"
+        meaning: "Window (generic; consult window schedule for type)"
+        discipline: architectural
+  - glyph: "ST"
+    expansions:
+      - csi_section: "08 11 13"
+        meaning: "Hollow Metal Storefront / Steel Door"
+        discipline: architectural
+  - glyph: "WD"
+    expansions:
+      - csi_section: "08 14 16"
+        meaning: "Wood Door"
+        discipline: architectural
+  - glyph: "ALUM"
+    expansions:
+      - csi_section: "08 41 13"
+        meaning: "Aluminum-Framed Storefront"
+        discipline: architectural
+  - glyph: "OH"
+    expansions:
+      - csi_section: "08 36 13"
+        meaning: "Overhead Door"
+        discipline: architectural
+  - glyph: "ACT"
+    expansions:
+      - csi_section: "09 51 13"
+        meaning: "Acoustical Ceiling Tile"
+        discipline: interior
+  - glyph: "GYP"
+    expansions:
+      - csi_section: "09 21 16"
+        meaning: "Gypsum Board"
+        discipline: architectural
+  - glyph: "VCT"
+    expansions:
+      - csi_section: "09 65 13"
+        meaning: "Vinyl Composition Tile"
+        discipline: interior
+  - glyph: "LVT"
+    expansions:
+      - csi_section: "09 65 19"
+        meaning: "Luxury Vinyl Tile"
+        discipline: interior
+  - glyph: "CT-CER"
+    expansions:
+      - csi_section: "09 30 13"
+        meaning: "Ceramic Tile"
+        discipline: interior
+  - glyph: "CPT"
+    expansions:
+      - csi_section: "09 68 13"
+        meaning: "Carpet Tile"
+        discipline: interior
+  - glyph: "WD-FLR"
+    expansions:
+      - csi_section: "09 64 23"
+        meaning: "Wood Strip Flooring"
+        discipline: interior
+
+  # =========================================================================
+  # Civil / Site (Div 31, 32, 33)
+  # =========================================================================
+  - glyph: "MH"
+    expansions:
+      - csi_section: "33 39 13"
+        meaning: "Sanitary Sewer Manhole"
+        discipline: civil
+  - glyph: "SDMH"
+    expansions:
+      - csi_section: "33 49 13"
+        meaning: "Storm Drainage Manhole"
+        discipline: civil
+  - glyph: "CB"
+    expansions:
+      - csi_section: "33 49 13"
+        meaning: "Catch Basin"
+        discipline: civil
+  - glyph: "INL"
+    expansions:
+      - csi_section: "33 49 13"
+        meaning: "Storm Inlet"
+        discipline: civil
+  - glyph: "FH-EXT"
+    expansions:
+      - csi_section: "33 12 19"
+        meaning: "Fire Hydrant (existing)"
+        discipline: civil
+  - glyph: "GV"
+    expansions:
+      - csi_section: "33 12 16"
+        meaning: "Gate Valve"
+        discipline: civil
+  - glyph: "BLDG"
+    expansions:
+      - csi_section: "00 00 00"
+        meaning: "Building Footprint (general reference)"
+        discipline: civil
+  - glyph: "ACP"
+    expansions:
+      - csi_section: "32 12 16"
+        meaning: "Asphalt Concrete Pavement"
+        discipline: civil
+  - glyph: "PCC"
+    expansions:
+      - csi_section: "32 13 13"
+        meaning: "Portland Cement Concrete Pavement"
+        discipline: civil
+  - glyph: "CG"
+    expansions:
+      - csi_section: "32 16 13"
+        meaning: "Concrete Curb & Gutter"
+        discipline: civil
+  - glyph: "SW"
+    expansions:
+      - csi_section: "32 13 13"
+        meaning: "Sidewalk"
+        discipline: civil
+
+  # =========================================================================
+  # Structural (Div 03, 05)
+  # =========================================================================
+  - glyph: "FTG"
+    expansions:
+      - csi_section: "03 30 00"
+        meaning: "Concrete Footing"
+        discipline: structural
+  - glyph: "GB"
+    expansions:
+      - csi_section: "03 30 00"
+        meaning: "Grade Beam"
+        discipline: structural
+  - glyph: "PED"
+    expansions:
+      - csi_section: "03 30 00"
+        meaning: "Concrete Pedestal"
+        discipline: structural
+  - glyph: "WF"
+    expansions:
+      - csi_section: "05 12 23"
+        meaning: "Wide Flange Steel Beam"
+        discipline: structural
+  - glyph: "HSS"
+    expansions:
+      - csi_section: "05 12 23"
+        meaning: "Hollow Structural Section (Steel Tube)"
+        discipline: structural
+  - glyph: "C"
+    expansions:
+      - csi_section: "05 12 23"
+        meaning: "Steel Channel"
+        discipline: structural
+  - glyph: "L"
+    expansions:
+      - csi_section: "05 12 23"
+        meaning: "Steel Angle"
+        discipline: structural
+  - glyph: "REINF"
+    expansions:
+      - csi_section: "03 21 00"
+        meaning: "Concrete Reinforcing Steel"
+        discipline: structural
+  - glyph: "CMU"
+    expansions:
+      - csi_section: "04 22 00"
+        meaning: "Concrete Masonry Unit"
+        discipline: structural
